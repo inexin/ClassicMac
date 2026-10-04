@@ -773,7 +773,15 @@ public static class HfsWriter
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The size is not whole 512-byte blocks, or outside 400 KB to 2 GB.</exception>
     /// <exception cref="ArgumentException">The name is empty, over 27 bytes, has a colon, or a character Mac OS Roman has not.</exception>
-    public static byte[] Format(long size, string volumeName, MacDate? created = null) => HfsFormatter.Format(size, volumeName, created);
+    public static byte[] Format(long size, string volumeName, MacDate? created = null, uint? blockSize = null) =>
+        HfsFormatter.Format(size, volumeName, created, blockSize);
+
+    /// <summary>
+    /// The allocation block size Mac OS 9.0's initializer gives a volume of <paramref name="size"/> bytes (hfs.md §3.1),
+    /// which <see cref="Format"/> and <see cref="Resize"/> use when no block size is given; a larger multiple of 512
+    /// may be chosen instead.
+    /// </summary>
+    public static uint AutomaticBlockSize(long size) => HfsFormatter.AutomaticBlockSize(size);
 
     /// <summary>
     /// Writes a new, empty HFS volume to the file at <paramref name="path"/> (created, or replaced), laid out as
@@ -782,7 +790,8 @@ public static class HfsWriter
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The size is not whole 512-byte blocks, or outside 400 KB to 2 TB.</exception>
     /// <exception cref="ArgumentException">The name is empty, over 27 bytes, has a colon, or a character Mac OS Roman has not.</exception>
-    public static void FormatTo(string path, long size, string volumeName, MacDate? created = null) => HfsFormatter.FormatTo(path, size, volumeName, created);
+    public static void FormatTo(string path, long size, string volumeName, MacDate? created = null, uint? blockSize = null) =>
+        HfsFormatter.FormatTo(path, size, volumeName, created, blockSize);
 
     internal static HfsVolume FormatVolume(long size, string volumeName, MacDate? created = null) => HfsFormatter.FormatVolume(size, volumeName, created);
 
@@ -796,7 +805,7 @@ public static class HfsWriter
     /// The volume is not one the writer edits, or the size is not larger, or the volume would need more than 65,535
     /// allocation blocks of its size.
     /// </exception>
-    public static byte[] Resize(ForkData image, long size) => HfsResizer.Resize(image, size);
+    public static byte[] Resize(ForkData image, long size, uint? blockSize = null) => HfsResizer.Resize(image, size, blockSize);
 
     /// <summary>
     /// Lays the volume out again in its own size and geometry (hfs.md §3.4): every fork in one extent, in catalog order

@@ -325,19 +325,20 @@ entry writes more than one file.
 
 ### 3.4 format
 
-`classicmac format <file> --size <n> [--name <name>] [--overwrite] [--json]` writes a new, empty HFS volume image:
+`classicmac format <file> --size <n> [--name <name>] [--block-size <n>] [--overwrite] [--json]` writes a new, empty HFS volume image:
 `--size` in bytes or with K/KiB, M/MiB, G/GiB (400 KB to 2 TB, whole 512-byte blocks; only the volume's MDB, bitmap and B-trees are written, so a
 large volume is as quick to make as a small one), `--name` 1 to 27
-characters with no colon (default `Untitled`), laid out as [hfs.md §3.1](formats/file-systems/hfs.md#31-a-new-volume)
+characters with no colon (default `Untitled`), `--block-size` the allocation block size in bytes (a multiple of 512,
+large enough for 65,535 blocks; default the size Mac OS gives the volume), laid out as [hfs.md §3.1](formats/file-systems/hfs.md#31-a-new-volume)
 and checked before it is written. An existing file is replaced only with `--overwrite` (exit 4 otherwise); a size or
 name HFS cannot hold is a usage error (exit 2). It prints `Wrote <file> (HFS "<name>", <size> bytes, <n>-byte blocks)`;
 `--json`: `{ "written": [file], "name", "size", "blockSize" }`.
 
-`classicmac resize <file> --size <n>` grows or shrinks a plain HFS volume image, with the write options (`-o`, `--in-place`,
+`classicmac resize <file> --size <n> [--block-size <n>]` grows or shrinks a plain HFS volume image, with the write options (`-o`, `--in-place`,
 `--dry-run`, `--json`): grown, the new space is free at the end ([hfs.md §3.2](formats/file-systems/hfs.md#32-growing-a-volume));
 shrunk, what lies past the new end is moved down first ([hfs.md §3.3](formats/file-systems/hfs.md#33-shrinking-a-volume)).
 Past 65,535 allocation blocks of its block size the volume is laid out again with the block size Mac OS gives the new
-size (each fork in one extent). A size over 2 GB, one too small for the blocks in use, a shrink with no free run to
+size (each fork in one extent); a `--block-size` other than the volume's lays it out again at that size the same way. A size over 2 GB, one too small for the blocks in use, a shrink with no free run to
 move an extent to, and a partitioned disk's partition are refused (exit 2). The MCP server's `resize` tool takes `session` and `size`.
 
 ### 3.5 Exit codes

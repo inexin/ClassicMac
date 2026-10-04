@@ -446,7 +446,7 @@ public sealed class InputEditSession
     /// Grows or shrinks a plain volume image to <paramref name="size"/> bytes (hfs.md §3.2, §3.3); not a partitioned
     /// disk's partition, nor a Disk Copy or NDIF image's disk.
     /// </summary>
-    public void Resize(long size)
+    public void Resize(long size, uint? blockSize = null)
     {
         if (volumes.Count > 1)
         {
@@ -465,9 +465,10 @@ public sealed class InputEditSession
         }
 
         // Resizing rewrites the volume whole: it is held in memory from here, and saved whole.
-        volume.Overlay = new HfsVolume(ForkData.FromBytes(HfsWriter.Resize(Overlay(volume).AsForkData(), size)));
+        volume.Overlay = new HfsVolume(ForkData.FromBytes(HfsWriter.Resize(Overlay(volume).AsForkData(), size, blockSize)));
         resized = true;
-        changes.Add(new PlannedChange("resize", "", $"to {size.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} bytes"));
+        changes.Add(new PlannedChange("resize", "", $"to {size.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} bytes"
+            + (blockSize is { } blocks ? $", {blocks.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)}-byte blocks" : "")));
     }
 
     /// <summary>

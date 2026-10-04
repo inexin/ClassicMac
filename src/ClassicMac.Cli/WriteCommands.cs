@@ -173,7 +173,8 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
         var name = new Option<string>("--name") { Description = "The volume's name (1 to 27 characters, no colon)", DefaultValueFactory = _ => "Untitled" };
         var overwrite = new Option<bool>("--overwrite") { Description = "Replace an existing file" };
         var json = new Option<bool>("--json") { Description = "Print the result as JSON" };
-        var command = new Command("format", "Make a new, empty HFS volume image") { file, size, name, overwrite, json };
+        var blockSizeOption = BlockSizeOption();
+        var command = new Command("format", "Make a new, empty HFS volume image") { file, size, name, overwrite, json, blockSizeOption };
         command.SetAction(result =>
         {
             var path = result.GetRequiredValue(file).FullName;
@@ -189,7 +190,7 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
             // takes no more time or memory than a small one.
             try
             {
-                HfsWriter.FormatTo(path, bytes, volumeName);
+                HfsWriter.FormatTo(path, bytes, volumeName, blockSize: result.GetValue(blockSizeOption));
             }
             catch (ArgumentException e)
             {
@@ -232,16 +233,25 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
             Required = true,
             CustomParser = CommandLine.ParseSize,
         };
+        var blockSize = BlockSizeOption();
         var options = NewWriteOptions();
-        var command = new Command("resize", "Grow a plain HFS volume image") { path, size };
+        var command = new Command("resize", "Grow or shrink a plain HFS volume image") { path, size, blockSize };
         AddWriteOptions(command, options);
         command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (_, _, _) =>
         {
             var bytes = result.GetRequiredValue(size);
-            return session => session.Resize(bytes);
+            var blocks = result.GetValue(blockSize);
+            return session => session.Resize(bytes, blocks);
         }));
         return command;
     }
+
+    // --block-size: the allocation block size in bytes (a multiple of 512 at least the automatic one); the initializer's
+    // automatic size when left out (hfs.md §3.1).
+    private static Option<uint?> BlockSizeOption() => new("--block-size")
+    {
+        Description = "The allocation block size in bytes: a multiple of 512, at least what the size needs (default: the size Mac OS gives it)",
+    };
 
     // repair: First Aid's repair of a volume (cli.md §3.2); the verify after it decides the exit code.
     private Command RepairCommand()

@@ -220,6 +220,47 @@ public sealed class HfsResizeTests
         Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(grown)).Verdict);
     }
 
+    // A chosen allocation block size (hfs.md §3.1, §3.2): the initializer's automatic one, or a larger multiple of 512.
+    [Theory]
+    [InlineData(800L * 1024, 512u)]
+    [InlineData(20L * 1024 * 1024, 512u)]
+    [InlineData(40L * 1024 * 1024, 1024u)]
+    [InlineData(100L * 1024 * 1024, 2048u)]
+    public void The_automatic_block_size_is_the_initializer_s(long size, uint expected)
+    {
+        Assert.Equal(expected, HfsWriter.AutomaticBlockSize(size));
+        Assert.Equal(expected, BinaryPrimitives.ReadUInt32BigEndian(HfsWriter.Format(size, "Disk").AsSpan(Mdb + 0x14)));
+    }
+
+    [Fact]
+    public void Format_takes_a_larger_block_size()
+    {
+        var image = HfsWriter.Format(20 * 1024 * 1024, "Disk", blockSize: 4096);
+
+        Assert.Equal(4096u, BinaryPrimitives.ReadUInt32BigEndian(image.AsSpan(Mdb + 0x14)));
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(image)));
+        Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(image)).Verdict);
+        Assert.Throws<ArgumentOutOfRangeException>(() => HfsWriter.Format(20 * 1024 * 1024, "Disk", blockSize: 1000));    // not 512s
+        Assert.Throws<ArgumentOutOfRangeException>(() => HfsWriter.Format(100L * 1024 * 1024, "Disk", blockSize: 512));  // past 65,535 blocks
+    }
+
+    [Theory]
+    [InlineData(20L * 1024 * 1024, 2048u)]                                             // the same size, larger blocks
+    [InlineData(40L * 1024 * 1024, 4096u)]                                             // larger, larger blocks
+    [InlineData(10L * 1024 * 1024, 1024u)]                                             // smaller, larger blocks
+    public void Resize_lays_the_volume_out_again_at_a_chosen_block_size(long size, uint blockSize)
+    {
+        var source = Volume(20 * 1024 * 1024);
+
+        var resized = HfsWriter.Resize(ForkData.FromBytes(source), size, blockSize);
+
+        Assert.Equal(size, resized.Length);
+        Assert.Equal(blockSize, BinaryPrimitives.ReadUInt32BigEndian(resized.AsSpan(Mdb + 0x14)));
+        AssertSameFiles(source, resized);
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(resized)));
+        Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(resized)).Verdict);
+    }
+
     [Fact]
     public void The_same_size_and_odd_sizes_are_refused()
     {

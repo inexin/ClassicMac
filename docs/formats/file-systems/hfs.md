@@ -521,7 +521,7 @@ size in sectors.
 | Part | Rule | Source |
 | --- | --- | --- |
 | Sectors 0 to `drAlBlSt` + both B-trees | Zero (no boot blocks); the rest of the disk is not written | [Code: 0x1D254] |
-| `drAlBlkSiz` | ((N >> 16) + 1) × 512, plus 512 when that is a multiple of 65,536. Not the smallest size that fits: 32 MB gets 1,024, 64 MB 1,536 | [Code: 0x2C22] |
+| `drAlBlkSiz` | ((N >> 16) + 1) × 512, plus 512 when that is a multiple of 65,536. Not the smallest size that fits: 32 MB gets 1,024, 64 MB 1,536. A caller may give a larger multiple of 512 instead; the rest of the layout follows from it, with each B-tree file at least a header node and one more [ClassicMac: the caller's path not traced] | [Code: 0x2C22] |
 | `drVBMSt`, bitmap | Sector 3; ⌈⌊N ÷ a⌋ ÷ 4096⌉ sectors | [Code] |
 | `drAlBlSt` | 3 + the bitmap's sectors | [Code] |
 | `drNmAlBlks` | ⌊(N − `drAlBlSt` − 2) ÷ a⌋: the alternate MDB and the last sector outside | [Code] |

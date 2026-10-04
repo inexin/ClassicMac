@@ -12,20 +12,28 @@ namespace ClassicMac.Files.Hfs;
 // HfsWriter.Format: a new volume laid out as Mac OS 9.0's initializer lays it out (hfs.md §3.1).
 internal static class HfsFormatter
 {
-    internal static byte[] Format(long size, string volumeName, MacDate? created = null)
+    // The allocation block size Mac OS 9.0's initializer gives N sectors with no caller's value: ((N >> 16) + 1) × 512,
+    // one sector more when that is a multiple of 65,536 [Code: Mac OS 9.0 ptch -20217 0x2C22].
+    internal static uint AutomaticBlockSize(long size)
+    {
+        long blockBytes = ((size / BlockSize >> 16) + 1) * BlockSize;
+        return (uint)(blockBytes % 65536 == 0 ? blockBytes + BlockSize : blockBytes);
+    }
+
+    internal static byte[] Format(long size, string volumeName, MacDate? created = null, uint? blockSize = null)
     {
         if (size > MaximumFormatSize)
         {
             throw new ArgumentOutOfRangeException(nameof(size), "An HFS volume made in memory is at most just under 2 GB; FormatTo writes larger ones.");
         }
 
-        return FormatVolume(size, volumeName, created).ToArray();
+        return FormatVolume(size, volumeName, created, blockSize).ToArray();
     }
 
-    internal static void FormatTo(string path, long size, string volumeName, MacDate? created = null)
+    internal static void FormatTo(string path, long size, string volumeName, MacDate? created = null, uint? blockSize = null)
     {
         ArgumentNullException.ThrowIfNull(path);
-        var volume = FormatVolume(size, volumeName, created);
+        var volume = FormatVolume(size, volumeName, created, blockSize);
         using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
         stream.SetLength(size);
         var sector = new byte[BlockSize];
@@ -38,7 +46,7 @@ internal static class HfsFormatter
     }
 
     // The new volume over zeros, only its MDB, bitmap, B-trees and alternate MDB written.
-    internal static HfsVolume FormatVolume(long size, string volumeName, MacDate? created = null)
+    internal static HfsVolume FormatVolume(long size, string volumeName, MacDate? created = null, uint? requestedBlockSize = null)
     {
         ArgumentNullException.ThrowIfNull(volumeName);
         if (size % BlockSize != 0 || size < MinimumFormatSize || size > MaximumFormatToSize)
@@ -56,20 +64,29 @@ internal static class HfsFormatter
         // that is a multiple of 65,536 [Code: 0x2C22]; the bitmap from sector 3, one sector per 4,096 blocks of
         // ⌊N ÷ a⌋; the allocation area after it, up to the alternate MDB and the spare sector at the end.
         long sectors = size / BlockSize;
-        long blockBytes = ((sectors >> 16) + 1) * BlockSize;
-        if (blockBytes % 65536 == 0)
+        // A caller's block size, as the initializer takes one: a multiple of 512 that keeps the volume within 65,535
+        // blocks [ClassicMac: the caller's path of the initializer not traced].
+        long blockBytes = requestedBlockSize ?? AutomaticBlockSize(size);
+        if (blockBytes < BlockSize || blockBytes % BlockSize != 0)
         {
-            blockBytes += BlockSize;
+            throw new ArgumentOutOfRangeException(nameof(requestedBlockSize), "An allocation block is a multiple of 512 bytes.");
         }
 
         long factor = blockBytes / BlockSize;
         long bitmapSectors = (sectors / factor + 4095) / 4096;
         long count = (sectors - 3 - bitmapSectors - 2) / factor;
+        if (count > ushort.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(nameof(requestedBlockSize),
+                $"{size} bytes in blocks of {blockBytes} bytes is {count} blocks; HFS has at most 65,535 (blocks of {AutomaticBlockSize(size)} bytes or more fit).");
+        }
+
         uint blockSize = checked((uint)blockBytes);
 
         // Each B-tree file: min(N ÷ 128, 2,048) sectors rounded down to whole allocation blocks; one block when a block
         // is 1 MB or more, four when N ≤ 128. It is the files' size and their clump size [Code: 0x2F7A].
         long treeBlocks = blockBytes >= 1024 * 1024 ? 1 : sectors <= 128 ? 4 : Math.Min(sectors >> 7, 2048) / factor;
+        treeBlocks = Math.Max(treeBlocks, (2 * NodeSize + blockBytes - 1) / blockBytes);   // a header and one node, with large blocks
         long treeBytes = treeBlocks * blockSize;
         if (treeBytes < 2 * NodeSize || 2 * treeBlocks >= count)
         {

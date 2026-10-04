@@ -63,6 +63,22 @@ public sealed class FormatCommandTests : IDisposable
         Assert.Equal(ExitCodes.Usage, Run("resize", disk, "--size", "3G", "-o", big).Code);             // past what is made in memory
     }
 
+    // --block-size: a larger allocation block than the initializer's, for format and resize.
+    [Fact]
+    public void Format_and_resize_take_a_block_size()
+    {
+        var disk = Path.Combine(folder, "blocks.img");
+        var (code, output, error) = Run("format", disk, "--size", "20M", "--block-size", "4096");
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.Contains("4,096-byte blocks", output);
+        Assert.Equal(ExitCodes.Usage, Run("format", Path.Combine(folder, "odd.img"), "--size", "20M", "--block-size", "1000").Code);
+
+        var resized = Path.Combine(folder, "resized.img");
+        Assert.Equal(ExitCodes.Success, Run("resize", disk, "--size", "20M", "--block-size", "8192", "-o", resized).Code);
+        Assert.Equal(8192, HfsReader.Instance.ReadVolumeInfo(ForkData.FromFile(resized))!.BlockSize);
+        Assert.Equal(ExitCodes.Success, Run("check", resized).Code);
+    }
+
     // defrag (docs/cli.md §3.4): a volume whose free space lies in gaps between a file's pieces laid out again.
     [Fact]
     public void Defrag_lays_every_fork_out_whole()

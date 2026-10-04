@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `format --block-size` and `resize --block-size`: a larger allocation block size than Mac OS's automatic one; a resize to another block size lays the volume out again (hfs.md §3.1, §3.2).
 - App: Volume ▸ Resize… grows or shrinks a plain HFS volume image, showing its size, the smallest it shrinks to and the largest; sizes are typed as in the CLI (bytes, or K, M, G).
 - A container whose data is shorter than its structures say is reported as unreadable (`container.unreadable`) and kept, as damaged data is, instead of ending the read.
 - Fragmentation (hfs.md §5.7): `stat` on an HFS volume shows how many files lie in more than one extent and how the

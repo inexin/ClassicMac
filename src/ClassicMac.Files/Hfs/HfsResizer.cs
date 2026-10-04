@@ -15,7 +15,7 @@ namespace ClassicMac.Files.Hfs;
 // in its own geometry (hfs.md §3.2–§3.4).
 internal static class HfsResizer
 {
-    internal static byte[] Resize(ForkData image, long size)
+    internal static byte[] Resize(ForkData image, long size, uint? blockSize = null)
     {
         ArgumentNullException.ThrowIfNull(image);
         if (size % BlockSize != 0 || size <= 0 || size > MaximumFormatSize)
@@ -25,6 +25,14 @@ internal static class HfsResizer
 
         var state = OpenCatalog(image);
         var source = state.Source.ToArray();
+        if (blockSize is { } chosen && chosen != state.BlockSize)
+        {
+            // Another block size: every extent changes, so the volume is laid out again in the new geometry (§3.2).
+            var template = HfsFormatter.FormatVolume(size, "Untitled", null, chosen).ToArray();
+            var layout = new BigEndianReader(template.AsMemory(MdbOffset, MdbSize));
+            return Relayout(state, source, template, layout.ReadUInt16At(0x88), layout.ReadUInt16At(0x98));
+        }
+
         if (size < source.Length)
         {
             return Shrink(state, source, size);
