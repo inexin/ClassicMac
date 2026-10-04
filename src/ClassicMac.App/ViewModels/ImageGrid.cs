@@ -15,7 +15,7 @@ public sealed record FinderStatesRow(IReadOnlyList<ImageItem> Items, double MaxW
 
 // The image preview's grid (design/boards/main-window.md, P1): the summary line, Show masks and Finder states, and the
 // cards cut into rows for the viewport's width, so a list of hundreds of images is a virtualising list of rows.
-public sealed partial class MainViewModel
+public sealed partial class ImageGrid(MainViewModel main) : ObservableObject
 {
     private const double CardGap = 12;
 
@@ -39,17 +39,17 @@ public sealed partial class MainViewModel
     [ObservableProperty]
     private IReadOnlyList<object> imageRows = [];
 
-    public bool HasMasks => Preview.Masks.Count > 0;
+    public bool HasMasks => main.Preview.Masks.Count > 0;
 
-    public bool HasFinderStates => Preview.FinderStates.Count > 0;
+    public bool HasFinderStates => main.Preview.FinderStates.Count > 0;
 
     /// <summary>The Finder states at 2× when the zoom is 2 or more, else 1×.</summary>
     public IReadOnlyList<ImageItem> FinderStateItems
     {
         get
         {
-            var zoom = Zoom >= 2 ? 2 : 1;
-            return Preview.FinderStates.Select(s => new ImageItem(s, s.Width * zoom, s.Height * zoom, zoom)).ToList();
+            var zoom = main.Zoom >= 2 ? 2 : 1;
+            return main.Preview.FinderStates.Select(s => new ImageItem(s, s.Width * zoom, s.Height * zoom, zoom)).ToList();
         }
     }
 
@@ -58,22 +58,23 @@ public sealed partial class MainViewModel
     {
         get
         {
-            var count = Preview.Images.Count;
-            var noun = Preview.IsFamily ? count == 1 ? "member" : "members" : count == 1 ? "image" : "images";
-            return string.Create(CultureInfo.InvariantCulture, $"{count} {noun} · {Zoom}× · nearest neighbour · {ScreenDepth}-bit screen");
+            var count = main.Preview.Images.Count;
+            var noun = main.Preview.IsFamily ? count == 1 ? "member" : "members" : count == 1 ? "image" : "images";
+            return string.Create(CultureInfo.InvariantCulture, $"{count} {noun} · {main.Zoom}× · nearest neighbour · {main.ScreenDepth}-bit screen");
         }
     }
 
     /// <summary>Every card's width: the widest image at the zoom with its padding, at least room for the caption.</summary>
-    public double ImageCardWidth => Math.Max(MinCardWidth, Images.Count == 0 ? 0 : Images.Max(i => i.Width) + CardPadding);
+    public double ImageCardWidth => Math.Max(MinCardWidth, main.Images.Count == 0 ? 0 : main.Images.Max(i => i.Width) + CardPadding);
 
-    partial void OnShowMasksChanged(bool value) => Images = ItemsAt(Preview, Zoom);
+    partial void OnShowMasksChanged(bool value) => main.Images = main.ItemsAt(main.Preview, main.Zoom);
 
     partial void OnShowFinderStatesChanged(bool value) => LayOutImages();
 
     partial void OnImageViewportWidthChanged(double value) => LayOutImages();
 
-    partial void OnImagesChanged(IReadOnlyList<ImageItem> value)
+    // MainViewModel.Images changed: the grid follows.
+    internal void ImagesChanged()
     {
         OnPropertyChanged(nameof(ImageCardWidth));
         OnPropertyChanged(nameof(ImageSummary));
@@ -89,9 +90,9 @@ public sealed partial class MainViewModel
         // The list has a 12 margin on each side and every card a 12 gap after it.
         var columns = ImageViewportWidth <= 0 ? 4 : Math.Max(1, (int)((ImageViewportWidth - 2 * CardGap) / (ImageCardWidth + CardGap)));
         var rows = new List<object>();
-        for (var i = 0; i < Images.Count; i += columns)
+        for (var i = 0; i < main.Images.Count; i += columns)
         {
-            rows.Add(new ImageRow(Images.Skip(i).Take(columns).ToList()));
+            rows.Add(new ImageRow(main.Images.Skip(i).Take(columns).ToList()));
         }
 
         if (ShowFinderStates && HasFinderStates)

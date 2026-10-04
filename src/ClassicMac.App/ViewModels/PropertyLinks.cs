@@ -7,7 +7,7 @@ namespace ClassicMac.App.ViewModels;
 
 // The property view's Properties | JSON switch (design/boards/property-view.md, P2): Properties by default, the choice
 // kept for the session.
-public sealed partial class MainViewModel
+public sealed partial class PropertyLinks(MainViewModel main) : ObservableObject
 {
     /// <summary>Whether a JSON preview shows its JSON rather than its properties.</summary>
     [ObservableProperty]
@@ -25,16 +25,16 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>Whether the preview shows property cards.</summary>
-    public bool ShowsProperties => Preview.IsJson && !ShowJson && Preview.PropertyCards.Count > 0;
+    public bool ShowsProperties => main.Preview.IsJson && !ShowJson && main.Preview.PropertyCards.Count > 0;
 
     /// <summary>Whether the preview shows the JSON text: on request, or when it has no properties to show.</summary>
-    public bool ShowsJsonText => Preview.IsJson && (ShowJson || Preview.PropertyCards.Count == 0);
+    public bool ShowsJsonText => main.Preview.IsJson && (ShowJson || main.Preview.PropertyCards.Count == 0);
 
     /// <summary>Whether a font family shows its sample and tables (P6).</summary>
-    public bool ShowsFontFamily => Preview.IsFontFamily && !ShowJson;
+    public bool ShowsFontFamily => main.Preview.IsFontFamily && !ShowJson;
 
     /// <summary>Whether a font family shows its JSON.</summary>
-    public bool ShowsFontJson => Preview.IsFontFamily && ShowJson;
+    public bool ShowsFontJson => main.Preview.IsFontFamily && ShowJson;
 
     /// <summary>
     /// A font family's resource link (a matrix cell or the sample's source): selects that resource of the family's
@@ -43,7 +43,7 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanSelectFontResource))]
     private void SelectFontResource(object? target)
     {
-        if (Link(target) is not { } link || Selected is not ResourceNode { Parent.Parent: { } owner })
+        if (Link(target) is not { } link || main.Selected is not ResourceNode { Parent.Parent: { } owner })
         {
             return;
         }
@@ -51,7 +51,7 @@ public sealed partial class MainViewModel
         if (owner.Children.OfType<ResourceTypeNode>().FirstOrDefault(t => t.Type.ToString() == link.Type)?
             .Children.OfType<ResourceNode>().FirstOrDefault(r => r.Resource.Id == link.Id) is { } node)
         {
-            Selected = node;
+            main.Selected = node;
         }
     }
 
@@ -66,11 +66,11 @@ public sealed partial class MainViewModel
 
     /// <summary>A row's right-click Copy as decimal, hex or JSON: <paramref name="text"/> on the clipboard.</summary>
     [RelayCommand(CanExecute = nameof(CanCopyProperty))]
-    private Task CopyProperty(string? text) => text is null ? Task.CompletedTask : Shell?.CopyTextAsync(text) ?? Task.CompletedTask;
+    private Task CopyProperty(string? text) => text is null ? Task.CompletedTask : main.Shell?.CopyTextAsync(text) ?? Task.CompletedTask;
 
     private static bool CanCopyProperty(string? text) => text is not null;
 
-    private void OnPropertyPreviewChanged()
+    internal void OnPropertyPreviewChanged()
     {
         OnPropertyChanged(nameof(ShowsProperties));
         OnPropertyChanged(nameof(ShowsJsonText));

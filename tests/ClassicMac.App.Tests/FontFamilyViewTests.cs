@@ -100,11 +100,11 @@ public sealed class FontFamilyViewTests
             // JSON is one click away.
             model.Selected = fond;
             Headless.Pump(model.PreviewTask);
-            model.PropertyModeIndex = 1;
+            model.PropertyLinks.PropertyModeIndex = 1;
             Dispatcher.UIThread.RunJobs();
             Assert.False(view.IsEffectivelyVisible);
             Assert.True(window.FindControl<ScrollViewer>("FontJson")!.IsEffectivelyVisible);
-            model.PropertyModeIndex = 0;
+            model.PropertyLinks.PropertyModeIndex = 0;
             window.Close();
             Baselines.Verify(baselines);
         }

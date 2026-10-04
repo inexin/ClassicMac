@@ -44,11 +44,11 @@ public sealed class ImageGridTests : IDisposable
         var preview = model.Preview;
         Assert.Equal(["'ICN#'", "'icl8'", "'ics#'"], preview.Images.Select(i => i.Title));
         Assert.Equal(["32×32 · 1-bit", "32×32 · 8-bit", "16×16 · 1-bit"], preview.Images.Select(i => i.Detail));
-        Assert.Equal("3 members · 4× · nearest neighbour · 32-bit screen", model.ImageSummary);
+        Assert.Equal("3 members · 4× · nearest neighbour · 32-bit screen", model.ImageGrid.ImageSummary);
 
         await Select(model, input, "ICN#", 129);                              // alone: one member
         Assert.Equal(["'ICN#'"], model.Preview.Images.Select(i => i.Title));
-        Assert.StartsWith("1 member · ", model.ImageSummary);
+        Assert.StartsWith("1 member · ", model.ImageGrid.ImageSummary);
     }
 
     [Fact]
@@ -56,10 +56,10 @@ public sealed class ImageGridTests : IDisposable
     {
         var (model, input) = await Family();
         await Select(model, input, "ICN#", 128);
-        Assert.True(model.HasMasks);
-        Assert.False(model.ShowMasks);
+        Assert.True(model.ImageGrid.HasMasks);
+        Assert.False(model.ImageGrid.ShowMasks);
         Assert.Equal(3, model.Images.Count);
-        model.ShowMasks = true;
+        model.ImageGrid.ShowMasks = true;
         Assert.Equal(["'ICN#'", "'ICN#' mask", "'icl8'", "'ics#'", "'ics#' mask"], model.Images.Select(i => i.Image.Title));
         Assert.Equal((32, 32), (model.Images[1].Image.Width, model.Images[1].Image.Height));
     }
@@ -69,21 +69,21 @@ public sealed class ImageGridTests : IDisposable
     {
         var (model, input) = await Family();
         await Select(model, input, "ICN#", 128);
-        Assert.True(model.HasFinderStates);
-        Assert.True(model.ShowFinderStates);
+        Assert.True(model.ImageGrid.HasFinderStates);
+        Assert.True(model.ImageGrid.ShowFinderStates);
         Assert.Equal(["Normal", "Selected", "Disabled", "Offline", "Open", "Essential", "Hot", "In Progress", "Cool", "Personal", "Project 1", "Project 2"],
             model.Preview.FinderStates.Select(s => s.Caption));
         Assert.All(model.Preview.FinderStates, s => Assert.Equal((32, 32), (s.Width, s.Height)));
         Assert.Equal(4, model.Zoom);
-        Assert.All(model.FinderStateItems, s => Assert.Equal(2, s.Zoom));      // 2× when the zoom is 2 or more
+        Assert.All(model.ImageGrid.FinderStateItems, s => Assert.Equal(2, s.Zoom));      // 2× when the zoom is 2 or more
         model.Zoom = 1;
-        Assert.All(model.FinderStateItems, s => Assert.Equal(1, s.Zoom));
-        model.ShowFinderStates = false;
-        Assert.DoesNotContain(model.ImageRows, r => r is FinderStatesRow);
-        model.ShowFinderStates = true;
-        Assert.IsType<FinderStatesRow>(model.ImageRows[^1]);
-        model.ImageViewportWidth = 300;                                       // the strip wraps inside the margins
-        Assert.Equal(276, ((FinderStatesRow)model.ImageRows[^1]).MaxWidth);
+        Assert.All(model.ImageGrid.FinderStateItems, s => Assert.Equal(1, s.Zoom));
+        model.ImageGrid.ShowFinderStates = false;
+        Assert.DoesNotContain(model.ImageGrid.ImageRows, r => r is FinderStatesRow);
+        model.ImageGrid.ShowFinderStates = true;
+        Assert.IsType<FinderStatesRow>(model.ImageGrid.ImageRows[^1]);
+        model.ImageGrid.ImageViewportWidth = 300;                                       // the strip wraps inside the margins
+        Assert.Equal(276, ((FinderStatesRow)model.ImageGrid.ImageRows[^1]).MaxWidth);
     }
 
     [Fact]
@@ -92,9 +92,9 @@ public sealed class ImageGridTests : IDisposable
         var (model, input) = await Open(("PICT", 128, null, PreviewTests.Picture));
         await Select(model, input, "PICT", 128);
         Assert.Equal(("'PICT'", "4×4"), (model.Preview.Images[0].Title, model.Preview.Images[0].Detail));
-        Assert.False(model.HasMasks);
-        Assert.False(model.HasFinderStates);
-        Assert.Equal("1 image · 4× · nearest neighbour · 32-bit screen", model.ImageSummary);
+        Assert.False(model.ImageGrid.HasMasks);
+        Assert.False(model.ImageGrid.HasFinderStates);
+        Assert.Equal("1 image · 4× · nearest neighbour · 32-bit screen", model.ImageGrid.ImageSummary);
     }
 
     [Fact]
@@ -105,16 +105,16 @@ public sealed class ImageGridTests : IDisposable
         await Select(model, input, "SICN", 128);
         Assert.Equal(500, model.Images.Count);
         Assert.Equal(("'SICN' #1", "16×16 · 1-bit"), (model.Images[0].Image.Title, model.Images[0].Image.Detail));
-        Assert.StartsWith("500 images · ", model.ImageSummary);
-        var card = model.ImageCardWidth;
+        Assert.StartsWith("500 images · ", model.ImageGrid.ImageSummary);
+        var card = model.ImageGrid.ImageCardWidth;
         Assert.True(card >= 16 * model.Zoom + 24);
 
-        model.ImageViewportWidth = 24 + 4 * (card + 12);                      // four cards, their gaps and the margins
-        var rows = model.ImageRows.OfType<ImageRow>().ToList();
+        model.ImageGrid.ImageViewportWidth = 24 + 4 * (card + 12);                      // four cards, their gaps and the margins
+        var rows = model.ImageGrid.ImageRows.OfType<ImageRow>().ToList();
         Assert.Equal(125, rows.Count);
         Assert.All(rows, r => Assert.Equal(4, r.Items.Count));
         Assert.Equal(model.Images[4], rows[1].Items[0]);
-        model.ImageViewportWidth = 10;                                        // narrower than a card: one a row
-        Assert.Equal(500, model.ImageRows.Count);
+        model.ImageGrid.ImageViewportWidth = 10;                                        // narrower than a card: one a row
+        Assert.Equal(500, model.ImageGrid.ImageRows.Count);
     }
 }

@@ -45,7 +45,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
         {
             if (DataContext is MainViewModel model)
             {
-                model.ImageViewportWidth = e.NewSize.Width;
+                model.ImageGrid.ImageViewportWidth = e.NewSize.Width;
             }
         };
         DataContextChanged += (_, _) =>
@@ -275,7 +275,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
     {
         if (DataContext is MainViewModel model && sender is MenuItem { Tag: string text })
         {
-            model.CopyPropertyCommand.Execute(text);
+            model.PropertyLinks.CopyPropertyCommand.Execute(text);
         }
     }
 

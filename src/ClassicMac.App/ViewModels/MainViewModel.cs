@@ -67,6 +67,16 @@ public interface IFilePicker
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    private ImageGrid? imageGrid;
+
+    /// <summary>The image grid of an image resource's preview: its items, masks, Finder states and layout.</summary>
+    public ImageGrid ImageGrid => imageGrid ??= new(this);
+
+    private PropertyLinks? propertyLinks;
+
+    /// <summary>The Properties tab's links and copy actions.</summary>
+    public PropertyLinks PropertyLinks => propertyLinks ??= new(this);
+
     // For the window's parts: raises PropertyChanged for one of this view model's properties.
     internal void RaisePropertyChanged(string name) => OnPropertyChanged(name);
 
@@ -190,6 +200,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private IReadOnlyList<ImageItem> images = [];
+
+    partial void OnImagesChanged(IReadOnlyList<ImageItem> value) => ImageGrid.ImagesChanged();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasHex))]
@@ -315,7 +327,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private bool CanClose() => Selected is not null;
 
-    private void Report(DiagnosticEntry entry) => DiagnosticsPanel.Add(entry);
+    internal void Report(DiagnosticEntry entry) => DiagnosticsPanel.Add(entry);
 
     private void OnSelectedChanged(NodeViewModel? value)
     {
@@ -338,15 +350,15 @@ public sealed partial class MainViewModel : ObservableObject
     {
         Images = ItemsAt(value, Zoom);
         OnSoundPreviewChanged();
-        OnPropertyPreviewChanged();
+        PropertyLinks.OnPropertyPreviewChanged();
         OnHelpPreviewChanged();
     }
 
     partial void OnHexSourceChanged(HexSource? value) => HexLines = value is null ? null : new HexLines(value.Data);
 
     // The cards: each image at the zoom, with its mask after it when "Show masks" is on.
-    private IReadOnlyList<ImageItem> ItemsAt(PreviewViewModel preview, int zoom) =>
-        preview.Images.SelectMany(i => ShowMasks ? preview.Masks.Where(m => m.Title == i.Title + " mask").Prepend(i) : [i])
+    internal IReadOnlyList<ImageItem> ItemsAt(PreviewViewModel preview, int zoom) =>
+        preview.Images.SelectMany(i => ImageGrid.ShowMasks ? preview.Masks.Where(m => m.Title == i.Title + " mask").Prepend(i) : [i])
             .Select(i => new ImageItem(i, i.Width * zoom, i.Height * zoom, zoom)).ToList();
 
     // Decodes the selection's preview off the UI thread; a newer selection cancels an older one.

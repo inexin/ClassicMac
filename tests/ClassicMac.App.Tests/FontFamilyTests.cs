@@ -124,16 +124,16 @@ public sealed class FontFamilyTests : IDisposable
     public async Task A_cell_selects_its_resource()
     {
         var (model, input, font) = await Open();
-        model.SelectFontResourceCommand.Execute(font.Rows[1].Cells[1]);
+        model.PropertyLinks.SelectFontResourceCommand.Execute(font.Rows[1].Cells[1]);
         Assert.Same(Resource(input, "NFNT", 1003), model.Selected);
 
         // A missing one cannot be selected.
         model.Selected = Resource(input, "FOND", 128);
         await model.PreviewTask;
         font = model.Preview.FontFamily!;
-        Assert.False(model.SelectFontResourceCommand.CanExecute(font.Rows[1].Cells[4]));
-        Assert.False(model.SelectFontResourceCommand.CanExecute(font.Rows[0].Cells[1]));
-        model.SelectFontResourceCommand.Execute(font.SampleLink);
+        Assert.False(model.PropertyLinks.SelectFontResourceCommand.CanExecute(font.Rows[1].Cells[4]));
+        Assert.False(model.PropertyLinks.SelectFontResourceCommand.CanExecute(font.Rows[0].Cells[1]));
+        model.PropertyLinks.SelectFontResourceCommand.Execute(font.SampleLink);
         Assert.Same(Resource(input, "NFNT", 1002), model.Selected);
     }
 
@@ -220,14 +220,14 @@ public sealed class FontFamilyTests : IDisposable
     public async Task The_JSON_is_one_click_away()
     {
         var (model, _, _) = await Open();
-        Assert.True(model.ShowsFontFamily);
-        Assert.False(model.ShowsFontJson);
+        Assert.True(model.PropertyLinks.ShowsFontFamily);
+        Assert.False(model.PropertyLinks.ShowsFontJson);
         Assert.Contains("\"fonts\"", model.Preview.Text);
-        model.PropertyModeIndex = 1;
-        Assert.False(model.ShowsFontFamily);
-        Assert.True(model.ShowsFontJson);
+        model.PropertyLinks.PropertyModeIndex = 1;
+        Assert.False(model.PropertyLinks.ShowsFontFamily);
+        Assert.True(model.PropertyLinks.ShowsFontJson);
         Assert.True(model.Preview.IsZoomable);
-        model.PropertyModeIndex = 0;
+        model.PropertyLinks.PropertyModeIndex = 0;
     }
 
     [Fact]

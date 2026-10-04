@@ -101,8 +101,8 @@ public sealed class PropertyViewTests : IDisposable
     {
         var shell = new CopyShell();
         var model = new MainViewModel { Shell = shell };
-        Assert.False(model.CopyPropertyCommand.CanExecute(null));
-        await model.CopyPropertyCommand.ExecuteAsync("0x780A");
+        Assert.False(model.PropertyLinks.CopyPropertyCommand.CanExecute(null));
+        await model.PropertyLinks.CopyPropertyCommand.ExecuteAsync("0x780A");
         Assert.Equal("0x780A", shell.Copied);
     }
 
@@ -121,27 +121,27 @@ public sealed class PropertyViewTests : IDisposable
         await model.PreviewTask;
 
         Assert.True(model.Preview.IsJson);
-        Assert.False(model.ShowJson);                                       // Properties by default
-        Assert.True(model.ShowsProperties);
-        Assert.False(model.ShowsJsonText);
+        Assert.False(model.PropertyLinks.ShowJson);                                       // Properties by default
+        Assert.True(model.PropertyLinks.ShowsProperties);
+        Assert.False(model.PropertyLinks.ShowsJsonText);
         Assert.Equal(["Run 1", "Run 2"], model.Preview.PropertyCards.Select(c => c.Caption));
         Assert.True(model.Preview.HasProperties);
         var font = model.Preview.PropertyCards[0].Rows.Single(r => r.Label == "Font");
         Assert.Equal(("Times", "20"), (font.Value, font.Raw));
 
-        Assert.Equal(["Properties", "JSON"], MainViewModel.PropertyModes);
-        Assert.Equal(0, model.PropertyModeIndex);
-        model.PropertyModeIndex = 1;                                        // JSON one click away
-        Assert.True(model.ShowJson);
-        Assert.False(model.ShowsProperties);
-        Assert.True(model.ShowsJsonText);
+        Assert.Equal(["Properties", "JSON"], PropertyLinks.PropertyModes);
+        Assert.Equal(0, model.PropertyLinks.PropertyModeIndex);
+        model.PropertyLinks.PropertyModeIndex = 1;                                        // JSON one click away
+        Assert.True(model.PropertyLinks.ShowJson);
+        Assert.False(model.PropertyLinks.ShowsProperties);
+        Assert.True(model.PropertyLinks.ShowsJsonText);
         Assert.StartsWith("{", model.Preview.Text);
 
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single();  // the choice holds for the session
         await model.PreviewTask;
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single().Children[0];
         await model.PreviewTask;
-        Assert.True(model.ShowJson);
-        Assert.True(model.ShowsJsonText);
+        Assert.True(model.PropertyLinks.ShowJson);
+        Assert.True(model.PropertyLinks.ShowsJsonText);
     }
 }

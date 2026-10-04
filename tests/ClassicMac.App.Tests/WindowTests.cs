@@ -67,7 +67,7 @@ public class WindowTests
             Dispatcher.UIThread.RunJobs();
             var cards = window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("image-card")).ToList();
             Assert.Equal(3, cards.Count);
-            Assert.Equal(model.ImageCardWidth, cards[0].Bounds.Width);
+            Assert.Equal(model.ImageGrid.ImageCardWidth, cards[0].Bounds.Width);
             Capture(window, "image-family", baselines);
 
             window.FindControl<CheckBox>("ShowMasksBox")!.IsChecked = true;
@@ -129,7 +129,7 @@ public class WindowTests
 
             window.FindControl<ListBox>("PropertyMode")!.SelectedIndex = 1;
             Dispatcher.UIThread.RunJobs();
-            Assert.True(model.ShowJson);
+            Assert.True(model.PropertyLinks.ShowJson);
             Assert.False(cards.IsEffectivelyVisible);
             Capture(window, "properties-json");
             window.Close();
