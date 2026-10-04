@@ -68,15 +68,22 @@
       <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportActions.ImportCommand}" />
     </MenuItem>
     <MenuItem Header="_Volume">
-      <MenuItem Header="New _File…" Command="{Binding VolumeActions.NewFileCommand}" />
-      <MenuItem Header="_Import File…" Command="{Binding VolumeActions.ImportFileCommand}" />
-      <MenuItem Header="New F_older…" Command="{Binding VolumeActions.NewFolderCommand}" />
+      <MenuItem Header="New _File…" Command="{Binding VolumeActions.NewFileCommand}"
+                ToolTip.Tip="{Binding VolumeActions.EditReason}" ToolTip.ShowOnDisabled="True" />
+      <MenuItem Header="New F_older…" Command="{Binding VolumeActions.NewFolderCommand}" InputGesture="Ctrl+Shift+N" HotKey="Ctrl+Shift+N"
+                ToolTip.Tip="{Binding VolumeActions.EditReason}" ToolTip.ShowOnDisabled="True" />
+      <MenuItem Header="_Import File…" Command="{Binding VolumeActions.ImportFileCommand}"
+                ToolTip.Tip="{Binding VolumeActions.EditReason}" ToolTip.ShowOnDisabled="True" />
       <Separator />
-      <MenuItem Header="_Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" />
+      <MenuItem Header="_Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" InputGesture="Delete"
+                ToolTip.Tip="{Binding VolumeActions.EditReason}" ToolTip.ShowOnDisabled="True" />
       <Separator />
-      <MenuItem Header="First _Aid…" Command="{Binding VolumeActions.FirstAidCommand}" />
-      <MenuItem Header="Defra_gment" Command="{Binding VolumeActions.DefragmentCommand}" />
-      <MenuItem Header="Resi_ze…" Command="{Binding VolumeActions.ResizeCommand}" />
+      <MenuItem Header="First _Aid…" Command="{Binding VolumeActions.FirstAidCommand}"
+                ToolTip.Tip="{Binding VolumeActions.FirstAidReason}" ToolTip.ShowOnDisabled="True" />
+      <MenuItem Header="Defra_gment…" Command="{Binding VolumeActions.DefragmentCommand}"
+                ToolTip.Tip="{Binding VolumeActions.EditReason}" ToolTip.ShowOnDisabled="True" />
+      <MenuItem Header="Resi_ze…" Command="{Binding VolumeActions.ResizeCommand}"
+                ToolTip.Tip="{Binding VolumeActions.ResizeReason}" ToolTip.ShowOnDisabled="True" />
     </MenuItem>
     <MenuItem Header="E_xport">
       <MenuItem Header="_Save Resource As…" Command="{Binding ExportActions.SaveResourceAsCommand}" InputGesture="Ctrl+E" HotKey="Ctrl+E" />

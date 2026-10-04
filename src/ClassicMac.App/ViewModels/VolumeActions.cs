@@ -53,6 +53,54 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
         return null;
     }
 
+    // Why the Volume menu's items do not apply to the selection (design/boards/volume-tools.md §1); null when they do.
+    private const string HfsPlusOnly = "Only First Aid works on HFS Plus volumes";
+    private const string ReadOnlyVolume = "This volume can't be changed";
+
+    // What the selection's volume lets the session do: its partition's kind on a disk with several.
+    private static InputEditKind KindAt(NodeViewModel node)
+    {
+        var session = node.Input.VolumeSession;
+        return session.PartitionNames.Count == 0 ? session.Kind
+            : node.Input.VolumeOf(node) is { } volume ? session.KindOf(volume.Name)
+            : InputEditKind.ReadOnly;
+    }
+
+    /// <summary>Why New File, New Folder, Import File, Delete and Defragment do not apply to the selection; null when they do.</summary>
+    public string? EditReason => appSelection.Selected is not { } node ? null
+        : KindAt(node) switch { InputEditKind.HfsVolume => null, InputEditKind.HfsPlusVolume => HfsPlusOnly, _ => ReadOnlyVolume };
+
+    /// <summary>Why Resize does not apply to the selection; null when it does.</summary>
+    public string? ResizeReason => appSelection.Selected is not { } node ? null
+        : EditReason is { } reason ? reason
+        : node.Input.VolumeSession.CanResize ? null
+        : node.Input.VolumeSession.Partition is not null || node.Input.VolumeSession.PartitionNames.Count > 0
+            ? "A partition can't be resized: its map would change"
+            : "A disk image's disk can't be resized yet";
+
+    /// <summary>Why First Aid does not apply to the selection; null when it does.</summary>
+    public string? FirstAidReason => appSelection.Selected is not { } node ? null
+        : KindAt(node) is InputEditKind.HfsVolume or InputEditKind.HfsPlusVolume ? null : ReadOnlyVolume;
+
+    /// <summary>
+    /// Whether the selection is a volume's own node (the input that is a volume, or a disk image's or partition's volume
+    /// node): the tree's context menu offers First Aid, Defragment and Resize there only.
+    /// </summary>
+    public bool IsVolumeNode => appSelection.Selected switch
+    {
+        InputNode input => input.IsFirstAidVolume && input.VolumeSession.PartitionNames.Count == 0,
+        ContainerFileNode container => container.Input.IsFirstAidVolume && container.Node.Volume?.Format is "HFS" or "HFS Plus",
+        _ => false,
+    };
+
+    internal void NotifyReasons()
+    {
+        OnPropertyChanged(nameof(EditReason));
+        OnPropertyChanged(nameof(ResizeReason));
+        OnPropertyChanged(nameof(FirstAidReason));
+        OnPropertyChanged(nameof(IsVolumeNode));
+    }
+
     // The selected file or folder, when it can be deleted from a plain HFS image.
     internal static NodeViewModel? VolumeItem(NodeViewModel? node) =>
         node is FileNode or ContainerFileNode or FolderNode && TreeLayout.FolderOf(node) is { } parent && VolumeFolder(parent) == parent ? node : null;

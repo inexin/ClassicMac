@@ -50,7 +50,7 @@
   <controls:BrowseTree x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding TreeRows}" SelectedItem="{Binding Selected, Mode=OneWay}"
             ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.AllowAutoHide="False">
     <ListBox.KeyBindings>
-      <KeyBinding Gesture="Delete" Command="{Binding EditActions.DeleteResourceCommand}" />
+      <KeyBinding Gesture="Delete" Command="{Binding EditActions.DeleteSelectionCommand}" />
     </ListBox.KeyBindings>
     <ListBox.ItemTemplate>
       <DataTemplate DataType="vm:NodeViewModel">
@@ -119,13 +119,17 @@
         <MenuItem Header="_Replace Data from File…" Command="{Binding EditActions.ReplaceDataCommand}" />
         <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportActions.ImportCommand}" />
         <Separator />
+        <MenuItem Header="First Aid…" Command="{Binding VolumeActions.FirstAidCommand}" IsVisible="{Binding VolumeActions.IsVolumeNode}"
+                  ToolTip.Tip="{Binding VolumeActions.FirstAidReason}" ToolTip.ShowOnDisabled="True" />
+        <MenuItem Header="Defragment…" Command="{Binding VolumeActions.DefragmentCommand}" IsVisible="{Binding VolumeActions.IsVolumeNode}"
+                  ToolTip.Tip="{Binding VolumeActions.EditReason}" ToolTip.ShowOnDisabled="True" />
+        <MenuItem Header="Resize…" Command="{Binding VolumeActions.ResizeCommand}" IsVisible="{Binding VolumeActions.IsVolumeNode}"
+                  ToolTip.Tip="{Binding VolumeActions.ResizeReason}" ToolTip.ShowOnDisabled="True" />
+        <Separator IsVisible="{Binding VolumeActions.IsVolumeNode}" />
         <MenuItem Header="New _File…" Command="{Binding VolumeActions.NewFileCommand}" />
+        <MenuItem Header="New F_older…" Command="{Binding VolumeActions.NewFolderCommand}" InputGesture="Ctrl+Shift+N" />
         <MenuItem Header="Import File…" Command="{Binding VolumeActions.ImportFileCommand}" />
-        <MenuItem Header="New F_older…" Command="{Binding VolumeActions.NewFolderCommand}" />
-        <MenuItem Header="Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" />
-        <MenuItem Header="First Aid…" Command="{Binding VolumeActions.FirstAidCommand}" />
-        <MenuItem Header="Defragment" Command="{Binding VolumeActions.DefragmentCommand}" />
-        <MenuItem Header="Resize…" Command="{Binding VolumeActions.ResizeCommand}" />
+        <MenuItem Header="Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" InputGesture="Delete" />
         <Separator />
         <MenuItem Header="_Save Resource As…" Command="{Binding ExportActions.SaveResourceAsCommand}" InputGesture="Ctrl+E" />
         <MenuItem Header="_Export Resources…" Command="{Binding ExportActions.ExportResourcesCommand}" />

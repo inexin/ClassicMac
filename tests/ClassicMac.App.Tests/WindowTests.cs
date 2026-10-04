@@ -197,9 +197,10 @@ public class WindowTests
             menu.Open(tree);
             Dispatcher.UIThread.RunJobs();
             var items = menu.Items.OfType<MenuItem>().ToList();
-            Assert.Equal(["_New Resource…", "_Duplicate", "De_lete", "Get _Info…", "Edit _Hex…", "_Replace Data from File…", "I_mport Image or Sound…", "First Aid…", "Defragment", "Resize…",
+            // The volume's maintenance commands are on its own node only (volume-tools.md §1), so not here.
+            Assert.Equal(["_New Resource…", "_Duplicate", "De_lete", "Get _Info…", "Edit _Hex…", "_Replace Data from File…", "I_mport Image or Sound…",
                 "_Save Resource As…"],
-                items.Where(i => i.Command?.CanExecute(null) == true).Select(i => (string)i.Header!));
+                items.Where(i => i.IsVisible && i.Command?.CanExecute(null) == true).Select(i => (string)i.Header!));
             Capture(window, "context-menu");
             menu.Close();
 

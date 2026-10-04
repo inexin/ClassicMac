@@ -255,10 +255,20 @@ public sealed partial class EditActions(IAppSelection appSelection, IAppServices
             command.NotifyCanExecuteChanged();
         }
 
+        DeleteSelectionCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(UndoTitle));
         OnPropertyChanged(nameof(RedoTitle));
         appParts.ShellActions.NotifyTitle();
+        appParts.VolumeActions.NotifyReasons();
     }
+
+    private bool CanDeleteSelection() => DeleteResourceCommand.CanExecute(null) || appParts.VolumeActions.DeleteItemCommand.CanExecute(null);
+
+    // Del: the selected resource, or else the selected file or folder of a volume.
+    [RelayCommand(CanExecute = nameof(CanDeleteSelection))]
+    private Task DeleteSelection() => DeleteResourceCommand.CanExecute(null)
+        ? DeleteResourceCommand.ExecuteAsync(null)
+        : appParts.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
 
     internal void OnSelectedChanged(NodeViewModel? oldValue, NodeViewModel? newValue)
     {
