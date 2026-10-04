@@ -439,6 +439,57 @@ A picture that every PICT reader, the ROM and Mac OS 9 decode alike:
 
 Rows are packed as [packbits.md §3](../codecs/packbits.md#3-writing) describes.
 
+### 3.3 Recording a picture
+
+OpenPicture, OpenCPicture and ClosePicture record what is drawn into a port, as both QuickDraws do it
+[Code: 68k ROM $077D] [Code: Mac OS 9.0 QuickDraw]; the differences are §4.3.
+
+1. **Opening.** OpenPicture(frame) in a colour port makes version 2 with the version −1 header (§1.3):
+   `0011 02FF 0C00 FFFF FFFF`, the frame as Fixed left, top, right, bottom, `u32 0`; picFrame is the frame.
+   OpenCPicture(srcRect, hRes, vRes) makes the extended header: `0011 02FF 0C00 FFFE 0000`, hRes, vRes, srcRect,
+   `u32 0`, and picFrame `(0, 0, height × 72 / vRes, width × 72 / hRes)` (an unsigned truncating divide). Pictures do
+   not nest. Opening calls HidePen, so nothing is drawn while recording unless the caller shows the pen again.
+2. **The saved state** starts as: background pattern white, pen and fill patterns black, pen (1, 1) patCopy at (0, 0),
+   text font 0, face 0, srcOr, size 0, no space or character extra, ratio 1/1, text at (0, 0), the rect and oval size
+   0, the origin the port's, foreground black, background white, OpColor black, the highlight colour **black**, glyph
+   state $80808080, and the clip an **empty** region; font 0 is known.
+3. **State is lazy.** Setting a pen, colour, font or clip writes nothing; each drawing call writes what it needs where
+   it differs from the saved state, which it then takes. Before every drawing call (CheckPic), in this order:
+   OpColor `001F`; the highlight colour, as DefHilite `001E` when it is the system's (the low-memory HiliteRGB), else
+   HiliteColor `001D`; HiliteMode `001C` when the next drawing highlights; RGBFgCol `001A`; RGBBkCol `001B`; Origin
+   `000C` (dh, dv); the clip `0001` with its region (a wide-open clip is the rect (−32767, −32767, 32767, 32767)).
+4. **The verb's state** (PutPicVerb): frame writes PnSize `0007` (v, h), PnMode `0008` and the pen pattern; paint the
+   pen mode and pattern; erase the background pattern; fill the fill pattern; invert nothing. An old 8-byte pattern
+   is PnPat `0009`, BkPat `0002` or FillPat `000A`; a pixel pattern PnPixPat `0013`, BkPixPat `0012` or FillPixPat
+   `0014`.
+5. **Lines** take the frame state, then: when dh and dv both fit in −128…127, ShortLineFrom `0023 dh dv` if the pen is
+   where the picture last left it, else ShortLine `0022 v h dh dv`; otherwise LineFrom `0021` (the end) or Line `0020`
+   (the start and the end). MoveTo writes nothing.
+6. **Rects, round rects, ovals and arcs** write the noun ($30, $40, $50, $60) plus the verb and the rect; the same rect
+   as the last one of any noun writes the noun + 8 + verb and no rect. A round rect first writes OvSize `000B`
+   (height, width) when it changed; an arc ends with its start and arc angles. **Polygons** `0070`+verb and
+   **regions** `0080`+verb always write their whole data.
+7. **Text**, in pieces of at most 255 bytes: first the state where it changed, in this order: FontName `002C`
+   (length + 3, the font number, its name as a Pascal string; once per font, and not when the name is empty), TxFont
+   `0003`, TxFace `0004` (a byte), TxMode `0005`, TxSize `000D`, SpExtra `0006`, GlyphState `002E` (`0004`, then
+   outline preferred, preserve glyph, FractEnable and FScaleDisable as $FF or 0), TxRatio `0010`, PnLocHFrac `0015`
+   (whenever the fraction is not $8000), ChExtra `0016`. Then, with dh, dv the pen less where the last text was: both
+   in 0…255, DHText `0029 dh` when dv is 0, DVText `002A dv` when dh is 0, else DHDVText `002B dh dv`; otherwise
+   LongText `0028 v h`; then the count and the bytes.
+8. **CopyBits** writes only CheckPic's state. The source is trimmed to srcRect's rows and to whole bytes around its
+   columns, rowBytes even. BitsRect `0090` (BitsRgn `0091` with a mask region), + 8 for PackBitsRect and PackBitsRgn
+   when rowBytes ≥ 8; a direct pixel map DirectBitsRect `009A` (`009B` with a mask) and baseAddr $000000FF. A BitMap
+   writes rowBytes and bounds; a pixel map its record without baseAddr (packType 1 when rowBytes < 8, else 0 indexed,
+   3 for 16-bit, 4 for 32-bit) and, when indexed, its colour table (none: `00000000 0000 0000 4B4F 0000 0000 0000`).
+   Then srcRect, dstRect, the mode, the mask region and the rows: raw under 8 bytes, else each packed with its length
+   before it, a byte when rowBytes ≤ 250, else a word.
+9. **PicComment** writes ShortComment `00A0 kind`, or LongComment `00A1 kind size` and the data; it writes no state and
+   is recorded even when nothing else is.
+10. **Recording stops** when the pen is hidden twice (an open region or polygon, or one more HidePen): nothing but
+    comments is recorded until it is shown again.
+11. **Padding and the end:** every opcode starts on an even offset (a zero byte before it); data after an opcode is
+    not padded. ClosePicture writes `00FF`, sets picSize to the low word of the length and calls ShowPen.
+
 ## 4. Variants
 
 ### 4.1 Inside Macintosh and the ROM
@@ -485,6 +536,23 @@ differ from §2; it still uses the ROM's MapPt, MapRect, ScalePt, FixMul and Fix
      97-byte row of 96 literals ends with its first output byte, so pixel 31's blue takes pixel 0's red. The ROM reads
      such rows correctly.
 
+### 4.3 Recording: the ROM and Mac OS 9
+
+Picture recording (§3.3) differs [Code: 68k ROM $077D] [Code: Mac OS 9.0 QuickDraw]:
+
+- **OpenCPicture's frame:** the ROM scales srcRect only when both resolutions are set, else keeps srcRect; Mac OS 9
+  always scales.
+- **CopyBits of a BitMap:** Mac OS 9 records the mode without ditherCopy and with the arithmetic modes as Boolean ones
+  (blend → srcCopy, addPin → srcBic, addOver → srcXor, subPin → srcOr, transparent → srcCopy, by `index & 3`); the ROM
+  records the mode as given. A pixel map's mode is recorded as given in both.
+- **An empty CopyBits** (no width once trimmed): the ROM records nothing; Mac OS 9 records it.
+- **ScrollRect:** the ROM stops recording while it runs; Mac OS 9 does not, so it records its CopyBits and erase (not
+  verified live).
+- **GlyphState:** Mac OS 9 writes FractEnable as $FF when it is set; the ROM writes the byte as stored.
+- **The pattern origin:** Mac OS 9 writes `0200` (v, h) when QDSetPatternOrigin changed it.
+- **Version 1 pictures** (an old GrafPort): the ROM also writes FontName, LineLayout and GlyphState (every ROM version 1
+  picture with text gets `2E 0004 xxxxxxxx`); Mac OS 9 writes them only in version 2.
+
 ## 5. ClassicMac
 
 - **Decoding:** `PictReader.Decode` returns the `RgbaBitmap`; `PictReader.Read` adds the `PictInfo` (version, extended
@@ -525,6 +593,13 @@ differ from §2; it still uses the ROM's MapPt, MapRect, ScalePt, FixMul and Fix
   `InvalidImageContentException`. The SkiaSharp adapter's `PictSkia` decodes to an unpremultiplied `SKBitmap` or an
   `SKImage`, `DecodeAny` tries QTIF, PICT and MacPaint, and `Encode` writes §3. [ClassicMac]
 
+- **Recording** (§3.3, §4.3): `PictureRecorder.OpenPicture`/`OpenCPicture` and `ClosePicture` record a
+  `QuickDrawPort`'s drawing, and `QuickDrawPort.PicComment` adds comments. A port is a colour port, so pictures are
+  version 2. ClassicMac records neither ScrollRect, nor CopyMask, nor a picture drawn into the port, writes no pattern
+  origin and no LineLayout, has no memory limit (so no dead picture), and takes font names from the port's
+  `FontLibrary`. A pixel pattern is written as its PixPat with ClassicMac's pixel map record; rows are packed with
+  ClassicMac's PackBits (§3.2); OpenCPicture with a zero resolution keeps srcRect in both modes. [ClassicMac]
+
 ## 6. Diagnostics
 
 `ClassicMac.Graphics` reports no diagnostics: it throws (§5). When `ClassicMac.Resources.Decoders` converts a `PICT`
@@ -556,6 +631,10 @@ resource ([export-manifest.md](../output/export-manifest.md)), it reports:
   - `PortTests`: DrawPicture into a port draws nothing before a clip, stays inside the port's clip, scales and
     restores the port.
   - `TextTests`: PnLocHFrac, TxRatio, fontName and TxSize keeping the character extra.
+  - `PictureRecordingTests`: the traced code's example recording byte for byte in both modes (derived from the code,
+    not dumped live), lazy state and the same rect, a pen hidden twice, the line and text opcodes, a BitMap's mode in
+    each QuickDraw, OpenCPicture's frame, recorded drawing and 4-, 8-, 16- and 32-bit pixel maps playing back
+    pixel-identical.
   - `WriterTests`: every format round-trips; incompressible 32-bit rows stay readable by Mac OS 9; the plain BitMap;
     palettes; resolution and picFrame; ICC across several comments; strips; a bare picture.
   - `StreamDecodingTests`, `ImageSharpPluginTests`, `SkiaSharpPluginTests`: streams, the adapters' detection,
@@ -563,7 +642,8 @@ resource ([export-manifest.md](../output/export-manifest.md)), it reports:
 
 ## 8. Not covered
 
-- The pattern origin of Mac OS 9's opcode `$0200` (QDSetPatternOrigin).
+- The pattern origin of Mac OS 9's opcode `$0200` (QDSetPatternOrigin), read and written.
+- Recording version 1 pictures (an old GrafPort), ScrollRect, CopyMask and DrawPicture into a recording port.
 - Drawing gaps are in [quickdraw.md §8](quickdraw.md#8-not-covered), QuickTime's in
   [quicktime.md §8](quicktime.md#8-not-covered).
 

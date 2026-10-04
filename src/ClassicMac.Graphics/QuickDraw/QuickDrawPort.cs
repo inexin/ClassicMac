@@ -178,6 +178,21 @@ public sealed class QuickDrawPort
     /// <summary>The pen's visibility (<c>pnVis</c>): drawing is hidden while it is negative.</summary>
     public int PenVisibility => PenVis;
 
+    // The picture open on the port (OpenPicture, OpenCPicture; pict.md §3.3), recording each drawing call.
+    internal IPictureRecording? Picture;
+
+    // The highlight colour as the port holds it, for the picture recorder.
+    internal RgbColor HiliteRgb => hilite16;
+
+    // The system's highlight colour (the low-memory HiliteRGB) the options give.
+    internal RgbColor SystemHilite => Options.HiliteColor ?? (macOS9 ? new RgbColor(0xCCCC, 0xCCCC, 0xFFFF) : new RgbColor(0x9999, 0xCCCC, 0xCCCC));
+
+    /// <summary>
+    /// Records a picture comment in an open picture (<c>PicComment</c>): <paramref name="kind"/> with its
+    /// <paramref name="data"/> (none for a short comment). Nothing is drawn, and nothing happens without a picture.
+    /// </summary>
+    public void PicComment(int kind, ReadOnlySpan<byte> data) => Picture?.Comment(kind, data);
+
     // OpenRgn's and OpenPoly's recordings, while open (quickdraw.md §2.26, §2.27).
     private RegionRecording? regionRecording;
     private PolygonRecording? polygonRecording;
@@ -264,6 +279,7 @@ public sealed class QuickDrawPort
     public void LineTo(int h, int v)
     {
         RecordLine(PenH, PenV, h, v);
+        Picture?.Line(PenH, PenV, h, v);
         PaintLine(PenH - OriginH, PenV - OriginV, h - OriginH, v - OriginV);
         MoveTo(h, v);
         Done();
@@ -278,63 +294,142 @@ public sealed class QuickDrawPort
     public void FrameRect(MacRect rect)
     {
         regionRecording?.Rect(rect);
+        Picture?.Shape(PictureNoun.Rect, 0, rect, 0, 0, 0, 0);
         RectShape(ToCanvas(rect), 0);
     }
     /// <summary>Fills a rectangle with the pen pattern and mode (<c>PaintRect</c>).</summary>
-    public void PaintRect(MacRect rect) => RectShape(ToCanvas(rect), 1);
+    public void PaintRect(MacRect rect)
+    {
+        Picture?.Shape(PictureNoun.Rect, 1, rect, 0, 0, 0, 0);
+        RectShape(ToCanvas(rect), 1);
+    }
+
     /// <summary>Fills a rectangle with the background pattern (<c>EraseRect</c>).</summary>
-    public void EraseRect(MacRect rect) => RectShape(ToCanvas(rect), 2);
+    public void EraseRect(MacRect rect)
+    {
+        Picture?.Shape(PictureNoun.Rect, 2, rect, 0, 0, 0, 0);
+        RectShape(ToCanvas(rect), 2);
+    }
+
     /// <summary>Inverts a rectangle's pixels (<c>InvertRect</c>).</summary>
-    public void InvertRect(MacRect rect) => RectShape(ToCanvas(rect), 3);
+    public void InvertRect(MacRect rect)
+    {
+        Picture?.Shape(PictureNoun.Rect, 3, rect, 0, 0, 0, 0);
+        RectShape(ToCanvas(rect), 3);
+    }
+
     /// <summary>Fills a rectangle with <paramref name="pattern"/> (<c>FillRect</c>).</summary>
-    public void FillRect(MacRect rect, QuickDrawPattern pattern) { FillPattern = pattern; RectShape(ToCanvas(rect), 4); }
+    public void FillRect(MacRect rect, QuickDrawPattern pattern)
+    {
+        FillPattern = pattern;
+        Picture?.Shape(PictureNoun.Rect, 4, rect, 0, 0, 0, 0);
+        RectShape(ToCanvas(rect), 4);
+    }
 
     /// <summary>Outlines the oval inscribed in a rectangle (<c>FrameOval</c>).</summary>
     public void FrameOval(MacRect rect)
     {
         regionRecording?.Shape(Region.Oval(rect));
+        Picture?.Shape(PictureNoun.Oval, 0, rect, 0, 0, 0, 0);
         OvalShape(ToCanvas(rect), 0);
     }
     /// <summary>Paints an oval (<c>PaintOval</c>).</summary>
-    public void PaintOval(MacRect rect) => OvalShape(ToCanvas(rect), 1);
+    public void PaintOval(MacRect rect)
+    {
+        Picture?.Shape(PictureNoun.Oval, 1, rect, 0, 0, 0, 0);
+        OvalShape(ToCanvas(rect), 1);
+    }
+
     /// <summary>Erases an oval (<c>EraseOval</c>).</summary>
-    public void EraseOval(MacRect rect) => OvalShape(ToCanvas(rect), 2);
+    public void EraseOval(MacRect rect)
+    {
+        Picture?.Shape(PictureNoun.Oval, 2, rect, 0, 0, 0, 0);
+        OvalShape(ToCanvas(rect), 2);
+    }
+
     /// <summary>Inverts an oval (<c>InvertOval</c>).</summary>
-    public void InvertOval(MacRect rect) => OvalShape(ToCanvas(rect), 3);
+    public void InvertOval(MacRect rect)
+    {
+        Picture?.Shape(PictureNoun.Oval, 3, rect, 0, 0, 0, 0);
+        OvalShape(ToCanvas(rect), 3);
+    }
+
     /// <summary>Fills an oval with <paramref name="pattern"/> (<c>FillOval</c>).</summary>
-    public void FillOval(MacRect rect, QuickDrawPattern pattern) { FillPattern = pattern; OvalShape(ToCanvas(rect), 4); }
+    public void FillOval(MacRect rect, QuickDrawPattern pattern)
+    {
+        FillPattern = pattern;
+        Picture?.Shape(PictureNoun.Oval, 4, rect, 0, 0, 0, 0);
+        OvalShape(ToCanvas(rect), 4);
+    }
 
     /// <summary>Outlines a rounded rectangle with corner ovals <paramref name="ovalWidth"/> × <paramref name="ovalHeight"/> (<c>FrameRoundRect</c>).</summary>
     public void FrameRoundRect(MacRect rect, int ovalWidth, int ovalHeight)
     {
         regionRecording?.Shape(Region.RoundRect(rect, ovalWidth, ovalHeight));
+        Picture?.Shape(PictureNoun.RoundRect, 0, rect, ovalWidth, ovalHeight, 0, 0);
         RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 0);
     }
     /// <summary>Paints a rounded rectangle (<c>PaintRoundRect</c>).</summary>
-    public void PaintRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 1);
+    public void PaintRoundRect(MacRect rect, int ovalWidth, int ovalHeight)
+    {
+        Picture?.Shape(PictureNoun.RoundRect, 1, rect, ovalWidth, ovalHeight, 0, 0);
+        RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 1);
+    }
+
     /// <summary>Erases a rounded rectangle (<c>EraseRoundRect</c>).</summary>
-    public void EraseRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 2);
+    public void EraseRoundRect(MacRect rect, int ovalWidth, int ovalHeight)
+    {
+        Picture?.Shape(PictureNoun.RoundRect, 2, rect, ovalWidth, ovalHeight, 0, 0);
+        RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 2);
+    }
+
     /// <summary>Inverts a rounded rectangle (<c>InvertRoundRect</c>).</summary>
-    public void InvertRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 3);
+    public void InvertRoundRect(MacRect rect, int ovalWidth, int ovalHeight)
+    {
+        Picture?.Shape(PictureNoun.RoundRect, 3, rect, ovalWidth, ovalHeight, 0, 0);
+        RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 3);
+    }
+
     /// <summary>Fills a rounded rectangle with <paramref name="pattern"/> (<c>FillRoundRect</c>).</summary>
     public void FillRoundRect(MacRect rect, int ovalWidth, int ovalHeight, QuickDrawPattern pattern)
     {
         FillPattern = pattern;
+        Picture?.Shape(PictureNoun.RoundRect, 4, rect, ovalWidth, ovalHeight, 0, 0);
         RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 4);
     }
 
     /// <summary>Outlines an arc of the oval in <paramref name="rect"/>, from <paramref name="startAngle"/> (degrees clockwise from 12 o'clock) through <paramref name="arcAngle"/> (<c>FrameArc</c>).</summary>
-    public void FrameArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(ToCanvas(rect), startAngle, arcAngle, 0);
+    public void FrameArc(MacRect rect, int startAngle, int arcAngle)
+    {
+        Picture?.Shape(PictureNoun.Arc, 0, rect, 0, 0, startAngle, arcAngle);
+        ArcShape(ToCanvas(rect), startAngle, arcAngle, 0);
+    }
     /// <summary>Paints a wedge of an oval (<c>PaintArc</c>).</summary>
-    public void PaintArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(ToCanvas(rect), startAngle, arcAngle, 1);
+    public void PaintArc(MacRect rect, int startAngle, int arcAngle)
+    {
+        Picture?.Shape(PictureNoun.Arc, 1, rect, 0, 0, startAngle, arcAngle);
+        ArcShape(ToCanvas(rect), startAngle, arcAngle, 1);
+    }
+
     /// <summary>Erases a wedge of an oval (<c>EraseArc</c>).</summary>
-    public void EraseArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(ToCanvas(rect), startAngle, arcAngle, 2);
+    public void EraseArc(MacRect rect, int startAngle, int arcAngle)
+    {
+        Picture?.Shape(PictureNoun.Arc, 2, rect, 0, 0, startAngle, arcAngle);
+        ArcShape(ToCanvas(rect), startAngle, arcAngle, 2);
+    }
+
     /// <summary>Inverts a wedge of an oval (<c>InvertArc</c>).</summary>
-    public void InvertArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(ToCanvas(rect), startAngle, arcAngle, 3);
+    public void InvertArc(MacRect rect, int startAngle, int arcAngle)
+    {
+        Picture?.Shape(PictureNoun.Arc, 3, rect, 0, 0, startAngle, arcAngle);
+        ArcShape(ToCanvas(rect), startAngle, arcAngle, 3);
+    }
+
     /// <summary>Fills a wedge of an oval with <paramref name="pattern"/> (<c>FillArc</c>).</summary>
     public void FillArc(MacRect rect, int startAngle, int arcAngle, QuickDrawPattern pattern)
     {
         FillPattern = pattern;
+        Picture?.Shape(PictureNoun.Arc, 4, rect, 0, 0, startAngle, arcAngle);
         ArcShape(ToCanvas(rect), startAngle, arcAngle, 4);
     }
 
@@ -347,36 +442,81 @@ public sealed class QuickDrawPort
             RecordLine(points[i - 1].H, points[i - 1].V, points[i].H, points[i].V);       // no closing edge
         }
 
+        Picture?.Polygon(0, points);
         PolyShape(Points(points), 0);
         PenFrac = 0x8000;                                     // the line routine's reset
     }
     /// <summary>Paints a polygon (<c>PaintPoly</c>).</summary>
-    public void PaintPoly(IReadOnlyList<MacPoint> points) => PolyShape(Points(points), 1);
+    public void PaintPoly(IReadOnlyList<MacPoint> points)
+    {
+        ArgumentNullException.ThrowIfNull(points);
+        Picture?.Polygon(1, points);
+        PolyShape(Points(points), 1);
+    }
+
     /// <summary>Erases a polygon (<c>ErasePoly</c>).</summary>
-    public void ErasePoly(IReadOnlyList<MacPoint> points) => PolyShape(Points(points), 2);
+    public void ErasePoly(IReadOnlyList<MacPoint> points)
+    {
+        ArgumentNullException.ThrowIfNull(points);
+        Picture?.Polygon(2, points);
+        PolyShape(Points(points), 2);
+    }
+
     /// <summary>Inverts a polygon (<c>InvertPoly</c>).</summary>
-    public void InvertPoly(IReadOnlyList<MacPoint> points) => PolyShape(Points(points), 3);
+    public void InvertPoly(IReadOnlyList<MacPoint> points)
+    {
+        ArgumentNullException.ThrowIfNull(points);
+        Picture?.Polygon(3, points);
+        PolyShape(Points(points), 3);
+    }
+
     /// <summary>Fills a polygon with <paramref name="pattern"/> (<c>FillPoly</c>).</summary>
-    public void FillPoly(IReadOnlyList<MacPoint> points, QuickDrawPattern pattern) { FillPattern = pattern; PolyShape(Points(points), 4); }
+    public void FillPoly(IReadOnlyList<MacPoint> points, QuickDrawPattern pattern)
+    {
+        ArgumentNullException.ThrowIfNull(points);
+        FillPattern = pattern;
+        Picture?.Polygon(4, points);
+        PolyShape(Points(points), 4);
+    }
 
     /// <summary>Outlines a region with the pen, inside its edge (<c>FrameRgn</c>).</summary>
     public void FrameRgn(Region region)
     {
         ArgumentNullException.ThrowIfNull(region);
         regionRecording?.Shape(region);
+        Picture?.Region(0, region);
         RgnShape(ToCanvas(region), 0);
     }
     /// <summary>Paints a region (<c>PaintRgn</c>).</summary>
-    public void PaintRgn(Region region) => RgnShape(ToCanvas(region ?? throw new ArgumentNullException(nameof(region))), 1);
+    public void PaintRgn(Region region)
+    {
+        ArgumentNullException.ThrowIfNull(region);
+        Picture?.Region(1, region);
+        RgnShape(ToCanvas(region), 1);
+    }
+
     /// <summary>Erases a region (<c>EraseRgn</c>).</summary>
-    public void EraseRgn(Region region) => RgnShape(ToCanvas(region ?? throw new ArgumentNullException(nameof(region))), 2);
+    public void EraseRgn(Region region)
+    {
+        ArgumentNullException.ThrowIfNull(region);
+        Picture?.Region(2, region);
+        RgnShape(ToCanvas(region), 2);
+    }
+
     /// <summary>Inverts a region (<c>InvertRgn</c>).</summary>
-    public void InvertRgn(Region region) => RgnShape(ToCanvas(region ?? throw new ArgumentNullException(nameof(region))), 3);
+    public void InvertRgn(Region region)
+    {
+        ArgumentNullException.ThrowIfNull(region);
+        Picture?.Region(3, region);
+        RgnShape(ToCanvas(region), 3);
+    }
+
     /// <summary>Fills a region with <paramref name="pattern"/> (<c>FillRgn</c>).</summary>
     public void FillRgn(Region region, QuickDrawPattern pattern)
     {
         ArgumentNullException.ThrowIfNull(region);
         FillPattern = pattern;
+        Picture?.Region(4, region);
         RgnShape(ToCanvas(region), 4);
     }
 
@@ -396,6 +536,7 @@ public sealed class QuickDrawPort
     public void CopyBits(PixMap source, MacRect sourceRect, MacRect destinationRect, TransferMode mode, Region? mask = null)
     {
         ArgumentNullException.ThrowIfNull(source);
+        Picture?.Bits(source, sourceRect, destinationRect, (int)mode, mask);
         CopyBits(source, PictRect.From(sourceRect), ToCanvas(destinationRect), (int)mode, mask == null ? null : ToCanvas(mask));
     }
 
@@ -620,7 +761,22 @@ public sealed class QuickDrawPort
     }
 
     /// <summary>Draws Mac OS Roman text at the pen, and moves the pen past it (<c>DrawText</c>).</summary>
-    public void DrawText(ReadOnlySpan<byte> text) => DrawTextAt(text, PenH - OriginH, PenV - OriginV, FontId, FontId, null, movePen: true);
+    public void DrawText(ReadOnlySpan<byte> text)
+    {
+        if (Picture is null || text.Length == 0)
+        {
+            DrawTextAt(text, PenH - OriginH, PenV - OriginV, FontId, FontId, null, movePen: true);
+            return;
+        }
+
+        // A picture records text in pieces of at most 255 bytes, each from where the last left the pen.
+        for (int start = 0; start < text.Length; start += 255)
+        {
+            var piece = text.Slice(start, Math.Min(255, text.Length - start));
+            Picture.Text(piece);
+            DrawTextAt(piece, PenH - OriginH, PenV - OriginV, FontId, FontId, null, movePen: true);
+        }
+    }
 
     /// <summary>Draws one character at the pen, and moves the pen past it (<c>DrawChar</c>).</summary>
     public void DrawChar(byte character) => DrawText([character]);

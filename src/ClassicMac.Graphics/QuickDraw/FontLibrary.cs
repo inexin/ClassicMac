@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.Fonts;
 
@@ -116,6 +117,9 @@ public sealed class FontLibrary
     }
 
     internal bool TryGetFamilyByName(string name, out int familyId) => familyNames.TryGetValue(name, out familyId);
+
+    // GetFontName: a family's name, or null.
+    internal string? FamilyName(int familyId) => familyNames.FirstOrDefault(p => p.Value == familyId).Key;
 
     internal FontFamily? Family(int familyId) => families.TryGetValue(familyId, out var f) ? f : null;
 
