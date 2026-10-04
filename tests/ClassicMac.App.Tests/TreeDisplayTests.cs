@@ -102,15 +102,15 @@ public sealed class TreeDisplayTests : IDisposable
     [Fact]
     public void Whitespace_names_are_shown_visibly()
     {
-        Assert.True(Tree.HasNoName(MacString.FromMacRoman("")));
-        Assert.True(Tree.HasNoName(new MacString([0x20, 0xCA, 0x09, 0x0D, 0x01, 0x7F])));
-        Assert.False(Tree.HasNoName(MacString.FromMacRoman(" a ")));
-        Assert.Empty(Tree.NameTokens(MacString.FromMacRoman("")));                // shown as "(empty)"
+        Assert.True(TreeLayout.HasNoName(MacString.FromMacRoman("")));
+        Assert.True(TreeLayout.HasNoName(new MacString([0x20, 0xCA, 0x09, 0x0D, 0x01, 0x7F])));
+        Assert.False(TreeLayout.HasNoName(MacString.FromMacRoman(" a ")));
+        Assert.Empty(TreeLayout.NameTokens(MacString.FromMacRoman("")));                // shown as "(empty)"
         Assert.Equal(["sp", "nbsp", "cr", "lf", "tab", "^A", "^?"],
-            Tree.NameTokens(new MacString([0x20, 0xCA, 0x0D, 0x0A, 0x09, 0x01, 0x7F])).Select(t => t.Label));
-        Assert.Equal(["sp×3", "nbsp", "sp×2"], Tree.NameTokens(new MacString([0x20, 0x20, 0x20, 0xCA, 0x20, 0x20])).Select(t => t.Label));
-        Assert.Equal("20 20 20 CA", Tree.NameBytes(new MacString([0x20, 0x20, 0x20, 0xCA])));
-        Assert.Equal("", Tree.NameBytes(MacString.FromMacRoman("")));
+            TreeLayout.NameTokens(new MacString([0x20, 0xCA, 0x0D, 0x0A, 0x09, 0x01, 0x7F])).Select(t => t.Label));
+        Assert.Equal(["sp×3", "nbsp", "sp×2"], TreeLayout.NameTokens(new MacString([0x20, 0x20, 0x20, 0xCA, 0x20, 0x20])).Select(t => t.Label));
+        Assert.Equal("20 20 20 CA", TreeLayout.NameBytes(new MacString([0x20, 0x20, 0x20, 0xCA])));
+        Assert.Equal("", TreeLayout.NameBytes(MacString.FromMacRoman("")));
     }
 
     [Fact]

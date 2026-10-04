@@ -113,7 +113,7 @@ public class TreeRowTests : IDisposable
     [InlineData(1_048_576, "1 MB")]
     [InlineData(1_468_006, "1.4 MB")]
     [InlineData(3_221_225_472, "3 GB")]
-    public void Sizes_read_as_bytes_KB_MB_or_GB(long bytes, string text) => Assert.Equal(text, NodeViewModel.FormatSize(bytes));
+    public void Sizes_read_as_bytes_KB_MB_or_GB(long bytes, string text) => Assert.Equal(text, NodeFormat.FormatSize(bytes));
 
     // A file never given a type or creator (copied from another system) has zeros there: no meta, or a dash for the one
     // that is zero, not "\x00\x00\x00\x00".
@@ -123,7 +123,7 @@ public class TreeRowTests : IDisposable
     [InlineData("TEXT", "\\x00\\x00\\x00\\x00", "TEXT · —")]
     [InlineData("\\x00\\x00\\x00\\x00", "ttxt", "— · ttxt")]
     public void Zero_types_and_creators_are_left_out(string type, string creator, string? meta) =>
-        Assert.Equal(meta, NodeViewModel.FormatTypeCreator(FourCC.FromString(type), FourCC.FromString(creator)));
+        Assert.Equal(meta, NodeFormat.FormatTypeCreator(FourCC.FromString(type), FourCC.FromString(creator)));
 
     [Fact]
     public async Task The_unsaved_mark_is_apart_from_the_name()
@@ -225,7 +225,7 @@ public class TreeRowTests : IDisposable
             }
         }
 
-        var small = Decode(NodeViewModel.Shrink16(bitmap));
+        var small = Decode(NodeImages.Shrink16(bitmap));
         Assert.Equal((16, 16), (small.Width, small.Height));
         for (int y = 0; y < 16; y++)
         {
@@ -257,7 +257,7 @@ public class TreeRowTests : IDisposable
         Assert.Null(app.IconPng);
         await containers.RequestIconAsync();
         Assert.Null(containers.IconPng);
-        Assert.Equal(2, NodeViewModel.ResolvedIcons(custom));
+        Assert.Equal(2, NodeImages.ResolvedIcons(custom));
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public class TreeRowTests : IDisposable
         var custom = Child<FileNode>(input, "Custom");
         await Task.WhenAll(custom.RequestIconAsync(), custom.RequestIconAsync());
         await custom.RequestIconAsync();
-        Assert.Equal(1, NodeViewModel.ResolvedIcons(custom));
+        Assert.Equal(1, NodeImages.ResolvedIcons(custom));
         Assert.NotNull(custom.IconPng);
     }
 }

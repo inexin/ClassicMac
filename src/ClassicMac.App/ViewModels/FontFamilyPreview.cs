@@ -459,7 +459,7 @@ public sealed partial class FontFamilyPreview : ObservableObject
 
         var size = sizes.Contains(24) ? 24 : sizes.Max();
         var strike = Strike(family.Fonts.First(f => f.Size == size && f.Face == 0))!;
-        return Render(Encode("Aa", strike), size, 0) is { } sample ? NodeViewModel.Fit(Bitmap(sample), 32) : null;
+        return Render(Encode("Aa", strike), size, 0) is { } sample ? NodeImages.Fit(Bitmap(sample), 32) : null;
     }
 
     private static RgbaBitmap Bitmap(FontSample sample)

@@ -8,6 +8,7 @@ using ClassicMac.Core;
 using ClassicMac.Files;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using static ClassicMac.App.ViewModels.Tree;
 
 namespace ClassicMac.App.ViewModels;
 
@@ -43,7 +44,7 @@ public sealed partial class TreeDisplayOptions : ObservableObject
 
 // The tree's display of a folder's items: invisible files hidden (T1), files with no name grouped (T2). Only the
 // tree changes; Items keeps every file for exports, previews and the volume commands.
-internal static partial class Tree
+internal static class TreeLayout
 {
     /// <summary>The folder (or input or container file) a node is in: its parent, past a "No name" group.</summary>
     public static NodeViewModel? FolderOf(NodeViewModel node) => node.Parent is NoNameGroupNode group ? group.Parent : node.Parent;

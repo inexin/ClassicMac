@@ -166,7 +166,7 @@ public sealed partial class EditActions(MainViewModel main) : ObservableObject
             yield return (root, state);
         }
 
-        foreach (var child in Tree.Contents(root))
+        foreach (var child in TreeLayout.Contents(root))
         {
             foreach (var found in EditedFiles(child))
             {
@@ -397,7 +397,7 @@ public sealed partial class EditActions(MainViewModel main) : ObservableObject
         var initial = new ResourceInfo(resource.Type.ToString(), resource.Id, resource.Name?.ToMacRoman() ?? "", resource.Attributes);
         var header = InspectorHeader.For(node)!;
         var subject = new DialogSubject(header.Name, string.Create(CultureInfo.InvariantCulture, $"{header.Kind} · {resource.Length:N0} bytes"),
-            await Task.Run(() => NodeViewModel.LargeIcon(node)));
+            await Task.Run(() => NodeImages.LargeIcon(node)));
         if (await main.EditDialogs.ResourceInfoAsync($"Info for {resource}", initial, isNew: false, subject) is not { } info || info == initial)
         {
             return;

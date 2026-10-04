@@ -118,7 +118,7 @@ public sealed class InspectorTests : IDisposable
         Assert.Equal(("inspect.img", "HFS volume"), (model.InspectorActions.Header!.Name, model.InspectorActions.Header.Kind));
         Assert.Equal(["Files", "Size"], model.InspectorActions.Header.Facts.Select(f => f.Label));
         Assert.Equal("4", Facts(model.InspectorActions.Header)["Files"].Value);
-        Assert.Equal(NodeViewModel.FormatSize(new FileInfo(path).Length), Facts(model.InspectorActions.Header)["Size"].Value);
+        Assert.Equal(NodeFormat.FormatSize(new FileInfo(path).Length), Facts(model.InspectorActions.Header)["Size"].Value);
 
         model.Selected = null;
         Assert.Null(model.InspectorActions.Header);
@@ -365,7 +365,7 @@ public sealed class InspectorTests : IDisposable
     [InlineData(16, 8, 16, 8)]
     public void Pictures_are_fitted_by_nearest_neighbour(int width, int height, int fittedWidth, int fittedHeight)
     {
-        using var fitted = SkiaSharp.SKBitmap.Decode(NodeViewModel.Fit(new ClassicMac.Graphics.RgbaBitmap(width, height), 32));
+        using var fitted = SkiaSharp.SKBitmap.Decode(NodeImages.Fit(new ClassicMac.Graphics.RgbaBitmap(width, height), 32));
         Assert.Equal((fittedWidth, fittedHeight), (fitted.Width, fitted.Height));
     }
 }

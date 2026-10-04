@@ -52,7 +52,7 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
 
     // The selected file or folder, when it can be deleted from a plain HFS image.
     internal static NodeViewModel? VolumeItem(NodeViewModel? node) =>
-        node is FileNode or ContainerFileNode or FolderNode && Tree.FolderOf(node) is { } parent && VolumeFolder(parent) == parent ? node : null;
+        node is FileNode or ContainerFileNode or FolderNode && TreeLayout.FolderOf(node) is { } parent && VolumeFolder(parent) == parent ? node : null;
 
     // A folder node's Mac path below the volume's root ("" for the root).
     private static List<string> FolderNames(NodeViewModel folder)
@@ -73,7 +73,7 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
         _ => item.BaseTitle,
     };
 
-    private static string MacPathOf(NodeViewModel item) => string.Join(":", FolderNames(Tree.FolderOf(item)!).Append(ItemName(item)));
+    private static string MacPathOf(NodeViewModel item) => string.Join(":", FolderNames(TreeLayout.FolderOf(item)!).Append(ItemName(item)));
 
     private bool CanCreateInVolume() => !main.ExportActions.IsExporting && VolumeFolder(main.Selected) is not null;
 
@@ -206,16 +206,16 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
             return;
         }
         // Shown or not (hidden, grouped), the item leaves its folder's items; the folder is laid out again.
-        var parent = Tree.FolderOf(item)!;
+        var parent = TreeLayout.FolderOf(item)!;
         parent.Items!.Remove(item);
-        Tree.Relayout(parent);
+        TreeLayout.Relayout(parent);
         main.Selected = parent;
         main.EditActions.NotifyEditCommands();
         main.Status = $"Deleted {name}; Save As ▸ HFS Volume Image writes the change.";
     }
 
     private static IEnumerable<NodeViewModel> Descendants(NodeViewModel node) =>
-        Tree.Contents(node).SelectMany(c => Descendants(c).Prepend(c));
+        TreeLayout.Contents(node).SelectMany(c => Descendants(c).Prepend(c));
 
     private void AddFile(NodeViewModel folder, MacFile file)
     {
@@ -280,13 +280,13 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
         }
 
         items.Insert(index, item);
-        Tree.Relayout(folder);
+        TreeLayout.Relayout(folder);
         folder.IsExpanded = true;
         if (item.Parent is NoNameGroupNode group)
         {
             group.IsExpanded = true;
         }
 
-        main.Selected = Tree.IsShown(item, main.Roots) ? item : folder;
+        main.Selected = TreeLayout.IsShown(item, main.Roots) ? item : folder;
     }
 }

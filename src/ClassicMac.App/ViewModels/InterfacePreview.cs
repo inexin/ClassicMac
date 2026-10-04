@@ -58,7 +58,7 @@ public sealed record DialogSources(IReadOnlyList<ResourceFork> SystemForks, Font
 
                 return;
             }
-            foreach (var child in Tree.Contents(node))
+            foreach (var child in TreeLayout.Contents(node))
             {
                 Walk(child);
             }

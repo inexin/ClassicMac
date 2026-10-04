@@ -59,7 +59,7 @@ public sealed record InspectorHeader(NodeViewModel Node, string Name, string Kin
         NoNameGroupNode group => new InspectorHeader(group, group.Name, $"Files with no name in {OwnerName(group)}",
             [new("Items", group.Children.Count.ToString(CultureInfo.InvariantCulture), false)]),
         InputNode input => new InspectorHeader(input, input.Name, input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "Resource fork",
-            [new("Files", input.Root.Leaves().Count().ToString("N0", CultureInfo.InvariantCulture), false), new("Size", NodeViewModel.FormatSize(NodeViewModel.HostSize(input)), false)]),
+            [new("Files", input.Root.Leaves().Count().ToString("N0", CultureInfo.InvariantCulture), false), new("Size", NodeFormat.FormatSize(NodeFormat.HostSize(input)), false)]),
         _ => null,
     };
 
@@ -271,7 +271,7 @@ public sealed partial class InspectorActions(MainViewModel main) : ObservableObj
             return;
         }
 
-        var png = await Task.Run(() => NodeViewModel.LargeIcon(node));
+        var png = await Task.Run(() => NodeImages.LargeIcon(node));
         if (ReferenceEquals(main.Selected, node))
         {
             HeaderIconPng = png;

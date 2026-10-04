@@ -221,7 +221,7 @@ internal static class FolderPreviews
                 }
 
                 var suite = FileIcon(resolver ?? Resolver(DialogSources.None), file, () => Fork(file)).Suite;
-                return treeIcons[(file, size)] = suite is null ? null : NodeViewModel.Plot(suite, size);
+                return treeIcons[(file, size)] = suite is null ? null : NodeImages.Plot(suite, size);
             }
         }
 

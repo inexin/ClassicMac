@@ -190,7 +190,7 @@ public sealed class DetailsViewModel
     {
         var info = file.FinderInfo;
         var kind = FileKinds.Of(node);
-        var parent = Tree.FolderOf(node);
+        var parent = TreeLayout.FolderOf(node);
         var fileRows = new List<DetailRow>
         {
             new("Name", file.Name.ToMacRoman()),
@@ -499,7 +499,7 @@ public sealed class DetailsViewModel
     private static string Path(NodeViewModel node)
     {
         var names = new List<string>();
-        for (var at = node; at is not null; at = Tree.FolderOf(at))
+        for (var at = node; at is not null; at = TreeLayout.FolderOf(at))
         {
             names.Insert(0, at is InputNode input ? input.Title : at.Name);
         }

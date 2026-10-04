@@ -8,49 +8,6 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ClassicMac.App.ViewModels;
 
-// A row's part in the tree's filter and type-ahead (design/boards/browse-tree.md, S6).
-public abstract partial class NodeViewModel
-{
-    /// <summary>Whether the filter hides the row: neither it, a node above it nor one below it matches.</summary>
-    [ObservableProperty]
-    private bool isFilteredOut;
-
-    /// <summary>Whether the row is dimmed: the type-ahead is open and the row does not match.</summary>
-    [ObservableProperty]
-    private bool isDimmed;
-
-    /// <summary>Whether the row is the type-ahead's current match.</summary>
-    [ObservableProperty]
-    private bool isCurrentMatch;
-
-    /// <summary>Where the filter or type-ahead text is in <see cref="Name"/> (start, length), or null.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(NameBefore), nameof(NameMatch), nameof(NameAfter), nameof(HasMatch))]
-    private (int Start, int Length)? match;
-
-    /// <summary>Whether the filter or type-ahead text is in the name (its letters are highlighted).</summary>
-    public bool HasMatch => Match is not null;
-
-    /// <summary>The name up to the matched letters (all of it when nothing matches).</summary>
-    public string NameBefore => Match is { } m && m.Start + m.Length <= Name.Length ? Name[..m.Start] : Name;
-
-    /// <summary>The matched letters, highlighted.</summary>
-    public string NameMatch => Match is { } m && m.Start + m.Length <= Name.Length ? Name.Substring(m.Start, m.Length) : "";
-
-    /// <summary>The name after the matched letters.</summary>
-    public string NameAfter => Match is { } m && m.Start + m.Length <= Name.Length ? Name[(m.Start + m.Length)..] : "";
-
-    partial void OnAliasChanged(string? value) => OnNameChanged();
-
-    // The name changed (an alias, the unsaved mark): its parts follow.
-    internal void OnNameChanged()
-    {
-        OnPropertyChanged(nameof(NameBefore));
-        OnPropertyChanged(nameof(NameMatch));
-        OnPropertyChanged(nameof(NameAfter));
-    }
-}
-
 // The tree's filter (Ctrl+F) and type-ahead: both match a row's shown name, ignoring case. Files in a "No name"
 // group, the "Loading…" placeholders and rows the filter hides are never matches (the group row itself matches
 // "no name"); the type-ahead looks only at loaded rows, the filter also reads the containers not yet read.

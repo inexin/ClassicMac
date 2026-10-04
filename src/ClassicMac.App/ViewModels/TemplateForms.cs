@@ -474,7 +474,7 @@ public sealed class TemplateFinder(MainViewModel main)
             yield return (raw, node.BaseTitle);
         }
 
-        foreach (var child in Tree.Contents(node))
+        foreach (var child in TreeLayout.Contents(node))
         {
             foreach (var found in Loaded(child))
             {

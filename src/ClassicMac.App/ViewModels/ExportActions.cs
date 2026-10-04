@@ -356,7 +356,7 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
 
     private static void Collect(NodeViewModel folder, List<ContainerNode> items, int depth)
     {
-        foreach (var child in Tree.Contents(folder))
+        foreach (var child in TreeLayout.Contents(folder))
         {
             var node = child switch { FileNode f => f.Node, ContainerFileNode c => c.Node, _ => null };
             if (node is not null)

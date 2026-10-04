@@ -411,7 +411,7 @@ public sealed class EditTests : EditTestsBase
         await model.EditActions.GetInfoCommand.ExecuteAsync(null);
         var subject = Assert.Single(dialogs.Subjects)!;
         Assert.Equal((InspectorHeader.For(node)!.Name, "String in Prefs · 6 bytes"), (subject.Name, subject.Line));
-        Assert.Equal(NodeViewModel.LargeIcon(node), subject.IconPng);
+        Assert.Equal(NodeImages.LargeIcon(node), subject.IconPng);
 
         await model.EditActions.NewResourceCommand.ExecuteAsync(null);
         Assert.Null(dialogs.Subjects[1]);

@@ -29,101 +29,9 @@ public enum TreeIconKind
     NoNameGroup,
 }
 
-// What a browse-tree row shows besides its title (design/boards/browse-tree.md): its icon, its own icon once
-// resolved, the right-aligned meta, the unsaved mark, the "not read" chip and the drag-source outline.
-public abstract partial class NodeViewModel
+// Text a tree row and the Details tab show for a node: its type and creator, a size, its host size.
+public static class NodeFormat
 {
-    private static readonly HashSet<string> ApplicationTypes = ["APPL", "APPC", "APPD", "appe"];
-    private static readonly HashSet<string> SuiteTypes = ["ICN#", "icl4", "icl8", "ics#", "ics4", "ics8", "icm#", "icm4", "icm8"];
-    private const string UnsavedMark = " •";
-
-    private Task? iconLoading;
-
-    /// <summary>The node's own 16 × 16 icon as PNG (a file's Finder icon, an icon resource's), once resolved; else null.</summary>
-    [ObservableProperty]
-    private byte[]? iconPng;
-
-    /// <summary>Whether the node is being dragged out of the tree (its row is outlined).</summary>
-    [ObservableProperty]
-    private bool isDragSource;
-
-    /// <summary>The icon for the node's kind, shown until (or instead of) its own.</summary>
-    public TreeIconKind IconKind => this switch
-    {
-        InputNode => TreeIconKind.HardDisk,
-        ContainerFileNode container => IsArchive(container.ContentFormat) ? TreeIconKind.Parcel : TreeIconKind.Floppy,
-        FileNode file => ApplicationTypes.Contains(file.File.FinderInfo.Type.ToString()) ? TreeIconKind.Application : TreeIconKind.Document,
-        ResourceTypeNode => TreeIconKind.ResourceType,
-        NoNameGroupNode => TreeIconKind.NoNameGroup,
-        ResourceNode => TreeIconKind.Resource,
-        LoadingNode => TreeIconKind.Loading,
-        _ => TreeIconKind.Folder,
-    };
-
-    /// <summary>The "Loading…" placeholder: a spinner, no icon.</summary>
-    public bool IsLoading => this is LoadingNode;
-
-    /// <summary>A resource type's title (<c>'ICN#' (12)</c>) is set in mono.</summary>
-    public bool IsResourceType => this is ResourceTypeNode;
-
-    /// <summary>The name shown: the title without the unsaved mark, or the alias for a file with no name.</summary>
-    public string Name => Alias ?? (IsUnsaved ? Title[..^UnsavedMark.Length] : Title);
-
-    /// <summary>Whether the node has unsaved edits (its title carries " •").</summary>
-    public bool IsUnsaved => Title != BaseTitle && Title.EndsWith(UnsavedMark, StringComparison.Ordinal);
-
-    /// <summary>A container file not read yet: it is read when expanded.</summary>
-    public bool IsUnread => this is ContainerFileNode { Node.UnreadFormat: not null };
-
-    /// <summary>
-    /// The row's right-aligned meta: type · creator for a file, the size for a resource, format and size for the
-    /// input; null for the others.
-    /// </summary>
-    public string? Meta => DetailsShown ? Details : null;
-
-    /// <summary>
-    /// The tooltip of a file's type · creator: its kind and where it came from ("SimpleText text document", "from
-    /// SimpleText’s 'kind' 128"), found only when the tooltip is shown; null for other rows.
-    /// </summary>
-    public object? KindTip => this is FileNode or ContainerFileNode ? new KindTip(this) : null;
-
-    // Whether the tree shows the details column (Tree display ▸ Show details column; off when the node is in no input).
-    private bool DetailsShown
-    {
-        get
-        {
-            var at = this;
-            while (at.Parent is { } parent)
-            {
-                at = parent;
-            }
-            return at is InputNode { Display.ShowDetails: true };
-        }
-    }
-
-    private string? Details => this switch
-    {
-        FileNode file => FormatTypeCreator(file.File.FinderInfo.Type, file.File.FinderInfo.Creator),
-        ContainerFileNode container => FormatTypeCreator(container.File.FinderInfo.Type, container.File.FinderInfo.Creator),
-        ResourceNode resource => FormatSize(resource.Resource.Length),
-        NoNameGroupNode group => string.Create(CultureInfo.InvariantCulture, $"{group.Children.Count} files"),
-        InputNode input => $"{(input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "resource fork")} · {FormatSize(HostSize(input))}",
-        _ => null,
-    };
-
-    partial void OnTitleChanged(string value)
-    {
-        OnPropertyChanged(nameof(Name));
-        OnPropertyChanged(nameof(IsUnsaved));
-        OnNameChanged();
-    }
-
-    /// <summary>Tells the row the container was read, so its "not read" chip goes.</summary>
-    internal void OnRead() => OnPropertyChanged(nameof(IsUnread));
-
-    /// <summary>Tells the row its meta changed (a "No name" group's count).</summary>
-    internal void OnMetaChanged() => OnPropertyChanged(nameof(Meta));
-
     /// <summary>
     /// "type · creator", a zero code (a file never given one, as from another system) a dash; null when both are zero.
     /// </summary>
@@ -164,60 +72,24 @@ public abstract partial class NodeViewModel
     }
 
     // Archives show a parcel, disk images and the other containers a floppy.
-    private static bool IsArchive(string format) =>
+    internal static bool IsArchive(string format) =>
         format.Contains("archive", StringComparison.OrdinalIgnoreCase) || format.Contains("split file", StringComparison.OrdinalIgnoreCase)
         || format is "gzip" or "LHA" or "tar" or "Zip";
+}
 
-    /// <summary>
-    /// Resolves the node's own icon (once), off the UI thread: a file's Finder icon, an icon resource's small icon.
-    /// The tree asks only for rows on screen; nodes without one of their own complete at once.
-    /// </summary>
-    public Task RequestIconAsync() => iconLoading ??= LoadIconAsync();
-
-    /// <summary>
-    /// An alias row's state, learnt with its icon (rows on screen only): found, or why not (aliases.md §5); null for
-    /// other rows and before it is known.
-    /// </summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsBrokenAlias))]
-    private ClassicMac.Files.AliasState? aliasState;
-
-    /// <summary>Whether the row is an alias whose original is not found: dimmed, a mark on its badge.</summary>
-    public bool IsBrokenAlias => AliasState is { } state && state != ClassicMac.Files.AliasState.Found;
-
-    private async Task LoadIconAsync()
-    {
-        if (IsAliasFile && Input is { } input)
-        {
-            var inputs = input.Display.Inputs().ToList();
-            AliasState = await Task.Run(() => Aliases.Of(this, inputs)?.Resolution.State);
-        }
-
-        Func<byte[]?>? load = this switch
-        {
-            FileNode file => () => FolderPreviews.TreeIcon(file),
-            ResourceNode resource when IsIconResource(resource.Resource.Type.ToString()) => () => ResourceIcon(resource),
-            _ => null,
-        };
-        if (load is null)
-        {
-            return;
-        }
-
-        if (await Task.Run(load) is { } png)
-        {
-            IconPng = png;
-        }
-    }
+// The pictures a tree row and the folder preview show for a node: an icon resource drawn small or large, a thumbnail.
+public static class NodeImages
+{
+    internal static readonly HashSet<string> SuiteTypes = ["ICN#", "icl4", "icl8", "ics#", "ics4", "ics8", "icm#", "icm4", "icm8"];
 
     /// <summary>How many file icons the volume holding <paramref name="node"/> has resolved (for tests).</summary>
     internal static int ResolvedIcons(NodeViewModel node) => FolderPreviews.ResolvedTreeIcons(node);
 
-    private static bool IsIconResource(string type) => SuiteTypes.Contains(type) || type is "icns" or "cicn" or "CURS";
+    internal static bool IsIconResource(string type) => SuiteTypes.Contains(type) || type is "icns" or "cicn" or "CURS";
 
     // An icon resource's 16-pixel icon: the suite of its ID plotted at 16 × 16 (the small member, else the large one
     // shrunk); a cicn shrunk by nearest neighbour; a cursor as it is.
-    private static byte[]? ResourceIcon(ResourceNode node) => ResourceIcon(node, large: false);
+    internal static byte[]? ResourceIcon(ResourceNode node) => ResourceIcon(node, large: false);
 
     /// <summary>
     /// The node's large icon for the inspector's header, as PNG: an icon resource's family at 32 × 32 (at 16 when it
@@ -234,7 +106,7 @@ public abstract partial class NodeViewModel
     };
 
     // A picture fitted into 32 × 32 by nearest neighbour; none when it does not decode.
-    private static byte[]? Thumbnail(ResourceNode node)
+    internal static byte[]? Thumbnail(ResourceNode node)
     {
         var diagnostics = new List<Diagnostic>();
         try
@@ -250,15 +122,15 @@ public abstract partial class NodeViewModel
     }
 
     // A font family: "Aa" in its 24 pt (or largest) strike; none without a strike in its file.
-    private static byte[]? FamilyTile(ResourceNode node)
+    internal static byte[]? FamilyTile(ResourceNode node)
     {
         var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, node.Input.Options, []);
         return FontFamilyPreview.Create(node.Resource, data, node.Fork, node.Input.Options)?.Tile();
     }
 
-    private static readonly HashSet<string> LargeMembers = ["ICN#", "icl4", "icl8", "il32"];
+    internal static readonly HashSet<string> LargeMembers = ["ICN#", "icl4", "icl8", "il32"];
 
-    private static byte[]? ResourceIcon(ResourceNode node, bool large)
+    internal static byte[]? ResourceIcon(ResourceNode node, bool large)
     {
         var resource = node.Resource;
         var fork = node.Fork;
@@ -322,5 +194,5 @@ public abstract partial class NodeViewModel
         return Png(small);
     }
 
-    private static byte[] Png(RgbaBitmap bitmap) => PngEncoder.Instance.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels);
+    internal static byte[] Png(RgbaBitmap bitmap) => PngEncoder.Instance.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels);
 }

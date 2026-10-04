@@ -177,7 +177,7 @@ public class TreeViewTests
             Settle(window);
 
             // The rows on screen asked (the tree is about 25 rows high); none of the thousands below did.
-            var resolved = NodeViewModel.ResolvedIcons(files[0]);
+            var resolved = NodeImages.ResolvedIcons(files[0]);
             Assert.InRange(resolved, 10, 40);
             Assert.All(files.Skip(60), f => Assert.Null(f.IconPng));
 
@@ -185,7 +185,7 @@ public class TreeViewTests
             var scroller = window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ScrollViewer>().First();
             scroller.Offset = new Vector(0, scroller.Extent.Height);
             Settle(window);
-            Assert.InRange(NodeViewModel.ResolvedIcons(files[0]) - resolved, 10, 40);
+            Assert.InRange(NodeImages.ResolvedIcons(files[0]) - resolved, 10, 40);
             window.Close();
         }
         finally

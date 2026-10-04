@@ -253,7 +253,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     private void ShowHidden() => TreeDisplay.HideInvisible = false;
 
-    private void UpdateHiddenCount() => HiddenCount = Roots.Sum(Tree.HiddenCount);
+    private void UpdateHiddenCount() => HiddenCount = Roots.Sum(TreeLayout.HiddenCount);
 
     // The details column switched: saved, and every row's meta shown or hidden.
     private void OnShowDetailsChanged()
@@ -273,7 +273,7 @@ public sealed partial class MainViewModel : ObservableObject
         var kept = Selected;
         foreach (var root in Roots)
         {
-            Tree.Relayout(root);
+            TreeLayout.Relayout(root);
         }
 
         UpdateHiddenCount();
@@ -283,7 +283,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         var shown = kept;
-        while (shown is not null && !Tree.IsShown(shown, Roots))
+        while (shown is not null && !TreeLayout.IsShown(shown, Roots))
         {
             shown = shown.Parent;
         }

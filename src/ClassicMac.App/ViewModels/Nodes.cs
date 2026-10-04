@@ -1,13 +1,21 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Editing;
+using ClassicMac.Graphics;
+using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Resources;
+using ClassicMac.Resources.Decoders.Images;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using static ClassicMac.App.ViewModels.NodeFormat;
+using static ClassicMac.App.ViewModels.NodeImages;
+using static ClassicMac.App.ViewModels.TreeLayout;
 
 namespace ClassicMac.App.ViewModels;
 
@@ -132,6 +140,183 @@ public abstract partial class NodeViewModel : ObservableObject
     }
 
     public override string ToString() => Title;
+
+    // What a browse-tree row shows besides its title (design/boards/browse-tree.md): its icon, its own icon once
+    // resolved, the right-aligned meta, the unsaved mark, the "not read" chip and the drag-source outline.
+
+    private static readonly HashSet<string> ApplicationTypes = ["APPL", "APPC", "APPD", "appe"];
+
+    private const string UnsavedMark = " •";
+
+    private Task? iconLoading;
+
+    /// <summary>The node's own 16 × 16 icon as PNG (a file's Finder icon, an icon resource's), once resolved; else null.</summary>
+    [ObservableProperty]
+    private byte[]? iconPng;
+
+    /// <summary>Whether the node is being dragged out of the tree (its row is outlined).</summary>
+    [ObservableProperty]
+    private bool isDragSource;
+
+    /// <summary>The icon for the node's kind, shown until (or instead of) its own.</summary>
+    public TreeIconKind IconKind => this switch
+    {
+        InputNode => TreeIconKind.HardDisk,
+        ContainerFileNode container => IsArchive(container.ContentFormat) ? TreeIconKind.Parcel : TreeIconKind.Floppy,
+        FileNode file => ApplicationTypes.Contains(file.File.FinderInfo.Type.ToString()) ? TreeIconKind.Application : TreeIconKind.Document,
+        ResourceTypeNode => TreeIconKind.ResourceType,
+        NoNameGroupNode => TreeIconKind.NoNameGroup,
+        ResourceNode => TreeIconKind.Resource,
+        LoadingNode => TreeIconKind.Loading,
+        _ => TreeIconKind.Folder,
+    };
+
+    /// <summary>The "Loading…" placeholder: a spinner, no icon.</summary>
+    public bool IsLoading => this is LoadingNode;
+
+    /// <summary>A resource type's title (<c>'ICN#' (12)</c>) is set in mono.</summary>
+    public bool IsResourceType => this is ResourceTypeNode;
+
+    /// <summary>The name shown: the title without the unsaved mark, or the alias for a file with no name.</summary>
+    public string Name => Alias ?? (IsUnsaved ? Title[..^UnsavedMark.Length] : Title);
+
+    /// <summary>Whether the node has unsaved edits (its title carries " •").</summary>
+    public bool IsUnsaved => Title != BaseTitle && Title.EndsWith(UnsavedMark, StringComparison.Ordinal);
+
+    /// <summary>A container file not read yet: it is read when expanded.</summary>
+    public bool IsUnread => this is ContainerFileNode { Node.UnreadFormat: not null };
+
+    /// <summary>
+    /// The row's right-aligned meta: type · creator for a file, the size for a resource, format and size for the
+    /// input; null for the others.
+    /// </summary>
+    public string? Meta => DetailsShown ? Details : null;
+
+    /// <summary>
+    /// The tooltip of a file's type · creator: its kind and where it came from ("SimpleText text document", "from
+    /// SimpleText’s 'kind' 128"), found only when the tooltip is shown; null for other rows.
+    /// </summary>
+    public object? KindTip => this is FileNode or ContainerFileNode ? new KindTip(this) : null;
+
+    // Whether the tree shows the details column (Tree display ▸ Show details column; off when the node is in no input).
+    private bool DetailsShown
+    {
+        get
+        {
+            var at = this;
+            while (at.Parent is { } parent)
+            {
+                at = parent;
+            }
+            return at is InputNode { Display.ShowDetails: true };
+        }
+    }
+
+    private string? Details => this switch
+    {
+        FileNode file => FormatTypeCreator(file.File.FinderInfo.Type, file.File.FinderInfo.Creator),
+        ContainerFileNode container => FormatTypeCreator(container.File.FinderInfo.Type, container.File.FinderInfo.Creator),
+        ResourceNode resource => FormatSize(resource.Resource.Length),
+        NoNameGroupNode group => string.Create(CultureInfo.InvariantCulture, $"{group.Children.Count} files"),
+        InputNode input => $"{(input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "resource fork")} · {FormatSize(HostSize(input))}",
+        _ => null,
+    };
+
+    partial void OnTitleChanged(string value)
+    {
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(IsUnsaved));
+        OnNameChanged();
+    }
+
+    /// <summary>Tells the row the container was read, so its "not read" chip goes.</summary>
+    internal void OnRead() => OnPropertyChanged(nameof(IsUnread));
+
+    /// <summary>Tells the row its meta changed (a "No name" group's count).</summary>
+    internal void OnMetaChanged() => OnPropertyChanged(nameof(Meta));
+
+    /// <summary>
+    /// Resolves the node's own icon (once), off the UI thread: a file's Finder icon, an icon resource's small icon.
+    /// The tree asks only for rows on screen; nodes without one of their own complete at once.
+    /// </summary>
+    public Task RequestIconAsync() => iconLoading ??= LoadIconAsync();
+
+    /// <summary>
+    /// An alias row's state, learnt with its icon (rows on screen only): found, or why not (aliases.md §5); null for
+    /// other rows and before it is known.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBrokenAlias))]
+    private ClassicMac.Files.AliasState? aliasState;
+
+    /// <summary>Whether the row is an alias whose original is not found: dimmed, a mark on its badge.</summary>
+    public bool IsBrokenAlias => AliasState is { } state && state != ClassicMac.Files.AliasState.Found;
+
+    private async Task LoadIconAsync()
+    {
+        if (IsAliasFile && Input is { } input)
+        {
+            var inputs = input.Display.Inputs().ToList();
+            AliasState = await Task.Run(() => Aliases.Of(this, inputs)?.Resolution.State);
+        }
+
+        Func<byte[]?>? load = this switch
+        {
+            FileNode file => () => FolderPreviews.TreeIcon(file),
+            ResourceNode resource when IsIconResource(resource.Resource.Type.ToString()) => () => ResourceIcon(resource),
+            _ => null,
+        };
+        if (load is null)
+        {
+            return;
+        }
+
+        if (await Task.Run(load) is { } png)
+        {
+            IconPng = png;
+        }
+    }
+
+    // A row's part in the tree's filter and type-ahead (design/boards/browse-tree.md, S6).
+
+    /// <summary>Whether the filter hides the row: neither it, a node above it nor one below it matches.</summary>
+    [ObservableProperty]
+    private bool isFilteredOut;
+
+    /// <summary>Whether the row is dimmed: the type-ahead is open and the row does not match.</summary>
+    [ObservableProperty]
+    private bool isDimmed;
+
+    /// <summary>Whether the row is the type-ahead's current match.</summary>
+    [ObservableProperty]
+    private bool isCurrentMatch;
+
+    /// <summary>Where the filter or type-ahead text is in <see cref="Name"/> (start, length), or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NameBefore), nameof(NameMatch), nameof(NameAfter), nameof(HasMatch))]
+    private (int Start, int Length)? match;
+
+    /// <summary>Whether the filter or type-ahead text is in the name (its letters are highlighted).</summary>
+    public bool HasMatch => Match is not null;
+
+    /// <summary>The name up to the matched letters (all of it when nothing matches).</summary>
+    public string NameBefore => Match is { } m && m.Start + m.Length <= Name.Length ? Name[..m.Start] : Name;
+
+    /// <summary>The matched letters, highlighted.</summary>
+    public string NameMatch => Match is { } m && m.Start + m.Length <= Name.Length ? Name.Substring(m.Start, m.Length) : "";
+
+    /// <summary>The name after the matched letters.</summary>
+    public string NameAfter => Match is { } m && m.Start + m.Length <= Name.Length ? Name[(m.Start + m.Length)..] : "";
+
+    partial void OnAliasChanged(string? value) => OnNameChanged();
+
+    // The name changed (an alias, the unsaved mark): its parts follow.
+    internal void OnNameChanged()
+    {
+        OnPropertyChanged(nameof(NameBefore));
+        OnPropertyChanged(nameof(NameMatch));
+        OnPropertyChanged(nameof(NameAfter));
+    }
 }
 
 /// <summary>The "Loading…" placeholder.</summary>
@@ -329,7 +514,7 @@ public sealed class FileNode : NodeViewModel
     /// <summary>The edits made to the file's resources, once any are.</summary>
     public EditState? Editing { get; internal set; }
 
-    public override string Source => Tree.FolderOf(this) is FolderNode folder ? $"{folder.Source}:{Title}" : $"{Parent!.Source} › {Title}";
+    public override string Source => TreeLayout.FolderOf(this) is FolderNode folder ? $"{folder.Source}:{Title}" : $"{Parent!.Source} › {Title}";
 
     protected override Task LoadAsync() => LoadResourcesAsync(this, File, raw: false);
 
@@ -429,7 +614,7 @@ public sealed class ResourceNode(NodeViewModel parent, ResourceFork fork, Resour
 }
 
 // Builds the nodes for what a container holds: its files, grouped into folder nodes by their folder paths.
-internal static partial class Tree
+internal static class Tree
 {
     public static void AddContents(NodeViewModel parent, IReadOnlyList<ContainerNode> contents)
     {

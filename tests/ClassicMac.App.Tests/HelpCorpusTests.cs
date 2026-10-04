@@ -25,7 +25,7 @@ public sealed class HelpCorpusTests
         var pages = new List<FileNode>();
         void Walk(NodeViewModel node)
         {
-            foreach (var child in Tree.Contents(node))
+            foreach (var child in TreeLayout.Contents(node))
             {
                 if (child is FileNode file && HelpPagePreview.Applies(file))
                 {

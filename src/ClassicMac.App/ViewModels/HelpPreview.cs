@@ -53,7 +53,7 @@ public sealed class HelpPagePreview : IWebPreview
     internal static HelpPagePreview Create(FileNode file, DecodeOptions options, ICollection<Diagnostic> diagnostics)
     {
         var source = HelpPages.Decode(file.File.DataFork.ToArray(MaxFile));
-        var folder = PathOf(Tree.FolderOf(file));
+        var folder = PathOf(TreeLayout.FolderOf(file));
         var root = RootOf(file);
         var html = HelpPages.Render(source, folder, path => Find(root, path) is FileNode found && found.File.DataFork.Length <= MaxFile
             ? new HelpFile(found.File.DataFork.ToArray(MaxFile), found.File.FinderInfo.Type) : null, options, diagnostics);
@@ -76,7 +76,7 @@ public sealed class HelpPagePreview : IWebPreview
     private static IReadOnlyList<string> PathOf(NodeViewModel? folder)
     {
         var names = new List<string>();
-        for (var at = folder; at is FolderNode; at = Tree.FolderOf(at))
+        for (var at = folder; at is FolderNode; at = TreeLayout.FolderOf(at))
         {
             names.Insert(0, at.BaseTitle);
         }
@@ -90,7 +90,7 @@ public sealed class HelpPagePreview : IWebPreview
         var at = root;
         foreach (var name in path)
         {
-            var next = Tree.Contents(at).SelectMany(n => n is NoNameGroupNode group ? Tree.Contents(group) : [n])
+            var next = TreeLayout.Contents(at).SelectMany(n => n is NoNameGroupNode group ? TreeLayout.Contents(group) : [n])
                 .FirstOrDefault(n => string.Equals(NameOf(n), name, StringComparison.OrdinalIgnoreCase));
             if (next is null)
             {
