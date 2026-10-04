@@ -78,6 +78,10 @@ internal static class VolumeInfoCheck
             return run.Fatal(10);
         }
 
+        run.BlockSize = a;
+        run.BlockCount = n;
+        run.BitmapStart = bitmapStart;
+        run.AllocationStart = allocationStart;
         return true;
     }
 }

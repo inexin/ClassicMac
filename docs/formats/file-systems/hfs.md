@@ -772,6 +772,47 @@ An HFS Plus volume, bare or in its HFS wrapper, is not checked [ClassicMac].
 | 9 | Invalid VBM start block | `drVBMSt` ≤ 2 |
 | 10 | Invalid allocation block start | `drVBMSt` + B > `drAlBlSt` (read as a signed word) |
 
+**B-tree files** (no line of their own). Each tree file is read through the alternate MDB's extents; its node count is
+its PEOF ÷ node size, not `bthNNodes`. Each of these ends the check (%2 = the file's CNID):
+
+| # | Text | Fails when |
+| --- | --- | --- |
+| 47 | Invalid extent file PEOF | The block count of `drXTExtRec`'s extents (to the first empty one) × A ≠ `drXTFlSize` |
+| 46 | Invalid catalog PEOF | The block count of `drCTExtRec`'s extents and the catalog's overflow extents (fork $00, file 4) × A ≠ `drCTFlSize` [Verified] |
+| 61 | Invalid BTree node size | `bthNodeSize` is not 512, 1,024 … 32,768, or node 0's first record offset is under 14, odd or past the node |
+
+A nonzero reserved header byte (`bthResv` byte 6, node 0 + $32) is cleared by repair, with no problem printed.
+
+**"Checking for locked volume name."** The catalog's first leaf record is the root folder's; if there is none, #56
+"Catalog file entry not found for extent" ends the check (the text does not fit the condition). Its key's name is the
+volume's name for the later MDB compare. A root folder with `frFlags` bit $1000 (name locked) is #55 "Directory name
+locked", repaired by clearing the bit [Verified].
+
+**"Checking extent BTree."**, **"Checking extent file."**, **"Checking catalog BTree."** Each tree is checked so (the
+header node, then a depth-first walk from the root; %3 = the node):
+
+1. Header node: unreadable → #22 "Invalid node structure"; not of kind 1 or not 3 records → #28 "Invalid header node";
+   height not 0 → #5 "Invalid node height"; header record not 106 bytes → #13 "Invalid BTH length"; depth over 8 →
+   #29 "Exceeded maximum BTree depth"; root past the last node → #15 "Invalid root node number"; exactly one of root
+   and depth 0 → #29. An empty tree (both 0) is not walked.
+2. Walk, each node once, every one of these ending the check: a node reached twice → #23 "Overlapped node
+   allocation"; no records and no links → #22; a key longer than 7 (extents) or 37 (catalog) → #25 "Invalid key
+   length"; a key not greater than the one before it in its node (§1.11) → #26 "Keys out of order"; links that do not
+   chain each level's nodes in walk order → #21 "Invalid sibling link"; a first child pointer of 0 or past the last
+   node → #20 "Invalid index link"; an extents leaf record whose extent starts or counts at or past `drNmAlBlks`, or
+   has blocks after an empty extent → #11 "Invalid extent entry" (a start plus count past the end is not checked).
+3. Walk, these flagged for a rebuild of the tree and the walk going on: a kind other than index (0) or leaf (−1) →
+   #16 "Invalid node type"; a height other than the depth less the level, plus 1 → #5; a node's first key other than
+   its parent's index key → #19 "Invalid index key"; a later child pointer of 0 or past the last node → #20; a level
+   past 8 → #29.
+4. Map: the header's map record and then each map node along `ndFLink` must cover the nodes exactly; a map node past
+   the last node → #22, reached twice → #23, not a one-record kind 2 node → #27 "Invalid map node", a chain too short
+   or too long → #24 "Invalid map node linkage" (all ending the check); a map node's height other than 0 → #5. A map
+   that marks other nodes than the walk reached is rewritten by repair, with no problem printed.
+5. The header record's first 30 bytes (depth, root, leaf records, first and last leaf, node size, maximum key length,
+   total and free nodes) against the walk's → #54 "Invalid BTree Header", rewritten by repair [Verified: `bthNRecs`
+   + 1].
+
 ## 6. Diagnostics
 
 "Not traced" means the Mac's behaviour in that case has not been followed in its code. The HFS wrapper's

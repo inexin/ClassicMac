@@ -21,7 +21,12 @@ public static class HfsFirstAid
         var run = new FirstAidRun(volume);
         try
         {
-            _ = VolumeInfoCheck.Run(run);
+            _ = VolumeInfoCheck.Run(run)
+                && BTreeSetupCheck.Run(run)
+                && LockedNameCheck.Run(run)
+                && Stage(run, FirstAidMessages.CheckingExtentsBTree) && BTreeCheck.Run(run, run.Extents!)
+                && Stage(run, FirstAidMessages.CheckingExtentsFile)
+                && Stage(run, FirstAidMessages.CheckingCatalogBTree) && BTreeCheck.Run(run, run.Catalog!);
         }
         catch (EndOfStreamException)
         {
@@ -29,5 +34,11 @@ public static class HfsFirstAid
         }
 
         return new FirstAidReport(run);
+    }
+
+    private static bool Stage(FirstAidRun run, string line)
+    {
+        run.Stage(line);
+        return true;
     }
 }

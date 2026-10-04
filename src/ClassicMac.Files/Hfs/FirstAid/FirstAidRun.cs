@@ -74,6 +74,24 @@ internal sealed class FirstAidRun(HfsVolume volume)
     /// <summary>The primary MDB, at sector 2.</summary>
     public byte[] Primary { get; set; } = [];
 
+    // The volume's geometry, from the alternate MDB as Disk First Aid takes it (its CVCB).
+    public uint BlockSize { get; set; }
+
+    public uint BlockCount { get; set; }
+
+    public int AllocationStart { get; set; }
+
+    public int BitmapStart { get; set; }
+
+    /// <summary>The extents overflow file's B-tree, once set up.</summary>
+    public FirstAidTree? Extents { get; set; }
+
+    /// <summary>The catalog's B-tree, once set up.</summary>
+    public FirstAidTree? Catalog { get; set; }
+
+    /// <summary>The root folder's name, from its catalog key: the name the MDB's <c>drVN</c> must match.</summary>
+    public byte[] RootName { get; set; } = [];
+
     public List<string> Stages { get; } = [];
 
     public List<FirstAidProblem> Problems { get; } = [];
@@ -98,6 +116,34 @@ internal sealed class FirstAidRun(HfsVolume volume)
         return bytes;
     }
 
+    /// <summary>
+    /// A fork's bytes from its extents (start block, block count), <paramref name="length"/> long; blocks past the end of
+    /// the volume read as zeros.
+    /// </summary>
+    public byte[] ReadExtents(IEnumerable<(uint Start, uint Count)> extents, long length)
+    {
+        var bytes = new byte[length];
+        long at = 0;
+        foreach (var (start, count) in extents)
+        {
+            long offset = (long)AllocationStart * SectorSize + (long)start * BlockSize;
+            long size = Math.Min((long)count * BlockSize, length - at);
+            long available = Math.Clamp(Volume.Length - offset, 0, size);
+            if (available > 0)
+            {
+                Volume.Read(offset, bytes.AsSpan(checked((int)at), checked((int)available)));
+            }
+
+            at += size;
+            if (at >= length)
+            {
+                break;
+            }
+        }
+
+        return bytes;
+    }
+
     /// <summary>Records a problem that ends the check: Disk First Aid cannot repair it. Returns false, for the stage to return.</summary>
     public bool Fatal(int number, long arg2 = 0, long arg3 = 0)
     {
@@ -112,6 +158,9 @@ internal sealed class FirstAidRun(HfsVolume volume)
         Add(number, arg2, arg3, repairable: true);
         Repairs |= repairs;
     }
+
+    /// <summary>Records a repair Disk First Aid makes without printing a problem.</summary>
+    public void Silent(FirstAidRepairs repairs) => Repairs |= repairs;
 
     /// <summary>Ends the check: the disk is not an HFS volume (or not one ClassicMac's First Aid checks).</summary>
     public bool End(FirstAidVerdict verdict)
