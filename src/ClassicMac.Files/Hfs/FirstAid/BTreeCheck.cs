@@ -147,7 +147,7 @@ internal sealed class BTreeCheck
                 return run.Fatal(22, 0, node);
             }
 
-            if (tree.KeyLength(key.Span) > tree.MaxKeyLength)
+            if (tree.KeyLength(key.Span) > tree.MaxKeyLength || !tree.KeyFits(key.Span))
             {
                 return run.Fatal(25, 0, node);
             }

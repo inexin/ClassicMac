@@ -72,8 +72,9 @@ flowchart LR
   where it differs (QuickDraw, the Resource Manager).
 - **Licensing**: MIT; code ported from MIT projects keeps a notice in `THIRD-PARTY-NOTICES.md`; GPL, LGPL, AGPL and
   APSL code is reference only. No Apple code or files in the repository.
-- **Hostile input**: every size and offset checked; limits on nesting, expansion, decompressed size and pixels;
-  cycles detected; only `InvalidDataException` and `EndOfStreamException` escape (`MutationTests`).
+- **Hostile input**: every size and offset checked, by what is present rather than what a header declares; limits
+  on nesting, expansion, decompressed size and pixels; cycles detected; only `InvalidDataException` and
+  `EndOfStreamException` escape, and nothing runs long (the mutation tests).
 - **Configuration**: no tunable value hard-coded; immutable options records (`ContainerReadOptions`, `ReadOptions`,
   `DecodeOptions`, `ExportOptions`, `HostWriteOptions`, `PackOptions`) with a static `Default`, mapped by the CLI and
   the app.
@@ -130,8 +131,9 @@ In rough priority; each item names what blocks it, if anything.
    NDIF changed chunks compressed again, segmented images, a check against Disk Copy; cheaper fork edits
    (`ReplaceFork` checked as deletions are); the extents tree edited in place rather than rebuilt; `resize` shrinking
    and a new block size.
-4. **Fuzzing**: SharpFuzz with libFuzzer per reader in CI; `MutationTests` does not yet cover resource maps, `dcmp`,
-   the decoders or NDIF.
+4. **Fuzzing**: SharpFuzz with libFuzzer per reader in CI. The seeded mutation tests (`tests/Shared/Mutations.cs`)
+   cover the containers, resource maps, `dcmp`, every decoder's fixtures, NDIF's two forks and First Aid on HFS and
+   HFS Plus; `CLASSICMAC_MUTANTS` runs them deeper.
 5. **Decoders, later**: `icns`, AIFF/AIFC files, the multi-byte encodings and `--encoding`, a "make loadable" option
    for exported fonts, lossless WebP; QuickDraw's ScrollRect, OpenRgn/OpenPoly and OpenPicture.
 6. **App**: editing the hex view's text column; packaging (macOS bundle icon, Linux icons and `.desktop` file).

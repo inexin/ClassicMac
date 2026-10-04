@@ -162,7 +162,8 @@ None.
 - **The glyph sheet**: every glyph in character order, then the missing symbol, 16 to a row, each at its pen position
   in a cell as wide as the widest glyph plus 2 pixels, black ink on white. A deeper strike's pixel values take its
   `'fctb'`'s colours (the high bytes), and values the table lacks the ROM's ramp: grey `255 − value × 255 / max`.
-  Pixel value 0 is not drawn. The viewer shows the sheet. [ClassicMac]
+  Pixel value 0 is not drawn. A sheet over `DecodeOptions.MaxImagePixels` (a damaged strike's widths) is refused as
+  malformed. The viewer shows the sheet. [ClassicMac]
 - **BDF**: [ClassicMac]
   - `FONT -ClassicMac-<family>-Medium-R-Normal--<size>-<size × 10>-72-72-<M or P>-<widMax × 10>-Apple-Roman`, the
     family's spaces as `_`, or `NFNT<id>` when the family is unknown; `SIZE` the point size (the font's height when

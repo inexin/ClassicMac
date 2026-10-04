@@ -41,6 +41,25 @@ internal sealed class FirstAidTree(int fileId, byte[] bytes, int nodeSize, List<
         _ => HfsPlusBTree.CompareExtentKeys(left, right),
     };
 
+    /// <summary>
+    /// Whether an HFS Plus key's fields fit it: a catalog key's name (8 + 2n bytes), an extents key (12 bytes), an
+    /// attributes key's name (14 + 2n); HFS keys are compared by their own bounds.
+    /// </summary>
+    public bool KeyFits(ReadOnlySpan<byte> key)
+    {
+        if (!Plus)
+        {
+            return true;
+        }
+
+        return FileId switch
+        {
+            4 => key.Length >= 8 && 8 + 2 * (key[6] << 8 | key[7]) == key.Length,
+            8 => key.Length >= 14 && 14 + 2 * (key[12] << 8 | key[13]) == key.Length,
+            _ => key.Length == 12,
+        };
+    }
+
     /// <summary>A key's length, without its length field.</summary>
     public int KeyLength(ReadOnlySpan<byte> key) => Plus ? key[0] << 8 | key[1] : key[0];
 

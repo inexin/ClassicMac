@@ -62,8 +62,17 @@ internal sealed class PpcFragmentMap
     /// <summary>Each code section's traceback tables.</summary>
     public Dictionary<int, IReadOnlyList<TracebackTable>> Tracebacks { get; } = [];
 
-    /// <summary>A section's image (before relocation).</summary>
-    public ReadOnlyMemory<byte> Image(int section) => Pef.GetImage(section, diagnostics);
+    /// <summary>
+    /// A section's image (before relocation). A code section's ends with the bytes it holds: the zeros its total length
+    /// adds are not code, and are not listed [ClassicMac].
+    /// </summary>
+    public ReadOnlyMemory<byte> Image(int section)
+    {
+        var image = Pef.GetImage(section, diagnostics);
+        return Pef.Sections[section].Kind == PefSectionKind.Code
+            ? image[..Math.Min(image.Length, Pef.GetContents(section).Length)]
+            : image;
+    }
 
     /// <summary>Maps a fragment.</summary>
     public static PpcFragmentMap Build(PefContainer pef, ICollection<Diagnostic> diagnostics)
@@ -297,8 +306,9 @@ internal sealed class PpcFragmentMap
             {
                 string import = GlueImport((short)word);
                 Glue[(section, (uint)at)] = import;
-                Candidate(section, (uint)at, import.StartsWith('?') ? null : "." + import[(import.IndexOf("::", StringComparison.Ordinal) + 2)..],
-                    CodeFunctionSource.Glue);
+                int separator = import.IndexOf("::", StringComparison.Ordinal);
+                string symbol = separator < 0 ? import : import[(separator + 2)..];
+                Candidate(section, (uint)at, import.StartsWith('?') || symbol.Length == 0 ? null : "." + symbol, CodeFunctionSource.Glue);
             }
             if ((word & 0xFC000003) == 0x48000001)
             {

@@ -268,7 +268,8 @@ a call into the segment. A package's routines are at +$0A + their table offsets
 
 ### 2.6 PowerPC
 
-1. Each code section's image (unpacked) is listed from its start, word by word. Traceback tables are data.
+1. Each code section's image (unpacked) is listed from its start, word by word, up to the bytes the section holds:
+   the zeros its total length adds are not code [ClassicMac]. Traceback tables are data.
 2. Functions: exported code and transition vectors, traceback names, main/init/term, cross-TOC glue stubs and `bl`
    targets (§1.5).
 3. Transition vectors: a section relocation into a code section followed by one into a data section, the pair being

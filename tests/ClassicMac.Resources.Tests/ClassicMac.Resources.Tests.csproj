@@ -19,5 +19,6 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\CorpusFolders.cs" Link="Shared\CorpusFolders.cs" />
+    <Compile Include="..\Shared\Mutations.cs" Link="Shared\Mutations.cs" />
   </ItemGroup>
 </Project>

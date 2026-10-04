@@ -386,8 +386,8 @@ None.
   caller's. A header shorter than 40 bytes or without the tag throws; everything after is read as far as it goes and
   reported. [ClassicMac]
 - A section is placed in memory by its kind (§1.3), not by instSectionCount. [ClassicMac]
-- A section's contents are clipped to the container. An image is built at most max(unpackedLength, stored length) +
-  16 MB long, and pidata unpacking stops at 256 MB, so a damaged length is not allocated. An image is never shorter
+- A section's contents are clipped to the container. An image is built at most max(bytes unpacked, stored length) +
+  16 MB long (by the bytes actually unpacked, not the declared unpackedLength), and pidata unpacking stops at 256 MB, so a damaged length is not allocated. An image is never shorter
   than its unpacked pidata. Images are cached and built once. [ClassicMac]
 - Pidata that unpacks to more or to less than unpackedLength is reported either way (the Code Fragment Manager
   accepts less), and an argument wider than 32 bits is damage rather than wrapped. [ClassicMac]

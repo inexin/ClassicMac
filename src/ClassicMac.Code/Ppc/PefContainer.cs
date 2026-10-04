@@ -250,13 +250,11 @@ public sealed class PefContainer
     private byte[] BuildImage(PefSection section, ICollection<Diagnostic> diagnostics)
     {
         var contents = GetContents(section.Index).Span;
-        // A section longer than the bytes it could be built from is damage; cap it rather than allocate it.
-        long cap = Math.Max(section.UnpackedLength, (long)contents.Length) + (1 << 24);
-        long total = Math.Min(section.TotalLength, cap);
         ReadOnlySpan<byte> initialized;
         if (section.Kind == PefSectionKind.PatternInitData)
         {
-            var unpacked = PatternData.Unpack(contents, diagnostics, (int)Math.Min(cap, PatternData.DefaultMaxLength));
+            var unpacked = PatternData.Unpack(contents, diagnostics,
+                (int)Math.Min(Math.Max(section.UnpackedLength, (long)contents.Length) + (1 << 24), PatternData.DefaultMaxLength));
             if (unpacked.Length != section.UnpackedLength)
             {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.pidata-length",
@@ -270,6 +268,10 @@ public sealed class PefContainer
         {
             initialized = contents[..(int)Math.Min(contents.Length, section.UnpackedLength)];
         }
+
+        // A section longer than the bytes it was built from (16 MB of zero-filled space allowed) is damage; it is capped
+        // rather than allocated, by what was read, not by its declared lengths.
+        long total = Math.Min(section.TotalLength, Math.Max(initialized.Length, contents.Length) + (1L << 24));
         var image = new byte[Math.Max(total, initialized.Length)];
         initialized.CopyTo(image);
         return image;

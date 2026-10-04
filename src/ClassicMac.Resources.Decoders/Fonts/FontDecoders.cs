@@ -192,7 +192,14 @@ internal sealed class FontDecoder(DecodeOptions options, string name, params str
         var cellWidth = right - left + Gap;
         var cellHeight = Math.Max(1, font.RectHeight) + Gap;
         var rows = Math.Max(1, (glyphs.Count + Columns - 1) / Columns);
-        int width = Columns * cellWidth, height = rows * cellHeight;
+        // A damaged strike's widths can ask for any size: the sheet keeps to the decoders' pixel limit.
+        long sheetWidth = (long)Columns * cellWidth, sheetHeight = (long)rows * cellHeight;
+        if (sheetWidth * sheetHeight > options.MaxImagePixels)
+        {
+            throw new InvalidDataException($"The font's glyph sheet would be {sheetWidth} × {sheetHeight} pixels, over the {options.MaxImagePixels}-pixel limit.");
+        }
+
+        int width = (int)sheetWidth, height = (int)sheetHeight;
         var rgba = new byte[width * height * 4];
         rgba.AsSpan().Fill(255);
         for (var i = 0; i < glyphs.Count; i++)
