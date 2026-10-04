@@ -713,7 +713,9 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   first when an operation finds fewer free nodes than the depth + 1. Only the nodes, bitmap sectors and MDB that change
   are written [ClassicMac]. On a volume with no block to grow the file into, and for an empty tree, the writer instead
   rebuilds the tree's leaf and index nodes from the sorted records, each node filled in turn, using the nodes already
-  in the tree file first. The extents tree is always rebuilt so. Volumes edited so (a Mac OS-initialized 20 MB volume
+  in the tree file first. The extents tree is edited the same way, record by record (a fork's overflow records added,
+updated and removed, a deletion's removed one by one) [ClassicMac: the catalog's rules, not checked on Mac OS for this
+tree], and rebuilt only when an edit cannot be made in place (an empty tree, too few free nodes). Volumes edited so (a Mac OS-initialized 20 MB volume
   with 100 new folders, catalog depth 1 to 3; a new 20 MB volume with 600, depth 4) mount in Mac OS 9.0, pass Disk
   First Aid 8.5, take the Finder's own copies and deletions, and pass it again; so does the 600-folder volume with 300
   folders deleted (emptied leaves freed, depth kept: no merging) and with all 600 deleted (the root collapsed to one

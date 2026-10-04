@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- HFS writing: the extents overflow tree is edited in place by the BTree manager's rules, as the catalog is (a
+  deletion changes its leaf and the header, not every node); fork replacement checks the edited file by its own record
+  and forks, about twice as fast on a 500 MB volume.
 - First Aid on HFS Plus (hfs-plus.md §5.4): `check`, `repair` and Volume ▸ First Aid… check and repair HFS Plus
   and HFSX volumes, bare or in their HFS wrapper (HFSX in its catalog's own key order, with folder counts): the volume header (a sound alternate stands in for a
   damaged one), the special files, the B-trees with HFS Plus's keys, the catalog's records, threads and forks, the

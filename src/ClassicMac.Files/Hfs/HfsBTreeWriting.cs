@@ -88,8 +88,34 @@ internal static class HfsBTreeWriting
             throw new InvalidDataException("The extents-overflow record to remove was not found.");
         }
 
+        if (TryEditExtentsTree(tree, edit => edit.Delete(key)))
+        {
+            return;
+        }
+
         records.RemoveAt(recordIndex);
         RebuildBTree(tree, records.Select(record => (record.Key, record.Data)).ToList(), validateExtents: true);
+    }
+
+    /// <summary>
+    /// Edits the extents tree in place by the BTree manager's rules, as the catalog is edited (hfs.md §1.8); false, with
+    /// the tree unchanged, when the edit needs a rebuild instead (an empty tree, too few free nodes, a node that would not
+    /// fit). The result is validated before it is kept.
+    /// </summary>
+    internal static bool TryEditExtentsTree(byte[] tree, Action<BTreeEdit> change)
+    {
+        try
+        {
+            var edit = new BTreeEdit(tree.ToArray(), CompareExtentsKeys);
+            change(edit);
+            ValidateExtentsTree(edit.Bytes);
+            edit.Bytes.CopyTo(tree, 0);
+            return true;
+        }
+        catch (Exception e) when (e is BTreeEdit.NeedsNodesException or BTreeEdit.RebuildException)
+        {
+            return false;
+        }
     }
 
     internal static void RebuildBTree(byte[] tree, List<(byte[] Key, byte[] Data)> records, bool validateExtents)
@@ -324,6 +350,11 @@ internal static class HfsBTreeWriting
         if (insertion < 0)
         {
             insertion = records.Count;
+        }
+
+        if (TryEditExtentsTree(tree, edit => edit.Insert((key, data))))
+        {
+            return;
         }
 
         records.Insert(insertion, (key, data));
