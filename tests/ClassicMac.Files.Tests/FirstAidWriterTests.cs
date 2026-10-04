@@ -41,6 +41,18 @@ public class FirstAidWriterTests
     }
 
     [Fact]
+    public void The_test_builder_s_volumes_appear_to_be_OK()
+    {
+        var builder = new HfsBuilder();
+        var docs = builder.Folder(HfsBuilder.Root, "Docs");
+        builder.File(docs, "Letter", "data"u8.ToArray(), new byte[300]);
+        builder.File(HfsBuilder.Root, "Read Me", "hello"u8.ToArray(), []);
+
+        var problems = Problems(builder.Build("Disk"));
+        Assert.True(problems.Count == 0, string.Join("; ", problems));
+    }
+
+    [Fact]
     public void Volumes_Mac_OS_made_appear_to_be_OK()
     {
         if (!CorpusFolders.Any)

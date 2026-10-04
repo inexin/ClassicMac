@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System;
 using ClassicMac.Core;
 using ClassicMac.Files.Editing;
@@ -43,27 +44,32 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
         }
 
         string? fault = null;
+        FirstAidReport? firstAid = null;
         var volume = opened.Host.Layout == HostLayout.Plain && opened.Root.Volume?.Format == "HFS";
         if (volume)
         {
             fault = HfsWriter.Check(opened.Root.File.DataFork);
+            firstAid = HfsFirstAid.Verify(opened.Root.File.DataFork);
         }
         else if (InputEditSession.Open(input.FullName, containerOptions, readOptions) is { Kind: InputEditKind.HfsVolume, Partition: null } session)
         {
-            // A disk image the writer edits (Disk Copy 4.2, NDIF): its disk gets the writer's checks.
+            // A disk image the writer edits (Disk Copy 4.2, NDIF): its disk gets the writer's checks and First Aid.
             volume = true;
             fault = HfsWriter.Check(ForkData.FromBytes(session.Volume));
+            firstAid = HfsFirstAid.Verify(ForkData.FromBytes(session.Volume));
         }
 
-        // A partitioned disk: each HFS partition gets the writer's checks (one that wraps HFS Plus or is no HFS is left out).
-        var partitions = new List<(MacPartition Partition, string? Fault)>();
+        // A partitioned disk: each HFS partition gets the writer's checks and First Aid (one that wraps HFS Plus or is no
+        // HFS is left out).
+        var partitions = new List<(MacPartition Partition, string? Fault, FirstAidReport FirstAid)>();
         if (opened.Host.Layout == HostLayout.Plain)
         {
             foreach (var partition in PartitionMapReader.Partitions(opened.Root.File.DataFork).Where(p => p.Type == "Apple_HFS"))
             {
                 try
                 {
-                    partitions.Add((partition, HfsWriter.Check(opened.Root.File.DataFork.Slice(partition.Offset, partition.Length))));
+                    var slice = opened.Root.File.DataFork.Slice(partition.Offset, partition.Length);
+                    partitions.Add((partition, HfsWriter.Check(slice), HfsFirstAid.Verify(slice)));
                 }
                 catch (InvalidDataException)
                 {
@@ -74,10 +80,11 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
         fault ??= partitions.Select(p => p.Fault).FirstOrDefault(f => f is not null);
 
         int notOpened = opened.Leaves.Count(leaf => leaf.Node.UnreadFormat is not null);
-        // A volume or partition the writer refuses is an error too, counted with the reader's.
+        // A volume or partition the writer refuses, or that First Aid does not find OK, is one error too, counted with the
+        // reader's.
         int errors = found.Count(f => f.Diagnostic.Severity == DiagnosticSeverity.Error)
-                     + (volume && fault is not null && partitions.Count == 0 ? 1 : 0)
-                     + partitions.Count(p => p.Fault is not null);
+                     + (volume && partitions.Count == 0 && (fault is not null || Fails(firstAid)) ? 1 : 0)
+                     + partitions.Count(p => p.Fault is not null || Fails(p.FirstAid));
         int warnings = found.Count(f => f.Diagnostic.Severity == DiagnosticSeverity.Warning);
         if (json)
         {
@@ -118,16 +125,19 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
                     w.WriteNull("volume");
                 }
 
+                WriteFirstAid(w, partitions.Count == 0 ? firstAid : null);
+
                 if (partitions.Count > 0)
                 {
                     w.WriteStartArray("partitions");
-                    foreach (var (partition, partitionFault) in partitions)
+                    foreach (var (partition, partitionFault, partitionFirstAid) in partitions)
                     {
                         w.WriteStartObject();
                         w.WriteNumber("number", partition.Number);
                         w.WriteString("name", partition.Name);
                         w.WriteBoolean("passes", partitionFault is null);
                         w.WriteString("fault", partitionFault);
+                        WriteFirstAid(w, partitionFirstAid);
                         w.WriteEndObject();
                     }
 
@@ -146,13 +156,19 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
             {
                 reporter.Write(source, [d]);
             }
+            if (partitions.Count == 0 && firstAid is not null)
+            {
+                WriteFirstAid(output, "first aid: ", firstAid);
+            }
+
             if (volume)
             {
                 output.WriteLine($"volume: {fault ?? "passes the writer's checks"}");
             }
 
-            foreach (var (partition, partitionFault) in partitions)
+            foreach (var (partition, partitionFault, partitionFirstAid) in partitions)
             {
+                WriteFirstAid(output, $"partition {partition.Number} \"{partition.Name}\" first aid: ", partitionFirstAid);
                 output.WriteLine($"partition {partition.Number} \"{partition.Name}\": {partitionFault ?? "passes the writer's checks"}");
             }
 
@@ -165,5 +181,50 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
         }
 
         return errors > 0 || fault is not null || (strict && warnings > 0) ? ExitCodes.Damaged : ExitCodes.Success;
+    }
+
+    // A volume First Aid does not find OK: one that needs repair, cannot be repaired, or is not an HFS disk.
+    private static bool Fails(FirstAidReport? report) =>
+        report is { Verdict: not (FirstAidVerdict.AppearsOk or FirstAidVerdict.NotChecked) };
+
+    // Disk First Aid's lines: each problem, then the verdict.
+    private static void WriteFirstAid(TextWriter output, string prefix, FirstAidReport report)
+    {
+        foreach (var problem in report.Problems)
+        {
+            output.WriteLine(prefix + problem);
+        }
+
+        output.WriteLine(prefix + report.Summary);
+    }
+
+    private static void WriteFirstAid(Utf8JsonWriter w, FirstAidReport? report)
+    {
+        if (report is null)
+        {
+            w.WriteNull("firstAid");
+            return;
+        }
+
+        w.WriteStartObject("firstAid");
+        w.WriteString("verdict", JsonNamingPolicy.CamelCase.ConvertName(report.Verdict.ToString()));
+        w.WriteString("summary", report.Summary);
+        w.WriteStartArray("problems");
+        foreach (var problem in report.Problems)
+        {
+            w.WriteStartObject();
+            w.WriteNumber("number", problem.Number);
+            w.WriteString("message", problem.Message);
+            w.WriteNumber("arg2", problem.Arg2);
+            w.WriteNumber("arg3", problem.Arg3);
+            w.WriteString("stage", problem.Stage);
+            w.WriteBoolean("repairable", problem.Repairable);
+            w.WriteString("code", problem.Code);
+            w.WriteString("origin", JsonNamingPolicy.CamelCase.ConvertName(problem.Origin.ToString()));
+            w.WriteEndObject();
+        }
+
+        w.WriteEndArray();
+        w.WriteEndObject();
     }
 }

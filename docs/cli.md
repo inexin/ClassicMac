@@ -232,14 +232,21 @@ inside them)`; JSON `notOpened`). `--deep` reads through them too, as `info` and
 named by the containers down to its file (`disk.img > Images:Inner.img > Broken`). A plain
 HFS volume image also gets the checks the writer makes before an edit (`HfsWriter.Check`,
 [hfs.md §5.5](formats/file-systems/hfs.md#55-the-writer)), run even on a software-locked volume, and the first fault
-found is shown as `volume: <fault>`, or `volume: passes the writer's checks`. The last line counts the errors and
-warnings; a volume or partition the writer refuses counts as an error (in JSON's `errors` too).
+found is shown as `volume: <fault>`, or `volume: passes the writer's checks`. Each HFS volume, and each HFS partition
+of a partitioned disk, is also checked as Disk First Aid checks it ([hfs.md §5.6](formats/file-systems/hfs.md#56-first-aid)):
+its problem lines and verdict come before the `volume:` line, as `first aid: Problem:  Invalid PEOF, 18, 2` and
+`first aid: The volume “Macintosh HD” needs to be repaired.` (a partition's as `partition 3 "Macintosh HD" first aid:
+…`). The last line counts the errors and warnings; a volume or partition the writer refuses, or that First Aid does
+not find OK, counts as one error (in JSON's `errors` too).
 
 Exit 0 when nothing is wrong (warnings allowed, unless `--strict`), 1 when there is an error or a volume fault, 4 when
 the input cannot be read. `--json` writes `{ "input", "diagnostics": [{ "source", "severity", "code", "message",
-"location"?, "offset"? }], "volume": { "passes", "fault" } or null, "partitions"?: [{ "number", "name", "passes",
-"fault" }], "notOpened", "errors", "warnings" }`; `volume` is null for input that is not a plain HFS volume, and `partitions` lists a
-partitioned disk's HFS partitions (text: `partition 3 "Macintosh HD": passes the writer's checks`).
+"location"?, "offset"? }], "volume": { "passes", "fault" } or null, "firstAid": { "verdict", "summary", "problems":
+[{ "number", "message", "arg2", "arg3", "stage", "repairable", "code", "origin" }] } or null, "partitions"?:
+[{ "number", "name", "passes", "fault", "firstAid" }], "notOpened", "errors", "warnings" }`; `volume` and `firstAid`
+are null for input that is not a plain HFS volume, and `partitions` lists a partitioned disk's HFS partitions (text:
+`partition 3 "Macintosh HD": passes the writer's checks`). `verdict` is `appearsOk`, `needsRepair`, `cannotRepair`,
+`notHfs` or `notChecked` (an HFS Plus volume); `origin` is `diskFirstAid` or `classicMac`.
 
 ## 3. Write commands
 

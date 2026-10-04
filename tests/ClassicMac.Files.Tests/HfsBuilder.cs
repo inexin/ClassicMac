@@ -156,7 +156,9 @@ internal sealed class HfsBuilder
             BinaryPrimitives.WriteUInt16BigEndian(r.AsSpan(12), 0x0100);
             BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(20), f.Id);
             BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(26), (uint)f.Data.Length);
+            BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(30), (uint)((f.Data.Length + Block - 1) / Block * Block));         // filPyLen
             BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(36), (uint)f.Resource.Length);
+            BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(40), (uint)((f.Resource.Length + Block - 1) / Block * Block));     // filRPyLen
             BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(44), 2_526_595_200); // 1984-01-24
             BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(48), 2_526_595_260);
             r[56] = 0xFE; // a recognisable FXInfo byte
@@ -262,6 +264,7 @@ internal sealed class HfsBuilder
         BinaryPrimitives.WriteUInt16BigEndian(mdb[0x0E..], 3); // volume bitmap starts in allocation block 3
         BinaryPrimitives.WriteUInt16BigEndian(mdb[0x22..], checked((ushort)allocated.Count(value => !value)));
         BinaryPrimitives.WriteUInt32BigEndian(mdb[0x14..], Block);
+        BinaryPrimitives.WriteUInt32BigEndian(mdb[0x18..], 4 * Block); // drClpSiz: four blocks, as Mac OS initializes it
         BinaryPrimitives.WriteUInt16BigEndian(mdb[0x1C..], FirstAllocationBlock);
         BinaryPrimitives.WriteUInt32BigEndian(mdb[0x1E..], nextId);
         mdb[0x24] = (byte)volumeName.Length;
