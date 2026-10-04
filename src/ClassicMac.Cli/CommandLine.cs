@@ -634,43 +634,12 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
     internal static long ParseSize(ArgumentResult result)
     {
         var text = result.Tokens.Count == 1 ? result.Tokens[0].Value : string.Empty;
-        if (TryParseSize(text, out var size))
+        if (ByteSize.TryParse(text, out var size))
         {
             return size;
         }
 
         result.AddError($"'{text}' is not a size: use bytes, or a number with KiB, MiB or GiB.");
         return 0;
-    }
-
-    internal static bool TryParseSize(string text, out long size)
-    {
-        size = 0;
-        var s = text.Trim();
-        long unit = 1;
-        foreach (var (suffix, value) in new[]
-        {
-            ("KiB", 1L << 10), ("MiB", 1L << 20), ("GiB", 1L << 30), ("K", 1L << 10), ("M", 1L << 20), ("G", 1L << 30),
-        })
-        {
-            if (s.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-            {
-                s = s[..^suffix.Length].TrimEnd();
-                unit = value;
-                break;
-            }
-        }
-        if (!long.TryParse(s, NumberStyles.None, CultureInfo.InvariantCulture, out var number))
-        {
-            return false;
-        }
-
-        if (number > long.MaxValue / unit)
-        {
-            return false;
-        }
-
-        size = number * unit;
-        return size > 0;
     }
 }

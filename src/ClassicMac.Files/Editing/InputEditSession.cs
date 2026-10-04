@@ -433,7 +433,19 @@ public sealed class InputEditSession
         changes.Add(new PlannedChange("rename", macPath, $"to {newName}"));
     }
 
-    /// <summary>Grows a plain volume image to <paramref name="size"/> bytes (hfs.md §3.2); not a partitioned disk's partition.</summary>
+    /// <summary>Whether <see cref="Resize"/> takes the input: a plain HFS volume image (not a partition, nor a Disk Copy or NDIF image's disk).</summary>
+    public bool CanResize => Kind == InputEditKind.HfsVolume && ndif is null && volumes is [{ Region: null }];
+
+    /// <summary>The volume's size in bytes as edited so far; for an input <see cref="CanResize"/> takes.</summary>
+    public long VolumeSize => CanResize ? Overlay(volumes[0]).Length : throw NotVolume("have a size to change");
+
+    /// <summary>The smallest size the volume, as edited so far, shrinks to (hfs.md §3.3); for an input <see cref="CanResize"/> takes.</summary>
+    public long SmallestSize => CanResize ? HfsWriter.SmallestSize(Overlay(volumes[0]).AsForkData()) : throw NotVolume("have a size to change");
+
+    /// <summary>
+    /// Grows or shrinks a plain volume image to <paramref name="size"/> bytes (hfs.md §3.2, §3.3); not a partitioned
+    /// disk's partition, nor a Disk Copy or NDIF image's disk.
+    /// </summary>
     public void Resize(long size)
     {
         if (volumes.Count > 1)

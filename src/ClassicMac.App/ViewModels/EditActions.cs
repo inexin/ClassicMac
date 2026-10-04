@@ -76,7 +76,13 @@ public interface IEditDialogs
 
     /// <summary>First Aid's window: what a check or repair found; true when Repair is clicked (offered only when it can).</summary>
     Task<bool> FirstAidAsync(FirstAidView view);
+
+    /// <summary>Resize: the new size as typed (bytes, or with K, M or G), or null when cancelled.</summary>
+    Task<string?> ResizeAsync(ResizeView view);
 }
+
+/// <summary>Resize's window (Volume ▸ Resize…): the volume, its size, the smallest it shrinks to and the largest it grows to, in bytes.</summary>
+public sealed record ResizeView(string Volume, long Size, long Smallest, long Largest);
 
 /// <summary>
 /// First Aid's window (Volume ▸ First Aid…): the volume, the lines (problems, or the repairs made and what is left), the
@@ -244,7 +250,7 @@ public sealed partial class EditActions(IAppSelection appSelection, IAppServices
         foreach (var command in new IRelayCommand[] { NewResourceCommand, DuplicateResourceCommand, DeleteResourceCommand, GetInfoCommand,
             ReplaceDataCommand, EditHexCommand, BeginHexEditCommand, appParts.ImportActions.ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand,
             appParts.VolumeActions.NewFileCommand, appParts.VolumeActions.ImportFileCommand, appParts.VolumeActions.NewFolderCommand, appParts.VolumeActions.DeleteItemCommand,
-            appParts.VolumeActions.FirstAidCommand, appParts.VolumeActions.DefragmentCommand })
+            appParts.VolumeActions.FirstAidCommand, appParts.VolumeActions.DefragmentCommand, appParts.VolumeActions.ResizeCommand })
         {
             command.NotifyCanExecuteChanged();
         }

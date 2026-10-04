@@ -92,6 +92,15 @@ public abstract class EditTestsBase : IDisposable
         public Func<FirstAidView, bool> FirstAid { get; set; } = _ => false;
         public List<FirstAidView> FirstAidShown { get; } = [];
 
+        public Func<ResizeView, string?> Resize { get; set; } = _ => null;
+        public List<ResizeView> ResizeShown { get; } = [];
+
+        public Task<string?> ResizeAsync(ResizeView view)
+        {
+            ResizeShown.Add(view);
+            return Task.FromResult(Resize(view));
+        }
+
         public Task<bool> FirstAidAsync(FirstAidView view)
         {
             FirstAidShown.Add(view);

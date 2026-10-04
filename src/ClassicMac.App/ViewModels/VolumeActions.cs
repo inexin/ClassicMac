@@ -303,6 +303,48 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
         appServices.Status = "Defragmented the volume; Save As ▸ HFS Volume Image writes it.";
     }
 
+    private bool CanResize() => !appParts.ExportActions.IsExporting && appSelection.Selected?.Input is { VolumeSession.CanResize: true };
+
+    // Volume ▸ Resize… (hfs.md §3.2, §3.3): the input's volume grown or shrunk in the session, written by Save As; a
+    // size the dialog's text is not, or that the volume cannot take, says why in the status line.
+    [RelayCommand(CanExecute = nameof(CanResize))]
+    private async Task Resize()
+    {
+        if (appSelection.Selected?.Input is not { VolumeSession.CanResize: true } input || appServices.EditDialogs is not { } dialogs)
+        {
+            return;
+        }
+
+        var session = input.VolumeSession;
+        long smallest;
+        try
+        {
+            smallest = await Task.Run(() => session.SmallestSize);
+        }
+        catch (InvalidDataException e)
+        {
+            appServices.Status = $"Could not resize the volume: {e.Message}";
+            return;
+        }
+
+        var name = input.Root.Volume?.Name ?? input.BaseTitle;
+        if (await dialogs.ResizeAsync(new ResizeView(name, session.VolumeSize, smallest, HfsWriter.MaximumFormatSize)) is not { } typed)
+        {
+            return;
+        }
+
+        if (!ByteSize.TryParse(typed, out var size))
+        {
+            appServices.Status = $"“{typed}” is not a size: give bytes, or a number with K, M or G.";
+            return;
+        }
+
+        if (ChangeVolume(input, s => s.Resize(size), "resize the volume"))
+        {
+            appServices.Status = $"Resized the volume to {size.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} bytes; Save As ▸ HFS Volume Image writes it.";
+        }
+    }
+
     private static List<string> Lines(FirstAidReport report) => [.. report.Problems.Select(p => p.ToString())];
 
     private static IEnumerable<NodeViewModel> Descendants(NodeViewModel node) =>

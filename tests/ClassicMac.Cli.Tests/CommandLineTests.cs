@@ -15,30 +15,6 @@ public class CommandLineTests
         return (code, output.ToString(), error.ToString());
     }
 
-    [Theory]
-    [InlineData("1024", 1024L)]
-    [InlineData("64MiB", 64L << 20)]
-    [InlineData("64 mib", 64L << 20)]
-    [InlineData("2G", 2L << 30)]
-    [InlineData("8KiB", 8L << 10)]
-    public void Sizes_accept_bytes_and_binary_units(string text, long expected)
-    {
-        Assert.True(CommandLine.TryParseSize(text, out var size));
-        Assert.Equal(expected, size);
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("0")]
-    [InlineData("-5")]
-    [InlineData("1.5MiB")]
-    [InlineData("64MB")]
-    [InlineData("9999999999GiB")]
-    public void Sizes_reject_everything_else(string text)
-    {
-        Assert.False(CommandLine.TryParseSize(text, out _));
-    }
-
     [Fact]
     public void Limit_options_map_onto_the_options_records()
     {

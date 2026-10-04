@@ -676,6 +676,59 @@ public sealed class EditTests : EditTestsBase
         Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(saved)).Verdict);
     }
 
+    // Volume ▸ Resize… (hfs.md §3.2, §3.3): the dialog shows the size and its limits; the volume grows or shrinks in the
+    // session and Save As writes it.
+    [Theory]
+    [InlineData("1440K", 1440 * 1024)]
+    [InlineData("500k", 500 * 1024)]
+    public async Task Resize_grows_or_shrinks_the_volume_for_Save_As(string typed, long size)
+    {
+        var image = HfsWriter.Format(800 * 1024, "Floppy");
+        image = HfsWriter.CreateFile(ForkData.FromBytes(image), "Read Me", "hello"u8.ToArray(), Array.Empty<byte>(), FinderInfo.Empty);
+        var path = Path.Combine(folder, "Floppy.hfs");
+        File.WriteAllBytes(path, image);
+        var dialogs = new Dialogs { Resize = _ => typed };
+        var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
+        var input = (await model.OpenAsync(path))!;
+        model.Selected = input.Children.Single(n => n.Title == "Read Me");          // any item of the volume
+        Assert.True(model.VolumeActions.ResizeCommand.CanExecute(null));
+
+        await model.VolumeActions.ResizeCommand.ExecuteAsync(null);
+
+        var view = Assert.Single(dialogs.ResizeShown);
+        Assert.Equal(("Floppy", 800L * 1024, HfsWriter.SmallestSize(ForkData.FromBytes(image)), HfsWriter.MaximumFormatSize),
+            (view.Volume, view.Size, view.Smallest, view.Largest));
+        Assert.True(model.EditActions.HasUnsavedChanges);
+        Assert.Contains("Resized", model.Status);
+        model.Selected = input;
+        await model.EditActions.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        var saved = File.ReadAllBytes(Path.Combine(folder, "Floppy-edited.hfs"));
+        Assert.Equal(size, saved.Length);
+        Assert.Equal("hello"u8.ToArray(), HfsReader.Instance.Read(ForkData.FromBytes(saved), new ContainerContext()).Single().DataFork.ToArray());
+    }
+
+    [Fact]
+    public async Task Resize_refuses_what_is_no_size_and_disk_images_inside_others()
+    {
+        var path = Path.Combine(folder, "Floppy.hfs");
+        File.WriteAllBytes(path, HfsWriter.Format(800 * 1024, "Floppy"));
+        var dialogs = new Dialogs { Resize = _ => "big" };
+        var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
+        model.Selected = await model.OpenAsync(path);
+
+        await model.VolumeActions.ResizeCommand.ExecuteAsync(null);
+        Assert.Contains("“big” is not a size", model.Status);
+        dialogs.Resize = _ => "2K";                                                    // too small for the volume's blocks
+        await model.VolumeActions.ResizeCommand.ExecuteAsync(null);
+        Assert.Contains("Could not resize", model.Status);
+        Assert.False(model.EditActions.HasUnsavedChanges);
+
+        var disk = Path.Combine(folder, "Disk.img");
+        File.WriteAllBytes(disk, Fixtures.PartitionMap(("Floppy", "Apple_HFS", HfsWriter.Format(800 * 1024, "Floppy"))));
+        model.Selected = await model.OpenAsync(disk);
+        Assert.False(model.VolumeActions.ResizeCommand.CanExecute(null));             // a partition keeps its size
+    }
+
     [Fact]
     public async Task Defragment_is_for_writable_HFS_volumes()
     {

@@ -296,6 +296,27 @@ public class DialogTests
     });
 
     [Fact]
+    public void Resize_shows_the_size_and_its_limits_and_returns_what_was_typed() => OnUiThread(() =>
+    {
+        var dialog = Show(DialogViews.Resize(new ResizeView("Macintosh HD", 819_200, 412_160, 2_147_483_136)));
+        AssertFrame(dialog.Window, "Resize", "Resize", "Cancel");
+        var texts = dialog.Window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        Assert.Contains("819,200 bytes (800K)", texts);
+        Assert.Contains("412,160 bytes", texts);
+        Assert.Contains("2,147,483,136 bytes", texts);
+        var size = dialog.Window.GetVisualDescendants().OfType<TextBox>().Single(b => b.Name == "Size");
+        Assert.Equal("800K", size.Text);
+        Assert.Contains("mono", size.Classes);
+        size.Text = "20M";
+        Footer(dialog.Window, "Resize").Command!.Execute(null);
+        Assert.Equal("20M", dialog.Result);
+
+        var cancelled = Show(DialogViews.Resize(new ResizeView("Macintosh HD", 819_200, 412_160, 2_147_483_136)));
+        Footer(cancelled.Window, "Cancel").Command!.Execute(null);
+        Assert.Null(cancelled.Result);
+    });
+
+    [Fact]
     public void Dialogs_draw_in_light_and_dark() => OnUiThread(() =>
     {
         var baselines = new List<string>();
@@ -312,6 +333,9 @@ public class DialogTests
             ["Problem:  Invalid PEOF, 18, 2", "Problem:  MountCheck found minor errors."], "The volume “Macintosh HD” needs to be repaired.", CanRepair: true)));
         Baselines.Check(firstAid.Window, "dialog-first-aid", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
         firstAid.Window.Close();
+        var resize = Show(DialogViews.Resize(new ResizeView("Macintosh HD", 819_200, 412_160, 2_147_483_136)));
+        Baselines.Check(resize.Window, "dialog-resize", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+        resize.Window.Close();
         Baselines.Verify(baselines);
     });
 }

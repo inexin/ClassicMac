@@ -33,6 +33,7 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
         appParts.VolumeActions.DeleteItemCommand.NotifyCanExecuteChanged();
         appParts.VolumeActions.FirstAidCommand.NotifyCanExecuteChanged();
         appParts.VolumeActions.DefragmentCommand.NotifyCanExecuteChanged();
+        appParts.VolumeActions.ResizeCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>The last export's task (tests wait for it).</summary>

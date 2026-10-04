@@ -29,7 +29,7 @@ and the containers they travel in, disk images and archives, resources decoded t
 | Graphics | `ClassicMac.Graphics`: QuickDraw renderer (two QuickDraws, screen depths), PICT read and write, QuickTime images, MacPaint, fonts; ImageSharp and SkiaSharp adapters | graphics/ |
 | Code | PEF, `cfrg`, 68k applications, data initialisers, code resources; 68k and PowerPC disassemblers; `disasm` | code/, output/disassembly.md |
 | CLI | `info`, `list`, `unpack`, `extract`, `convert`, `disasm`, `pack`, the Mac-path commands (`ls`, `stat`, `cat`, `find`, `get`), the write commands, `check`, `repair`, `format`, `resize`, `shell`, `mcp` | cli.md |
-| App | Avalonia viewer and editor: browse, previews (images, sound, text, fonts, dialogs, menus, Finder windows, documents, listings, hex), export, resource edits with undo, typed forms and templates, image and sound import, the Volume menu with First Aid | design/APP-DESIGN-BRIEF.md |
+| App | Avalonia viewer and editor: browse, previews (images, sound, text, fonts, dialogs, menus, Finder windows, documents, listings, hex), export, resource edits with undo, typed forms and templates, image and sound import, the Volume menu with First Aid, Defragment and Resize | design/APP-DESIGN-BRIEF.md |
 
 Phases 1–11 (core, disk images, decoders I and II, viewer, editors I–III, the QuickDraw.Pict merge, HFS Plus and
 archives, code) are done and passed their exit checks.

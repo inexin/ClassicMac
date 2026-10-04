@@ -76,6 +76,7 @@
       <Separator />
       <MenuItem Header="First _Aid…" Command="{Binding VolumeActions.FirstAidCommand}" />
       <MenuItem Header="Defra_gment" Command="{Binding VolumeActions.DefragmentCommand}" />
+      <MenuItem Header="Resi_ze…" Command="{Binding VolumeActions.ResizeCommand}" />
     </MenuItem>
     <MenuItem Header="E_xport">
       <MenuItem Header="_Save Resource As…" Command="{Binding ExportActions.SaveResourceAsCommand}" InputGesture="Ctrl+E" HotKey="Ctrl+E" />

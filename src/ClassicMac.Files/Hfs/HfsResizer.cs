@@ -324,6 +324,20 @@ internal static class HfsResizer
         }
     }
 
+    // SmallestSize (hfs.md §3.3): the allocation area's start, the blocks in use, the alternate MDB and the spare sector.
+    internal static long SmallestSize(ForkData image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        var state = OpenCatalog(image, writable: false);
+        long used = 0;
+        for (uint block = 0; block < state.BlockCount; block++)
+        {
+            used += IsAllocated(state.Bitmap, (ushort)block) ? 1 : 0;
+        }
+
+        return state.FirstBlock + used * state.BlockSize + 2 * BlockSize;
+    }
+
     // Defragment (hfs.md §3.4): the volume laid out again in its own size and geometry, its extents tree as long as before
     // but empty, from block 0.
     internal static byte[] Defragment(ForkData image)

@@ -805,6 +805,13 @@ public static class HfsWriter
     /// </summary>
     /// <exception cref="InvalidDataException">The volume is not one the writer edits, has bad blocks or wraps HFS Plus.</exception>
     public static byte[] Defragment(ForkData image) => HfsResizer.Defragment(image);
+
+    /// <summary>
+    /// The smallest size <see cref="Resize"/> shrinks the volume to (hfs.md §3.3): room for its blocks in use, the
+    /// allocation area keeping its start; reached when the free space is one run at the end (<see cref="Defragment"/>).
+    /// </summary>
+    /// <exception cref="InvalidDataException">The volume is not one the writer edits.</exception>
+    public static long SmallestSize(ForkData image) => HfsResizer.SmallestSize(image);
 }
 
 /// <summary>The fork selected for an HFS file edit.</summary>

@@ -104,6 +104,37 @@ public sealed class HfsDefragmentTests : IDisposable
         Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(shrunk)).Verdict);
     }
 
+    // The smallest size a volume shrinks to: its blocks in use, with nothing to spare once it is defragmented.
+    [Fact]
+    public void The_smallest_size_holds_the_blocks_in_use()
+    {
+        var source = HfsWriter.Defragment(ForkData.FromBytes(Fragmented()));
+        long used = U16(source, Mdb + 0x12) - U16(source, Mdb + 0x22);
+
+        long smallest = HfsWriter.SmallestSize(ForkData.FromBytes(source));
+
+        Assert.Equal((U16(source, Mdb + 0x1C) + 2 + used) * 512L, smallest);                    // 512-byte blocks
+        Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(HfsWriter.Resize(ForkData.FromBytes(source), smallest))).Verdict);
+        Assert.Throws<InvalidDataException>(() => HfsWriter.Resize(ForkData.FromBytes(source), smallest - 512));
+    }
+
+    [Fact]
+    public void Only_a_plain_volume_image_is_resized()
+    {
+        var plain = Path.Combine(directory, "plain.img");
+        File.WriteAllBytes(plain, Fragmented());
+        var partitioned = Path.Combine(directory, "partitioned.img");
+        File.WriteAllBytes(partitioned, PartitionMap(("One", "Apple_HFS", Fragmented())));
+
+        var session = InputEditSession.Open(plain);
+
+        Assert.True(session.CanResize);
+        Assert.Equal(HfsWriter.SmallestSize(ForkData.FromFile(plain)), session.SmallestSize);
+        Assert.False(InputEditSession.Open(partitioned).CanResize);
+        session.Resize(4 * 1024 * 1024);
+        Assert.Equal(HfsWriter.SmallestSize(ForkData.FromBytes(session.Volume)), session.SmallestSize);   // as edited
+    }
+
     [Fact]
     public void The_session_defragments_one_partition_of_a_disk_with_several()
     {

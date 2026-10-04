@@ -11,6 +11,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using ClassicMac.App.Controls;
 using ClassicMac.App.ViewModels;
+using ClassicMac.Core;
 using ClassicMac.Resources;
 using CommunityToolkit.Mvvm.Input;
 
@@ -580,6 +581,41 @@ internal static class DialogViews
         });
         repair.IsEnabled = view.CanRepair;
         Compose(window, Header(window, "First Aid", () => { }), body, Footer(done, repair, null));
+        return dialog;
+    }
+
+    /// <summary>
+    /// Resize: the volume in the header, its size and the smallest and largest it takes, and the new size (bytes, or
+    /// with K, M or G; the size as it is to start with).
+    /// </summary>
+    public static Dialog<string?> Resize(ResizeView view)
+    {
+        const string title = "Resize";
+        var window = NewWindow(title);
+        var dialog = new Dialog<string?>(window, null);
+        static TextBlock Bytes(long value, bool unit = false) => new()
+        {
+            Text = value.ToString("N0", CultureInfo.InvariantCulture) + " bytes" + (unit ? $" ({ByteSize.Format(value)})" : ""),
+            Classes = { "mono" },
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var size = Input("Size", ByteSize.Format(view.Size), 160, mono: true);
+        var body = new StackPanel { Spacing = 10, Width = 420 };
+        body.Children.Add(new TextBlock { Text = $"“{view.Volume}”", Classes = { "alert-question" } });
+        body.Children.Add(Fields(("Now", Bytes(view.Size, unit: true)), ("Smallest", Bytes(view.Smallest)), ("Largest", Bytes(view.Largest)), ("New size", size)));
+        body.Children.Add(new TextBlock
+        {
+            Text = "Bytes, or a number with K, M or G. Growing past 65,535 blocks takes a larger block size and lays every file out whole; shrinking moves what lies past the new end.",
+            TextWrapping = TextWrapping.Wrap,
+            Classes = { "muted" },
+        });
+        var cancel = Button("Cancel", window.Close);
+        var resize = Button("Resize", () =>
+        {
+            dialog.Result = size.Text ?? "";
+            window.Close();
+        });
+        Compose(window, Header(window, title, () => { }), body, Footer(cancel, resize, null));
         return dialog;
     }
 

@@ -597,7 +597,10 @@ sectors). For the new size of N' logical blocks [ClassicMac]:
 4. The MDB's block is copied to N' − 2.
 
 The result must pass the writer's checks (§5.5), and every file must read back as the source's, both forks byte for
-byte. A shrink refused for want of a free run succeeds after a defragmentation (§3.4).
+byte. A shrink refused for want of a free run succeeds after a defragmentation (§3.4). `SmallestSize` gives the size
+that holds the blocks in use, `drAlBlSt` + 2 + the blocks in use × (`drAlBlkSiz` ÷ 512) sectors, reached when the free
+space is one run at the end. The CLI's `resize` and the app's Volume ▸ Resize… (which shows the size, the smallest and
+the largest) grow and shrink a plain volume image.
 
 ### 3.4 Defragmenting a volume
 

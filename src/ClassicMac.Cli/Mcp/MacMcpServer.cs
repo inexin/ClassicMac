@@ -598,7 +598,7 @@ internal sealed class MacMcpServer : IDisposable
             Schema($"{SessionProperty}, \"size\": {{ \"type\": \"string\" }}, {DryRunProperty}", "session", "size"), false, false,
             args => Write(args, (_, _, _) =>
             {
-                var size = CommandLine.TryParseSize(args.Required("size"), out var bytes) ? bytes : throw new BadArguments("size is bytes, or a number with K/KiB, M/MiB or G/GiB.");
+                var size = ByteSize.TryParse(args.Required("size"), out var bytes) ? bytes : throw new BadArguments("size is bytes, or a number with K/KiB, M/MiB or G/GiB.");
                 return session => session.Resize(size);
             })),
         new("defrag", "Defragment", "Lays the session's volume out again: every fork in one extent, the free space in one run at the end (path: empty, or on a disk with several partitions the partition's name).",

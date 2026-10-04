@@ -31,4 +31,6 @@ internal sealed class EditDialogs(Window owner) : IEditDialogs
     public Task<bool> ConfirmAsync(string title, string message) => Show(DialogViews.Confirm(title, message));
 
     public Task<bool> FirstAidAsync(FirstAidView view) => Show(DialogViews.FirstAid(view));
+
+    public Task<string?> ResizeAsync(ResizeView view) => Show(DialogViews.Resize(view));
 }
