@@ -10,7 +10,8 @@ internal static class BitmapCheck
     {
         run.Stage(FirstAidMessages.CheckingBitmap);
         int sectors = (int)((run.BlockCount + 4095) / 4096);
-        var computed = new byte[sectors * FirstAidRun.SectorSize];
+        // HFS compares whole bitmap sectors; HFS Plus the allocation file's bytes that cover the blocks.
+        var computed = new byte[run.Plus ? (run.BlockCount + 7) / 8 : sectors * FirstAidRun.SectorSize];
         bool overlapped = false;
         foreach (var (fileId, _, start, count) in run.ForkExtents)
         {
@@ -28,6 +29,18 @@ internal static class BitmapCheck
         }
 
         var onDisk = new byte[computed.Length];
+        if (run.AllocationFileExtents is { } allocation)
+        {
+            onDisk = run.ReadExtents(allocation, computed.Length);
+            if (!System.MemoryExtensions.SequenceEqual(computed, onDisk))
+            {
+                run.Flag(60, FirstAidRepairs.Bitmap);
+            }
+
+            run.ComputedBitmap = computed;
+            return true;
+        }
+
         run.Volume.Read((long)run.BitmapStart * FirstAidRun.SectorSize, onDisk);
         for (var sector = 0; sector < sectors; sector++)
         {

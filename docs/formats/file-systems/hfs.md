@@ -754,7 +754,8 @@ the number. The verdict is the first that applies:
 | Needs repair | "The volume “name” needs to be repaired." | Problems were found, all repairable |
 | Appears OK | "The volume “name” appears to be OK." | Nothing was found |
 
-An HFS Plus volume, bare or in its HFS wrapper, is not checked [ClassicMac]. Each problem also has a code,
+An HFS Plus volume, bare or in its HFS wrapper, is checked by its own stages ([hfs-plus.md §5.4](hfs-plus.md#54-first-aid));
+HFSX is not checked [ClassicMac]. Each problem also has a code,
 `firstaid.` and its text in lowercase words joined by hyphens (`firstaid.invalid-peof`; the long texts of #48, #66,
 #70 and #71 are `firstaid.folder-nesting`, `firstaid.volume-header-version`, `firstaid.first-allocation-block` and
 `firstaid.first-catalog-extent`), and MountCheck's lines are `firstaid.mountcheck-serious` and

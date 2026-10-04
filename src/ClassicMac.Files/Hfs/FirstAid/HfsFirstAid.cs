@@ -33,6 +33,26 @@ public static class HfsFirstAid
         var run = new FirstAidRun(volume);
         try
         {
+            var (plus, hfsx, offset, length) = PlusVolumeCheck.Find(volume);
+            if (hfsx)
+            {
+                run.Stage(FirstAidMessages.CheckingDiskVolume);
+                run.End(FirstAidVerdict.NotChecked);
+                return (run, new FirstAidReport(run));
+            }
+
+            if (plus)
+            {
+                _ = PlusVolumeCheck.Run(run, offset, length)
+                    && Stage(run, FirstAidMessages.CheckingExtentsBTree) && BTreeCheck.Run(run, run.Extents!)
+                    && Stage(run, FirstAidMessages.CheckingCatalogBTree) && BTreeCheck.Run(run, run.Catalog!)
+                    && (run.AttributesTree is not { } attributes || Stage(run, FirstAidMessages.CheckingAttributesBTree) && BTreeCheck.Run(run, attributes))
+                    && PlusCatalogScan.Run(run)
+                    && BitmapCheck.Run(run)
+                    && PlusHeaderCompare.Run(run);
+                return (run, new FirstAidReport(run));
+            }
+
             _ = VolumeInfoCheck.Run(run)
                 && BTreeSetupCheck.Run(run)
                 && LockedNameCheck.Run(run)

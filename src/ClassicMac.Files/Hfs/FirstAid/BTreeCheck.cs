@@ -4,7 +4,8 @@ using ClassicMac.Core;
 
 namespace ClassicMac.Files.Hfs;
 
-// Disk First Aid's B-tree check (BTCheck; hfs.md §5.6), for the extents tree and the catalog: the header node, a
+// Disk First Aid's B-tree check (BTCheck; hfs.md §5.6), for the extents tree and the catalog (and HFS Plus's attributes
+// tree, with HFS Plus's key lengths and orders): the header node, a
 // depth-first walk from the root checking each node's keys, links, kind and height, the node map, and the header record
 // against what the walk computed [Code: Disk First Aid 8.5.5, CODE 1 $1FEB4 BTCheck, $2097C BTKeyChk, $205B4 BTMapChk,
 // $20710 CmpBTH, $25B28 AllocBTN].
@@ -146,7 +147,7 @@ internal sealed class BTreeCheck
                 return run.Fatal(22, 0, node);
             }
 
-            if (key.Span[0] > tree.MaxKeyLength)
+            if (tree.KeyLength(key.Span) > tree.MaxKeyLength)
             {
                 return run.Fatal(25, 0, node);
             }
@@ -177,7 +178,7 @@ internal sealed class BTreeCheck
             file.TryRecord(node, i, out var key, out var data);
             tree.LeafRecords++;
             tree.Records.Add((key.ToArray(), data.ToArray(), node));
-            if (!tree.IsCatalog && !ExtentRecords.Check(run, data.Span, 0, node))
+            if (tree.Plus ? tree.FileId == 3 && !PlusExtentRecords.Check(run, data, 0, node) : !tree.IsCatalog && !ExtentRecords.Check(run, data.Span, 0, node))
             {
                 return false;
             }
@@ -323,6 +324,5 @@ internal sealed class BTreeCheck
     // AllocBTN: a node reached twice is an overlap.
     private bool Reach(uint node) => tree.Reached.Add(node) || run.Fatal(23, 0, node);
 
-    private int Compare(byte[] left, byte[] right) =>
-        tree.IsCatalog ? HfsCatalogKeys.CompareCatalogKeys(left, right) : HfsBTreeWriting.CompareExtentsKeys(left, right);
+    private int Compare(byte[] left, byte[] right) => tree.Compare(left, right);
 }

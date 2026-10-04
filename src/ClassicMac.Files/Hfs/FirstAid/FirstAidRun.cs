@@ -133,6 +133,21 @@ internal sealed class FirstAidRun(HfsVolume volume)
 
     public FirstAidRepairs Repairs { get; set; }
 
+    /// <summary>An HFS Plus volume, at <see cref="VolumeOffset"/> (inside an HFS wrapper, or 0).</summary>
+    public bool Plus { get; set; }
+
+    /// <summary>Where an HFS Plus volume starts in the image, in bytes.</summary>
+    public long VolumeOffset { get; set; }
+
+    /// <summary>The HFS Plus allocation file's extents (the volume bitmap on HFS is at <see cref="BitmapStart"/>).</summary>
+    public List<(uint Start, uint Count)>? AllocationFileExtents { get; set; }
+
+    /// <summary>The HFS Plus attributes tree, when the volume has one.</summary>
+    public FirstAidTree? AttributesTree { get; set; }
+
+    /// <summary>An HFS Plus volume's name, from its root folder's key.</summary>
+    public string? PlusVolumeName { get; set; }
+
     /// <summary>A problem no repair fixes was found, though the check went on.</summary>
     public bool Unrepairable { get; set; }
 
@@ -212,6 +227,14 @@ internal sealed class FirstAidRun(HfsVolume volume)
         Unrepairable |= repairs == FirstAidRepairs.None;
     }
 
+    /// <summary>Records a problem with no number that ends the check: it cannot be repaired. Returns false.</summary>
+    public bool FatalProblem(string message, string code)
+    {
+        Problems.Add(new FirstAidProblem(0, message, 0, 0, stage, Repairable: false, code));
+        Ended = FirstAidVerdict.CannotRepair;
+        return false;
+    }
+
     /// <summary>Records a problem that needs no repair: the volume can still appear to be OK.</summary>
     public void Note(int number, long arg2 = 0, long arg3 = 0) => Add(number, arg2, arg3, repairable: true);
 
@@ -231,5 +254,5 @@ internal sealed class FirstAidRun(HfsVolume volume)
 
     /// <summary>The volume's name, from the primary MDB's <c>drVN</c>.</summary>
     public string VolumeName =>
-        Primary.Length >= 0x40 ? MacRoman.Decode(Primary.AsSpan(0x25, Math.Min((int)Primary[0x24], 27))) : "";
+        PlusVolumeName ?? (Primary.Length >= 0x40 && !Plus ? MacRoman.Decode(Primary.AsSpan(0x25, Math.Min((int)Primary[0x24], 27))) : "");
 }

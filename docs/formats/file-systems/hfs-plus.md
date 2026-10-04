@@ -468,6 +468,44 @@ Everything else is reported and the volume read (§6):
   chain, count, private folder flags, ancestor flags) report and leave the files readable; none of the verifier's
   repairs are made.
 
+### 5.4 First Aid
+
+`HfsFirstAid.Verify` checks an HFS Plus volume, bare or in its HFS wrapper, in stages like HFS's
+([hfs.md §5.6](hfs.md#56-first-aid)), with the same report, verdicts and repair flags, and Disk First Aid's problem
+numbers and words where they mean the same. The rules are TN1150's; where Disk First Aid's own HFS Plus checks are not
+traced, the choices are ClassicMac's [ClassicMac]. HFSX is "not checked".
+
+1. **"Checking disk volume."**: the volume is the image (`'H+'` at 1024) or a wrapper's `drEmbedExtent`.
+2. **"Checking "Mac OS Extended" volume structures."**: the volume header at 1024 is used when sound (`'H+'`, version 4,
+   a power-of-two block size of at least 512, a block count that fits, and the extents and catalog files' own
+   extents consistent with their block counts); else a sound alternate at the volume's last 1,024 bytes is used
+   (`firstaid.volume-header-damaged`, repaired by writing the header). Otherwise the first failure ends the check:
+   not HFS Plus (`firstaid.invalid-volume-header`), #66 version, #7 block size, #8 block count, #47 extents file, #46
+   catalog file. An alternate at the end of the volume's blocks that is missing or differs in the signature, version,
+   block size and count, or the special files is `firstaid.alternate-volume-header`, repaired from the header. The
+   special files' extents (their own and the overflow records', for all but the extents file) must add up to their
+   block counts and lie within the volume (#11, #46, #47, `firstaid.invalid-special-file`); the allocation file must
+   hold a bit per block (`firstaid.invalid-allocation-file`). The blocks holding the boot blocks and header and the
+   alternate count as in use.
+3. **The B-trees**, extents, catalog and (when present) attributes ("Checking attributes BTree."), by the HFS check
+   (hfs.md §5.6) with 16-bit key lengths, maximum keys 10, 516 and 266, and HFS Plus's key orders (§2.5); node sizes
+   must be a power of two from 512, at least 4 KB for the catalog and attributes (#61).
+4. **"Checking catalog file."**: every leaf record in key order. The root thread (2, "") must exist (#35). A folder
+   record is 88 bytes (#32), a file record 248 (#34), a thread 10 + 2n with an empty key name (#33, #38) and a name of
+   1 to 255 units (#39); an unknown type is #31; a folder or file ID under 16 (but the root's) is #65. Each folder
+   and file needs its thread naming its parent and name (#36, repaired); a thread whose folder is missing is #37
+   (repaired from the thread), whose file is missing #6 (deleted). Each fork's extents must cover its block count
+   (#1), its logical size lie within it (#2), and an overflow record's start block be the fork's blocks before it
+   (`firstaid.extent-start`); a block count short of the extents is `firstaid.short-peof`.
+5. **"Checking catalog hierarchy."**: each folder's valence is its folders and files (#3, repaired); an item whose
+   parent folder is missing, with no thread to make it again, is `firstaid.missing-parent` (not repaired); a folder
+   that is its own ancestor is #41.
+6. **"Checking volume bit map."**: the allocation file's bytes for the volume's blocks against the blocks the extents
+   use (#60, repaired; #12 for blocks used twice).
+7. **"Checking volume info."**: `fileCount`, `folderCount`, `freeBlocks` and `nextCatalogID` (above the highest CNID,
+   unless `kHFSCatalogNodeIDsReusedBit`) against what the check counted: #59 "Volume Header needs minor repair".
+   Overflow extents records of files not in the catalog are `firstaid.orphaned-extents`.
+
 ## 6. Diagnostics
 
 The classic HFS codes are in [hfs.md §6](hfs.md#6-diagnostics). "Not traced" means the Mac's behaviour in that case

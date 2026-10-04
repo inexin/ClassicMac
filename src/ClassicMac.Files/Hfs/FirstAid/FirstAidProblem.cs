@@ -15,7 +15,7 @@ public enum FirstAidVerdict
     /// <summary>"This is not an HFS disk.": neither MDB is an HFS one.</summary>
     NotHfs,
 
-    /// <summary>An HFS Plus volume, which ClassicMac's First Aid does not check yet.</summary>
+    /// <summary>An HFSX volume, which First Aid does not check.</summary>
     NotChecked,
 }
 

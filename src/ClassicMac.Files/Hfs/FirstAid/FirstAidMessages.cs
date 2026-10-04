@@ -74,6 +74,8 @@ public static class FirstAidMessages
     // STR# 1200: the stage lines, in the order they run.
     internal const string CheckingDiskVolume = "Checking disk volume.";
     internal const string CheckingStandardVolume = "Checking \"Mac OS Standard\" volume structures.";
+    internal const string CheckingExtendedVolume = "Checking \"Mac OS Extended\" volume structures.";
+    internal const string CheckingAttributesBTree = "Checking attributes BTree.";
     internal const string CheckingLockedName = "Checking for locked volume name.";
     internal const string CheckingExtentsBTree = "Checking extent BTree.";
     internal const string CheckingExtentsFile = "Checking extent file.";
@@ -96,6 +98,6 @@ public static class FirstAidMessages
     internal const string NotHfs = "This is not an HFS disk.";
     internal const string UnableToRead = "Unable to read from disk.";
 
-    // ClassicMac's own: Disk First Aid 8.5.5 checks HFS Plus too, which ClassicMac's First Aid does not yet (hfs.md §5.6).
-    internal const string NotChecked = "An HFS Plus volume: ClassicMac's First Aid checks Mac OS Standard (HFS) volumes.";
+    // ClassicMac's own: an HFSX volume, which First Aid does not check (hfs-plus.md §5.4).
+    internal const string NotChecked = "An HFSX volume: First Aid checks Mac OS Standard (HFS) and Mac OS Extended (HFS Plus) volumes.";
 }
