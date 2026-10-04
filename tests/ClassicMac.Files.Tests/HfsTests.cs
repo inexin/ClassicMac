@@ -405,7 +405,7 @@ public class HfsTests
         byte[] secondKey = ReadCatalogKey(image, firstLeafOffset, secondRecordStart);
         Assert.Equal("Games", Encoding.ASCII.GetString(firstKey, 7, firstKey[6]));
         Assert.Equal("Aead Me", Encoding.ASCII.GetString(secondKey, 7, secondKey[6]));
-        Assert.True(HfsWriter.CompareCatalogKeys(firstKey, secondKey) > 0);
+        Assert.True(HfsCatalogKeys.CompareCatalogKeys(firstKey, secondKey) > 0);
 
         var (files, diagnostics) = Read(image);
 

@@ -887,7 +887,7 @@ public sealed class HfsReader : IContainerReader, IVolumeReader
         {
             if (name == "catalog")
             {
-                return HfsWriter.CompareCatalogKeys(left, right);
+                return HfsCatalogKeys.CompareCatalogKeys(left, right);
             }
 
             var leftReader = new BigEndianReader(left);

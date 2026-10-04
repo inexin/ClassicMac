@@ -1,23 +1,18 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsWriter;
+using static ClassicMac.Files.Hfs.HfsCatalogEditing;
+using static ClassicMac.Files.Hfs.HfsAllocation;
 
 namespace ClassicMac.Files.Hfs;
 
-public static partial class HfsWriter
+// HfsWriter.Resize: a volume grown within its allocation block size (hfs.md §3.2).
+internal static class HfsResizer
 {
-    /// <summary>
-    /// A plain HFS volume grown to <paramref name="size"/> bytes within its allocation block size (hfs.md §3.2): the new
-    /// allocation blocks are free, the bitmap covers them (the allocation area moved up whole sectors when the bitmap's
-    /// sectors are full), and the alternate MDB is at the new end. Every file, folder and CNID stays. Returns a new image.
-    /// </summary>
-    /// <exception cref="ArgumentOutOfRangeException">The size is not whole 512-byte blocks, or is past what an image in memory can hold.</exception>
-    /// <exception cref="InvalidDataException">
-    /// The volume is not one the writer edits, or the size is not larger, or the volume would need more than 65,535
-    /// allocation blocks of its size.
-    /// </exception>
-    public static byte[] Resize(ForkData image, long size)
+    internal static byte[] Resize(ForkData image, long size)
     {
         ArgumentNullException.ThrowIfNull(image);
         if (size % BlockSize != 0 || size <= 0 || size > MaximumFormatSize)

@@ -155,7 +155,7 @@ public sealed class BTreeFileTests
         var tree = Tree(512, (int)New, 256);
         BinaryPrimitives.WriteUInt32BigEndian(tree.AsSpan(14 + 22), Old);
 
-        uint added = HfsWriter.ExtendBTreeNodeMap(tree, Old, New);
+        uint added = HfsBTreeWriting.ExtendBTreeNodeMap(tree, Old, New);
 
         var file = new BTreeFile(tree, 512, wordKeyLength: false);
         Assert.True(file.TryReadMap(out var map, out var problem), problem);

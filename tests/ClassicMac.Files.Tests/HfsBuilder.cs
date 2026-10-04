@@ -178,7 +178,7 @@ internal sealed class HfsBuilder
         // Catalog: records in the leaves, linked in order, under one index node.
         // In the catalog's order: by parent, then by name as the Mac OS compares them (RelString's weights).
         var keyed = records.Select(r => Keyed(r.Parent, r.Name, r.Record, UncountedKeyPadding)).ToList();
-        keyed.Sort(HfsWriter.CompareCatalogKeys);
+        keyed.Sort(HfsCatalogKeys.CompareCatalogKeys);
         var perLeaf = (keyed.Count + CatalogLeaves - 1) / CatalogLeaves;
         var index = new List<byte[]>();
         for (var leaf = 1; leaf <= CatalogLeaves; leaf++)

@@ -122,7 +122,7 @@ public static class MacPaths
         ArgumentNullException.ThrowIfNull(left);
         ArgumentNullException.ThrowIfNull(right);
         return MacRoman.TryEncode(left, out var a) && MacRoman.TryEncode(right, out var b)
-            ? HfsWriter.CatalogNamesEqual(a, b)
+            ? HfsCatalogKeys.CatalogNamesEqual(a, b)
             : string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
     }
 }

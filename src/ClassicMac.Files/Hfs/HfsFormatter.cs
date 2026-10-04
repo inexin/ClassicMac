@@ -3,30 +3,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsWriter;
+using static ClassicMac.Files.Hfs.HfsCatalogEditing;
+using static ClassicMac.Files.Hfs.HfsBTreeWriting;
 
 namespace ClassicMac.Files.Hfs;
 
-public static partial class HfsWriter
+// HfsWriter.Format: a new volume laid out as Mac OS 9.0's initializer lays it out (hfs.md §3.1).
+internal static class HfsFormatter
 {
-    /// <summary>The smallest volume <see cref="Format"/> makes: 400 KB, a single-sided floppy.</summary>
-    public const long MinimumFormatSize = 400 * 1024;
-
-    /// <summary>The largest volume <see cref="Format"/> makes, as one in-memory image: just under 2 GB.</summary>
-    public const long MaximumFormatSize = int.MaxValue / BlockSize * BlockSize;
-
-    /// <summary>The largest volume <see cref="FormatTo"/> makes: 2 TB, HFS's limit (65,535 allocation blocks).</summary>
-    public const long MaximumFormatToSize = 2L << 40;
-
-    /// <summary>
-    /// A new, empty HFS volume of <paramref name="size"/> bytes named <paramref name="volumeName"/>, laid out as Mac OS 9.0's
-    /// initializer lays it out (hfs.md §3.1): boot blocks zero, the MDB, the bitmap, the extents overflow file and the
-    /// catalog (with the root folder and its thread) at the start of the allocation area, and the alternate MDB.
-    /// <paramref name="created"/> is the creation and modification date (the local time now when omitted). The result
-    /// passes <see cref="Check"/>.
-    /// </summary>
-    /// <exception cref="ArgumentOutOfRangeException">The size is not whole 512-byte blocks, or outside 400 KB to 2 GB.</exception>
-    /// <exception cref="ArgumentException">The name is empty, over 27 bytes, has a colon, or a character Mac OS Roman has not.</exception>
-    public static byte[] Format(long size, string volumeName, MacDate? created = null)
+    internal static byte[] Format(long size, string volumeName, MacDate? created = null)
     {
         if (size > MaximumFormatSize)
         {
@@ -36,14 +22,7 @@ public static partial class HfsWriter
         return FormatVolume(size, volumeName, created).ToArray();
     }
 
-    /// <summary>
-    /// Writes a new, empty HFS volume to the file at <paramref name="path"/> (created, or replaced), laid out as
-    /// <see cref="Format"/> lays it out, up to 2 TB: the file is made <paramref name="size"/> bytes long and only the MDB,
-    /// the bitmap, the B-tree files and the alternate MDB are written (a few MB).
-    /// </summary>
-    /// <exception cref="ArgumentOutOfRangeException">The size is not whole 512-byte blocks, or outside 400 KB to 2 TB.</exception>
-    /// <exception cref="ArgumentException">The name is empty, over 27 bytes, has a colon, or a character Mac OS Roman has not.</exception>
-    public static void FormatTo(string path, long size, string volumeName, MacDate? created = null)
+    internal static void FormatTo(string path, long size, string volumeName, MacDate? created = null)
     {
         ArgumentNullException.ThrowIfNull(path);
         var volume = FormatVolume(size, volumeName, created);
@@ -168,7 +147,7 @@ public static partial class HfsWriter
 
     // An empty B-tree file of 512-byte nodes: the header node (its header record, 128 bytes of user data and a map
     // record marking node 0 used) and free nodes after it (hfs.md §1.6, §1.7).
-    private static byte[] EmptyTree(long bytes, int maxKeyLength)
+    internal static byte[] EmptyTree(long bytes, int maxKeyLength)
     {
         var tree = new byte[bytes];
         var writer = new BigEndianWriter(tree);

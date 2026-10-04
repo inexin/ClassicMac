@@ -3,312 +3,20 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsWriter;
+using static ClassicMac.Files.Hfs.HfsCatalogKeys;
+using static ClassicMac.Files.Hfs.HfsBTreeWriting;
+using static ClassicMac.Files.Hfs.HfsAllocation;
+using static ClassicMac.Files.Hfs.HfsForkWriting;
 
 namespace ClassicMac.Files.Hfs;
 
-public static partial class HfsWriter
+// HfsWriter's catalog edits: opening a volume's catalog with the writer's checks, committing it (in place by the
+// BTree manager's rules, or rebuilt), the catalog's accounting, and what deletions keep (hfs.md §5.5).
+internal static class HfsCatalogEditing
 {
-    private static readonly ushort[] CatalogNameWeights = BuildCatalogNameWeights();
-
-    /// <summary>Creates a file and both of its forks in a plain HFS volume, returning a new image.</summary>
-    public static byte[] CreateFile(ForkData image, string macPath, ReadOnlyMemory<byte> data,
-        ReadOnlyMemory<byte> resource, FinderInfo finderInfo, MacDate? created = null, MacDate? modified = null) =>
-        CreateFile(new HfsVolume(image), macPath, data, resource, finderInfo, created, modified).ToArray();
-
-    internal static HfsVolume CreateFile(HfsVolume image, string macPath, ReadOnlyMemory<byte> data,
-        ReadOnlyMemory<byte> resource, FinderInfo finderInfo, MacDate? created = null, MacDate? modified = null)
-    {
-        ArgumentNullException.ThrowIfNull(finderInfo);
-        var state = OpenCatalog(image);
-        var (parent, name) = ResolveParent(state.Records, macPath);
-        EnsureAbsent(state.Records, parent, name);
-        uint id = U32(new BigEndianReader(state.Mdb), 0x1E);
-        if (id < 16 || id == uint.MaxValue)
-        {
-            throw new InvalidDataException("The HFS volume has no available catalog ID.");
-        }
-
-        var record = new byte[102];
-        record[0] = 2;
-        byte[] finderBytes = finderInfo.ToArray();
-        finderBytes.AsSpan(0, 16).CopyTo(record.AsSpan(4));
-        finderBytes.AsSpan(16, 16).CopyTo(record.AsSpan(56));
-        var writer = new BigEndianWriter(record);
-        writer.WriteUInt32At(20, id);
-        uint now = MacDate.FromDateTime(Now).Seconds;
-        writer.WriteUInt32At(44, created?.Seconds ?? now);
-        writer.WriteUInt32At(48, modified?.Seconds ?? now);
-        state.Records.Add((CatalogKey(parent, name), record));
-        AdjustParentValence(state.Records, parent, 1);
-        AddCount(state.Mdb, 0x1E, 1);
-        AddCount(state.Mdb, 0x54, 1);
-        if (parent == 2)
-        {
-            AddShortCount(state.Mdb, 0x0C, 1);
-        }
-
-        var result = CommitCatalog(state);
-        if (!data.IsEmpty)
-        {
-            result = ReplaceFork(result, macPath, HfsFork.Data, data);
-        }
-
-        if (!resource.IsEmpty)
-        {
-            result = ReplaceFork(result, macPath, HfsFork.Resource, resource);
-        }
-
-        if (modified is not null && (!data.IsEmpty || !resource.IsEmpty))
-        {
-            // Fork replacement stamps its edit time. Restore the caller's file date after both forks are written.
-            var dated = OpenCatalog(result);
-            var entry = FindCatalogRecord(dated.Records, parent, name);
-            new BigEndianWriter(entry.Data).WriteUInt32At(48, modified.Value.Seconds);
-            result = CommitCatalog(dated);
-        }
-        return result;
-    }
-
-    /// <summary>Deletes an HFS file and releases the blocks in both forks, returning a new image.</summary>
-    public static byte[] DeleteFile(ForkData image, string macPath) =>
-        DeleteFile(new HfsVolume(image), macPath).ToArray();
-
-    internal static HfsVolume DeleteFile(HfsVolume image, string macPath)
-    {
-        var initial = OpenCatalog(image);
-        var (parent, name) = ResolveParent(initial.Records, macPath);
-        var existing = FindCatalogRecord(initial.Records, parent, name);
-        if (existing.Data is null || existing.Data.Length < 102 || existing.Data[0] != 2)
-        {
-            throw new InvalidDataException("The HFS file to delete was not found.");
-        }
-
-        if ((existing.Data[2] & 1) != 0)
-        {
-            throw new InvalidDataException("The HFS file is locked.");
-        }
-
-        return DeleteTree(initial, parent, macPath, existing);
-    }
-
-    /// <summary>Creates an HFS folder and its catalog thread, returning a new image.</summary>
-    public static byte[] CreateFolder(ForkData image, string macPath, MacDate? created = null, MacDate? modified = null) =>
-        CreateFolder(new HfsVolume(image), macPath, created, modified).ToArray();
-
-    internal static HfsVolume CreateFolder(HfsVolume image, string macPath, MacDate? created = null, MacDate? modified = null)
-    {
-        var state = OpenCatalog(image);
-        var (parent, name) = ResolveParent(state.Records, macPath);
-        EnsureAbsent(state.Records, parent, name);
-        uint id = U32(new BigEndianReader(state.Mdb), 0x1E);
-        if (id < 16 || id == uint.MaxValue)
-        {
-            throw new InvalidDataException("The HFS volume has no available catalog ID.");
-        }
-
-        uint now = MacDate.FromDateTime(Now).Seconds;
-
-        var folder = new byte[70];
-        folder[0] = 1;
-        var folderWriter = new BigEndianWriter(folder);
-        folderWriter.WriteUInt32At(6, id);
-        folderWriter.WriteUInt32At(10, created?.Seconds ?? now);
-        folderWriter.WriteUInt32At(14, modified?.Seconds ?? now);
-        var thread = new byte[46];
-        thread[0] = 3;
-        new BigEndianWriter(thread).WriteUInt32At(10, parent);
-        byte[] nameBytes = MacRoman.Encode(name);
-        thread[14] = checked((byte)nameBytes.Length);
-        nameBytes.CopyTo(thread, 15);
-        state.Records.Add((CatalogKey(parent, name), folder));
-        state.Records.Add((CatalogKey(id, ""), thread));
-        AdjustParentValence(state.Records, parent, 1);
-        AddCount(state.Mdb, 0x1E, 1);
-        AddCount(state.Mdb, 0x58, 1);
-        if (parent == 2)
-        {
-            AddShortCount(state.Mdb, 0x52, 1);
-        }
-
-        return CommitCatalog(state);
-    }
-
-    /// <summary>Deletes an empty HFS folder and its catalog thread, returning a new image.</summary>
-    public static byte[] DeleteFolder(ForkData image, string macPath) =>
-        DeleteFolder(new HfsVolume(image), macPath).ToArray();
-
-    internal static HfsVolume DeleteFolder(HfsVolume image, string macPath)
-    {
-        var state = OpenCatalog(image);
-        var (parent, name) = ResolveParent(state.Records, macPath);
-        var folder = FindCatalogRecord(state.Records, parent, name);
-        if (folder.Data is null || folder.Data.Length < 70 || folder.Data[0] != 1)
-        {
-            throw new InvalidDataException("The HFS folder to delete was not found.");
-        }
-
-        uint id = U32(new BigEndianReader(folder.Data), 6);
-        if (state.Records.Any(record =>
-                U32(new BigEndianReader(record.Key), 2) == id && DecodeName(record.Key).Length != 0))
-        {
-            throw new InvalidDataException("A nonempty HFS folder cannot be deleted.");
-        }
-
-        var thread = FindCatalogRecord(state.Records, id, "");
-        if (thread.Data is null || thread.Data[0] != 3)
-        {
-            throw new InvalidDataException("The HFS folder thread is missing.");
-        }
-
-        state.Records.Remove(folder);
-        state.Records.Remove(thread);
-        AdjustParentValence(state.Records, parent, -1);
-        AddCount(state.Mdb, 0x58, -1);
-        if (parent == 2)
-        {
-            AddShortCount(state.Mdb, 0x52, -1);
-        }
-
-        return CommitCatalog(state);
-    }
-
-    /// <summary>
-    /// Renames a file or folder in its folder, returning a new image: the catalog record moves to its new key, and its
-    /// thread record (a folder's always, a file's when it has one) takes the new name. Its ID, forks and Finder info stay.
-    /// </summary>
-    public static byte[] Rename(ForkData image, string macPath, string newName) =>
-        Rename(new HfsVolume(image), macPath, newName).ToArray();
-
-    internal static HfsVolume Rename(HfsVolume image, string macPath, string newName)
-    {
-        ArgumentNullException.ThrowIfNull(newName);
-        ValidateCatalogName(newName);
-        var state = OpenCatalog(image);
-        var (parent, name) = ResolveParent(state.Records, macPath);
-        var item = FindCatalogRecord(state.Records, parent, name);
-        if (item.Data is null || item.Data[0] is not (1 or 2))
-        {
-            throw new InvalidDataException($"The HFS item '{name}' was not found.");
-        }
-
-        var newKey = CatalogKey(parent, newName);
-        var taken = FindCatalogRecord(state.Records, parent, newName);
-        if (taken.Data is not null && !ReferenceEquals(taken.Data, item.Data))
-        {
-            throw new InvalidDataException("An HFS catalog item with that name already exists.");
-        }
-
-        state.Records.Remove(item);
-        state.Records.Add((newKey, item.Data));
-        var isFolder = item.Data[0] == 1;
-        uint id = U32(new BigEndianReader(item.Data), isFolder ? 6 : 20);
-        var thread = FindCatalogRecord(state.Records, id, "");
-        if (isFolder && (thread.Data is null || thread.Data[0] != 3))
-        {
-            throw new InvalidDataException("The HFS folder thread is missing.");
-        }
-
-        if (thread.Data is not null)
-        {
-            // The thread's name, written at Mac OS's full length (46 bytes, the name padded to a Str31) whatever length it
-            // had: a length byte and up to 31 bytes at +14 (hfs.md §1.9).
-            var encoded = MacRoman.Encode(newName);
-            var full = new byte[46];
-            thread.Data.AsSpan(0, 14).CopyTo(full);
-            full[14] = (byte)encoded.Length;
-            encoded.CopyTo(full, 15);
-            state.Records[state.Records.IndexOf(thread)] = (thread.Key, full);
-        }
-
-        return CommitCatalog(state);
-    }
-
-    /// <summary>
-    /// Moves a file or folder into another folder of its volume (<paramref name="folderPath"/>, empty for the root),
-    /// returning a new image, as PBCatMove moves it (hfs.md §3): the record's key takes the folder's ID as its parent,
-    /// its thread record (a folder's always, a file's when it has one) records the new parent, and both folders'
-    /// valences change, with the MDB's root counts. Its name, ID, forks, Finder info and dates stay. A move into the
-    /// folder it is in, onto a name the folder holds, or of a folder into itself or a folder inside it is refused.
-    /// </summary>
-    public static byte[] Move(ForkData image, string macPath, string folderPath) =>
-        Move(new HfsVolume(image), macPath, folderPath).ToArray();
-
-    internal static HfsVolume Move(HfsVolume image, string macPath, string folderPath)
-    {
-        ArgumentNullException.ThrowIfNull(folderPath);
-        var state = OpenCatalog(image);
-        var (parent, name) = ResolveParent(state.Records, macPath);
-        var item = FindCatalogRecord(state.Records, parent, name);
-        if (item.Data is null || item.Data[0] is not (1 or 2))
-        {
-            throw new InvalidDataException($"The HFS item '{name}' was not found.");
-        }
-
-        uint destination = 2;
-        if (folderPath.Length != 0)
-        {
-            var (folderParent, folderName) = ResolveParent(state.Records, folderPath);
-            var folder = FindCatalogRecord(state.Records, folderParent, folderName);
-            if (folder.Data is null || folder.Data.Length < 70 || folder.Data[0] != 1)
-            {
-                throw new InvalidDataException($"The HFS folder '{folderPath}' was not found.");
-            }
-
-            destination = U32(new BigEndianReader(folder.Data), 6);
-        }
-
-        if (destination == parent)
-        {
-            throw new InvalidDataException($"The HFS item '{name}' is in that folder already.");
-        }
-
-        var isFolder = item.Data[0] == 1;
-        uint id = U32(new BigEndianReader(item.Data), isFolder ? 6 : 20);
-        if (isFolder)
-        {
-            // Up from the destination through the folder threads to the root's parent (1): the folder moved must not
-            // be on the way (PBCatMove's badMovErr).
-            for (uint at = destination; at > 1; at = ThreadParent(state.Records, at))
-            {
-                if (at == id)
-                {
-                    throw new InvalidDataException("An HFS folder cannot move into itself or a folder inside it.");
-                }
-            }
-        }
-
-        EnsureAbsent(state.Records, destination, name);
-        var thread = FindCatalogRecord(state.Records, id, "");
-        if (isFolder && (thread.Data is null || thread.Data[0] != 3))
-        {
-            throw new InvalidDataException("The HFS folder thread is missing.");
-        }
-
-        state.Records.Remove(item);
-        state.Records.Add((CatalogKey(destination, name), item.Data));
-        if (thread.Data is not null)
-        {
-            new BigEndianWriter(thread.Data).WriteUInt32At(10, destination);       // thdParID, in every thread's first 14 bytes
-        }
-
-        AdjustParentValence(state.Records, parent, -1);
-        AdjustParentValence(state.Records, destination, 1);
-        int rootCount = isFolder ? 0x52 : 0x0C;
-        if (parent == 2)
-        {
-            AddShortCount(state.Mdb, rootCount, -1);
-        }
-
-        if (destination == 2)
-        {
-            AddShortCount(state.Mdb, rootCount, 1);
-        }
-
-        return CommitCatalog(state);
-    }
-
     // A folder's parent ID, from its thread record (+10).
-    private static uint ThreadParent(List<(byte[] Key, byte[] Data)> records, uint folder)
+    internal static uint ThreadParent(List<(byte[] Key, byte[] Data)> records, uint folder)
     {
         var thread = FindCatalogRecord(records, folder, "");
         if (thread.Data is null || thread.Data.Length < 14 || thread.Data[0] != 3)
@@ -319,131 +27,11 @@ public static partial class HfsWriter
         return U32(new BigEndianReader(thread.Data), 10);
     }
 
-    /// <summary>
-    /// Locks or unlocks a file (<c>filFlags</c> bit 0, as PBHSetFLock and PBHRstFLock set it), returning a new image. An
-    /// HFS folder has no lock.
-    /// </summary>
-    public static byte[] SetLocked(ForkData image, string macPath, bool locked) =>
-        SetLocked(new HfsVolume(image), macPath, locked).ToArray();
-
-    internal static HfsVolume SetLocked(HfsVolume image, string macPath, bool locked)
-    {
-        var state = OpenCatalog(image);
-        var (parent, name) = ResolveParent(state.Records, macPath);
-        var file = FindCatalogRecord(state.Records, parent, name);
-        if (file.Data is null || file.Data.Length < 102 || file.Data[0] != 2)
-        {
-            throw new InvalidDataException(file.Data is { } data && data[0] == 1
-                ? "An HFS folder cannot be locked; only files have a lock."
-                : $"The HFS file '{name}' was not found.");
-        }
-
-        file.Data[2] = (byte)(locked ? file.Data[2] | 0x01 : file.Data[2] & ~0x01);
-        return CommitCatalog(state);
-    }
-
-    /// <summary>
-    /// Blesses a folder as the volume's System Folder (hfs.md §3): its ID goes in the MDB's <c>drFndrInfo[0]</c>, where
-    /// the boot code looks for the System file. Only a folder holding a System file (type <c>zsys</c>) is blessed.
-    /// </summary>
-    public static byte[] Bless(ForkData image, string folderPath) =>
-        Bless(new HfsVolume(image), folderPath).ToArray();
-
-    internal static HfsVolume Bless(HfsVolume image, string folderPath)
-    {
-        var state = OpenCatalog(image);
-        var (parent, name) = ResolveParent(state.Records, folderPath);
-        var folder = FindCatalogRecord(state.Records, parent, name);
-        if (folder.Data is null || folder.Data.Length < 70 || folder.Data[0] != 1)
-        {
-            throw new InvalidDataException($"The HFS folder '{folderPath}' was not found.");
-        }
-
-        uint id = U32(new BigEndianReader(folder.Data), 6);
-        var system = FourCC.FromString("zsys");
-        if (!state.Records.Any(record => record.Data.Length >= 102 && record.Data[0] == 2 &&
-                U32(new BigEndianReader(record.Key), 2) == id && new BigEndianReader(record.Data).ReadFourCCAt(4) == system))
-        {
-            throw new InvalidDataException($"The HFS folder '{folderPath}' holds no System file (type 'zsys'), so it cannot be blessed.");
-        }
-
-        new BigEndianWriter(state.Mdb).WriteUInt32At(0x5C, id);
-        return CommitCatalog(state);
-    }
-
-    /// <summary>Sets a file's Finder info (its <c>FInfo</c> and <c>FXInfo</c>), returning a new image.</summary>
-    public static byte[] SetFinderInfo(ForkData image, string macPath, FinderInfo finderInfo) =>
-        SetFinderInfo(new HfsVolume(image), macPath, finderInfo).ToArray();
-
-    internal static HfsVolume SetFinderInfo(HfsVolume image, string macPath, FinderInfo finderInfo)
-    {
-        ArgumentNullException.ThrowIfNull(finderInfo);
-        var state = OpenCatalog(image);
-        var (parent, name) = ResolveParent(state.Records, macPath);
-        var file = FindCatalogRecord(state.Records, parent, name);
-        if (file.Data is null || file.Data.Length < 102 || file.Data[0] != 2)
-        {
-            throw new InvalidDataException($"The HFS file '{name}' was not found.");
-        }
-
-        var bytes = finderInfo.ToArray();
-        bytes.AsSpan(0, 16).CopyTo(file.Data.AsSpan(4));
-        bytes.AsSpan(16, 16).CopyTo(file.Data.AsSpan(56));
-        return CommitCatalog(state);
-    }
-
-    /// <summary>Sets a folder's Finder flags (<c>DInfo.frFlags</c>), returning a new image.</summary>
-    public static byte[] SetFolderFlags(ForkData image, string macPath, FinderFlags flags) =>
-        SetFolderFlags(new HfsVolume(image), macPath, flags).ToArray();
-
-    internal static HfsVolume SetFolderFlags(HfsVolume image, string macPath, FinderFlags flags)
-    {
-        var state = OpenCatalog(image);
-        var (parent, name) = ResolveParent(state.Records, macPath);
-        var folder = FindCatalogRecord(state.Records, parent, name);
-        if (folder.Data is null || folder.Data.Length < 70 || folder.Data[0] != 1)
-        {
-            throw new InvalidDataException($"The HFS folder '{name}' was not found.");
-        }
-
-        new BigEndianWriter(folder.Data).WriteUInt16At(30, (ushort)flags);
-        return CommitCatalog(state);
-    }
-
-    /// <summary>
-    /// Deletes a file, or a folder: an empty one, or with <paramref name="recursive"/> one and everything in it (files
-    /// and folders deepest first). Returns a new image; a failure on the way leaves the given image as it was.
-    /// </summary>
-    public static byte[] Delete(ForkData image, string macPath, bool recursive) =>
-        Delete(new HfsVolume(image), macPath, recursive).ToArray();
-
-    internal static HfsVolume Delete(HfsVolume image, string macPath, bool recursive)
-    {
-        var state = OpenCatalog(image);
-        var (parent, name) = ResolveParent(state.Records, macPath);
-        var item = FindCatalogRecord(state.Records, parent, name);
-        if (item.Data is null || item.Data[0] is not (1 or 2))
-        {
-            throw new InvalidDataException($"The HFS item '{name}' was not found.");
-        }
-
-        if (item.Data[0] == 1 && !recursive)
-        {
-            uint id = U32(new BigEndianReader(item.Data), 6);
-            if (state.Records.Any(r => U32(new BigEndianReader(r.Key), 2) == id && r.Key[6] != 0))
-            {
-                throw new InvalidDataException("A nonempty HFS folder cannot be deleted.");
-            }
-        }
-
-        return DeleteTree(state, parent, macPath, item);
-    }
-
     // Deletes an item and, for a folder, everything below it, in one pass over the catalog (hfs.md §3): every fork's
     // blocks freed in the bitmap (overflow extents too, and their records removed), the file, folder and thread records
     // removed, the parent's valence, the MDB's counts and its free-block count changed. The result is checked as the
     // writer checks a volume, and every record and allocated block it keeps is compared with the source.
-    private static HfsVolume DeleteTree(CatalogEditState state, uint parent, string macPath, (byte[] Key, byte[] Data) item)
+    internal static HfsVolume DeleteTree(CatalogEditState state, uint parent, string macPath, (byte[] Key, byte[] Data) item)
     {
         var before = state.Records.Select(r => (r.Key, Data: r.Data.ToArray())).ToList();
         var children = state.Records.Where(r => r.Data[0] is 1 or 2).ToLookup(r => U32(new BigEndianReader(r.Key), 2));
@@ -558,7 +146,7 @@ public static partial class HfsWriter
     // valence); every extents overflow record is the source's except those of the files in overflowFiles and of the
     // B-tree files; and every sector the edit wrote lies in the MDB, the alternate MDB, the bitmap, the catalog and extents
     // files, or the blocks of skipBlocks. So no file kept has changed, without reading any fork.
-    private static void VerifyKept(HfsVolume result, List<(byte[] Key, byte[] Data)> before, HashSet<string> removedKeys, uint parent,
+    internal static void VerifyKept(HfsVolume result, List<(byte[] Key, byte[] Data)> before, HashSet<string> removedKeys, uint parent,
         List<(byte[] Key, byte[] Data)> overflowBefore, HashSet<uint> overflowFiles, HashSet<uint> skipBlocks)
     {
         var after = OpenCatalog(result, writable: false);
@@ -616,7 +204,7 @@ public static partial class HfsWriter
         }
     }
 
-    private sealed class CatalogEditState(HfsVolume source, byte[] mdb, byte[] catalog, byte[] extentsTree,
+    internal sealed class CatalogEditState(HfsVolume source, byte[] mdb, byte[] catalog, byte[] extentsTree,
         List<(ushort Start, ushort Count)> extentsTreeExtents,
         List<(ushort Start, ushort Count)> catalogExtents, List<(byte[] Key, byte[] Data)> records,
         uint firstBlock, uint blockSize, uint blockCount, int bitmapOffset, byte[] bitmap)
@@ -652,32 +240,8 @@ public static partial class HfsWriter
         public uint AllocatedCatalogBlocks { get; set; }
     }
 
-    /// <summary>
-    /// Checks a plain HFS volume as the writer does before every edit (hfs.md §5.5): the MDB's allocation area, both
-    /// B-trees, the catalog's counts and valences, the bitmap's free count and every extent's ownership. A software lock
-    /// does not stop the check.
-    /// </summary>
-    /// <returns>The first fault found, or null when the writer would edit the volume (were it not locked).</returns>
-    /// <exception cref="InvalidDataException">The image is not a plain HFS volume (no HFS signature, or an HFS Plus wrapper).</exception>
-    public static string? Check(ForkData image)
-    {
-        ArgumentNullException.ThrowIfNull(image);
-        var volume = new HfsVolume(image);
-        PlainVolume(volume);
-        try
-        {
-            OpenCatalog(volume, writable: false);
-            return null;
-        }
-        catch (Exception fault) when (fault is InvalidDataException or EndOfStreamException or OverflowException or
-                                          ArgumentException or IndexOutOfRangeException)
-        {
-            return fault.Message;
-        }
-    }
-
     // The MDB's sector of a plain HFS volume: refused when the image has no HFS signature or wraps HFS Plus.
-    private static byte[] PlainVolume(HfsVolume source)
+    internal static byte[] PlainVolume(HfsVolume source)
     {
         if (source.Length < MdbOffset + MdbSize)
         {
@@ -700,9 +264,9 @@ public static partial class HfsWriter
         return sector;
     }
 
-    private static CatalogEditState OpenCatalog(ForkData image, bool writable = true) => OpenCatalog(new HfsVolume(image), writable);
+    internal static CatalogEditState OpenCatalog(ForkData image, bool writable = true) => OpenCatalog(new HfsVolume(image), writable);
 
-    private static CatalogEditState OpenCatalog(HfsVolume source, bool writable = true)
+    internal static CatalogEditState OpenCatalog(HfsVolume source, bool writable = true)
     {
         ArgumentNullException.ThrowIfNull(source);
         var mdbSector = PlainVolume(source);
@@ -765,7 +329,7 @@ public static partial class HfsWriter
             workingBitmap) { OriginalRecords = [.. catalogRecords.Select(record => record with { Key = record.Key.ToArray(), Data = record.Data.ToArray() })] };
     }
 
-    private static HfsVolume CommitCatalog(CatalogEditState state)
+    internal static HfsVolume CommitCatalog(CatalogEditState state)
     {
         state.Records.Sort((left, right) => CompareCatalogKeys(left.Key, right.Key));
         // The tree's file grown when an operation finds too few free nodes, as the BTree manager grows it; on a volume with no
@@ -874,7 +438,7 @@ public static partial class HfsWriter
     }
 
     // How an edit in place of the catalog ended.
-    private enum CatalogUpdate
+    internal enum CatalogUpdate
     {
         // Every change is written.
         Done,
@@ -890,7 +454,7 @@ public static partial class HfsWriter
     // copy of it: records removed, then changed, then added, each in key order [ClassicMac order; Doc: the manager's
     // rules for each]. NeedsNodes, with the catalog unchanged, when an operation finds fewer free nodes than the tree's
     // depth + 1, as the manager grows the file then.
-    private static CatalogUpdate TryUpdateLeaves(CatalogEditState state)
+    internal static CatalogUpdate TryUpdateLeaves(CatalogEditState state)
     {
         var original = state.OriginalRecords;
         var records = state.Records;
@@ -963,7 +527,7 @@ public static partial class HfsWriter
     // BTreeAllocate.c, BTree.c]: inserts that fit go in; a full node rotates records into its left sibling, or splits to
     // the left into the first free node; a node's new first key is deleted from its parent and inserted again; an emptied
     // node is unlinked, zeroed and freed, its parent's record deleted; a root left with one record gives way to its child.
-    private sealed class CatalogTreeEdit
+    internal sealed class CatalogTreeEdit
     {
         public sealed class NeedsNodesException : Exception;
 
@@ -1412,7 +976,7 @@ public static partial class HfsWriter
     }
 
     // The catalog's nodes that differ from the catalog as read, and every node it grew by, written through its extents.
-    private static void WriteChangedNodes(CatalogEditState state)
+    internal static void WriteChangedNodes(CatalogEditState state)
     {
         for (int node = 0; node < state.Catalog.Length; node += NodeSize)
         {
@@ -1437,7 +1001,7 @@ public static partial class HfsWriter
         }
     }
 
-    private static void GrowCatalogTree(CatalogEditState state)
+    internal static void GrowCatalogTree(CatalogEditState state)
     {
         if (state.Catalog.Length > int.MaxValue - state.BlockSize)
         {
@@ -1496,7 +1060,7 @@ public static partial class HfsWriter
         }
     }
 
-    private static void UpdateCatalogOverflowExtents(CatalogEditState state, ushort start,
+    internal static void UpdateCatalogOverflowExtents(CatalogEditState state, ushort start,
         ushort count, bool extendLast, ushort forkBlock)
     {
         var lastRecord = LeafRecords(state.ExtentsTree)
@@ -1560,7 +1124,7 @@ public static partial class HfsWriter
         state.ExtentsTreeChanged = true;
     }
 
-    private static (uint Parent, string Name) ResolveParent(List<(byte[] Key, byte[] Data)> records, string path)
+    internal static (uint Parent, string Name) ResolveParent(List<(byte[] Key, byte[] Data)> records, string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         if (path.StartsWith(':') || path.EndsWith(':') || path.Contains("::", StringComparison.Ordinal))
@@ -1585,7 +1149,7 @@ public static partial class HfsWriter
         return (parent, parts[^1]);
     }
 
-    private static void ValidateCatalogAccounting(BigEndianReader mdb,
+    internal static void ValidateCatalogAccounting(BigEndianReader mdb,
         List<(byte[] Key, byte[] Data)> records)
     {
         var folders = records.Where(record => record.Data.Length >= 70 && record.Data[0] == 1).ToArray();
@@ -1653,7 +1217,7 @@ public static partial class HfsWriter
         }
     }
 
-    private static void ValidateCatalogName(string name)
+    internal static void ValidateCatalogName(string name)
     {
         byte[] encoded = MacRoman.Encode(name);
         if (encoded.Length is < 1 or > 31 || name.Contains(':') || name.Contains('\0'))
@@ -1662,14 +1226,14 @@ public static partial class HfsWriter
         }
     }
 
-    private static (byte[] Key, byte[] Data) FindCatalogRecord(List<(byte[] Key, byte[] Data)> records,
+    internal static (byte[] Key, byte[] Data) FindCatalogRecord(List<(byte[] Key, byte[] Data)> records,
         uint parent, string name)
     {
         byte[] wanted = CatalogKey(parent, name);
         return records.FirstOrDefault(record => CompareCatalogKeys(record.Key, wanted) == 0);
     }
 
-    private static void EnsureAbsent(List<(byte[] Key, byte[] Data)> records, uint parent, string name)
+    internal static void EnsureAbsent(List<(byte[] Key, byte[] Data)> records, uint parent, string name)
     {
         if (FindCatalogRecord(records, parent, name).Data is not null)
         {
@@ -1677,7 +1241,7 @@ public static partial class HfsWriter
         }
     }
 
-    private static byte[] CatalogKey(uint parent, string name)
+    internal static byte[] CatalogKey(uint parent, string name)
     {
         byte[] encoded = MacRoman.Encode(name);
         int length = (7 + encoded.Length + 1) & ~1;
@@ -1691,123 +1255,7 @@ public static partial class HfsWriter
         return key.ToArray();
     }
 
-    internal static int CompareCatalogKeys(byte[] left, byte[] right)
-    {
-        // The parent IDs, big-endian, compare as their bytes do (no reader per comparison: a sort makes thousands).
-        int byParent = left.AsSpan(2, 4).SequenceCompareTo(right.AsSpan(2, 4));
-        if (byParent != 0)
-        {
-            return byParent;
-        }
-
-        int leftLength = left[6], rightLength = right[6];
-        if (left.Length < 7 + leftLength || right.Length < 7 + rightLength)
-        {
-            throw new InvalidDataException("An HFS catalog key has an invalid name length.");
-        }
-
-        for (int index = 0; index < Math.Min(leftLength, rightLength); index++)
-        {
-            int comparison = CatalogNameWeights[left[7 + index]].CompareTo(CatalogNameWeights[right[7 + index]]);
-            if (comparison != 0)
-            {
-                return comparison;
-            }
-        }
-        return leftLength.CompareTo(rightLength);
-    }
-
-    /// <summary>Whether two Mac OS Roman names are the same name to an HFS catalog: equal by its ordering (case-insensitive, diacritics kept).</summary>
-    internal static bool CatalogNamesEqual(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
-    {
-        if (left.Length != right.Length)
-        {
-            return false;
-        }
-
-        for (int index = 0; index < left.Length; index++)
-        {
-            if (CatalogNameWeights[left[index]] != CatalogNameWeights[right[index]])
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static ushort[] BuildCatalogNameWeights()
-    {
-        // Inside Macintosh: Text, RelString; the exceptions here follow the Mac OS 9 ROM rules
-        // recorded in docs/formats/file-systems/hfs.md §1.11. Unlisted Mac Roman bytes keep their code order.
-        var weights = new ushort[256];
-        for (int value = 0; value < weights.Length; value++)
-        {
-            weights[value] = (ushort)(value << 8);
-        }
-
-        for (char value = 'a'; value <= 'z'; value++)
-        {
-            Set(value.ToString(), (ushort)((value - 32) << 8));
-        }
-
-        void Set(string chars, ushort weight)
-        {
-            foreach (char value in chars)
-            {
-                if (!MacRoman.TryGetByte(value, out byte encoded))
-                {
-                    throw new InvalidOperationException($"The HFS comparison table contains an unencodable character: {value}.");
-                }
-
-                weights[encoded] = weight;
-            }
-        }
-
-        Set("`", 0x4180);
-        Set("\u00A0", 0x2000);
-        Set("äÄ", 0x4108);
-        Set("åÅ", 0x410C);
-        Set("àÀ", 0x4104);
-        Set("ãÃ", 0x410A);
-        Set("æÆ", 0x4114);
-        Set("çÇ", 0x4310);
-        Set("éÉ", 0x4502);
-        Set("ñÑ", 0x4E0A);
-        Set("öÖ", 0x4F08);
-        Set("õÕ", 0x4F0A);
-        Set("øØ", 0x4F0E);
-        Set("œŒ", 0x4F14);
-        Set("üÜ", 0x5508);
-        Set("á", 0x4182);
-        Set("â", 0x4186);
-        Set("è", 0x4584);
-        Set("ê", 0x4586);
-        Set("ë", 0x4588);
-        Set("í", 0x4982);
-        Set("ì", 0x4984);
-        Set("î", 0x4986);
-        Set("ï", 0x4988);
-        Set("ó", 0x4F82);
-        Set("ò", 0x4F84);
-        Set("ô", 0x4F86);
-        Set("ú", 0x5582);
-        Set("ù", 0x5584);
-        Set("û", 0x5586);
-        Set("ß", 0x5382);
-        Set("ÿ", 0x5988);
-        Set("ª", 0x4192);
-        Set("º", 0x4F92);
-        Set("“", 0x2202);
-        Set("”", 0x2204);
-        Set("«", 0x2206);
-        Set("»", 0x2208);
-        Set("‘", 0x2702);
-        Set("’", 0x2704);
-        return weights;
-    }
-
-    private static void AdjustParentValence(List<(byte[] Key, byte[] Data)> records, uint parent, int adjustment)
+    internal static void AdjustParentValence(List<(byte[] Key, byte[] Data)> records, uint parent, int adjustment)
     {
         var folder = records.FirstOrDefault(record => record.Data.Length >= 70 && record.Data[0] == 1 &&
             U32(new BigEndianReader(record.Data), 6) == parent);
@@ -1826,53 +1274,15 @@ public static partial class HfsWriter
         new BigEndianWriter(folder.Data).WriteUInt16At(4, updated);
     }
 
-    // The volume with what hfsutils writes and Disk First Aid rejects made as Mac OS writes it, and how many records of
-    // each: thread records shorter than Mac OS's 46 bytes (hfsutils writes a thread only as long as its name) written at
-    // full length, the name padded to a Str31; file records with nonzero filStBlk (+$18), filRStBlk (+$22) or filResrv
-    // (+$62), which Disk First Aid reports as reserved fields with incorrect data and its Repair clears (hfs.md §1.9,
-    // §1.7) [Verified: Disk First Aid 8.5]. The volume itself when there are none.
-    internal static (HfsVolume Volume, int Threads, int FileRecords) RepairCatalog(HfsVolume image)
-    {
-        var state = OpenCatalog(image);
-        int threads = 0, files = 0;
-        for (var index = 0; index < state.Records.Count; index++)
-        {
-            var (key, data) = state.Records[index];
-            if (data[0] is 3 or 4 && data.Length < 46)
-            {
-                var full = new byte[46];
-                data.AsSpan(0, 15 + data[14]).CopyTo(full);
-                state.Records[index] = (key, full);
-                threads++;
-            }
-            else if (data[0] == 2 && data.Length >= 0x66)
-            {
-                var reader = new BigEndianReader(data);
-                if (reader.ReadUInt16At(0x18) != 0 || reader.ReadUInt16At(0x22) != 0 || reader.ReadUInt32At(0x62) != 0)
-                {
-                    var cleared = data.ToArray();
-                    var writer = new BigEndianWriter(cleared);
-                    writer.WriteUInt16At(0x18, (ushort)0);
-                    writer.WriteUInt16At(0x22, (ushort)0);
-                    writer.WriteUInt32At(0x62, 0u);
-                    state.Records[index] = (key, cleared);
-                    files++;
-                }
-            }
-        }
-
-        return threads + files == 0 ? (image, 0, 0) : (CommitCatalog(state), threads, files);
-    }
-
     // A count in the MDB's sector (offset from its start) changed by delta.
-    private static void AddCount(byte[] mdb, int offset, int delta) =>
+    internal static void AddCount(byte[] mdb, int offset, int delta) =>
         new BigEndianWriter(mdb).WriteUInt32At(offset, checked((uint)((long)U32(new BigEndianReader(mdb), offset) + delta)));
 
-    private static void AddShortCount(byte[] mdb, int offset, int delta) =>
+    internal static void AddShortCount(byte[] mdb, int offset, int delta) =>
         new BigEndianWriter(mdb).WriteUInt16At(offset, checked((ushort)(U16(new BigEndianReader(mdb), offset) + delta)));
 
     // A big-endian u16 read from a volume (a field outside the buffers an edit holds: the alternate MDB's signature).
-    private static ushort ReadUInt16(HfsVolume volume, long offset)
+    internal static ushort ReadUInt16(HfsVolume volume, long offset)
     {
         var bytes = new byte[2];
         volume.Read(offset, bytes);
