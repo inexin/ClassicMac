@@ -175,6 +175,11 @@
   </Style>
 
   <!-- Codes, OSTypes and paths in mono 12 (CmFontSizeMonoSmall). -->
+  <!-- Strong text, in the main window and the dialogs alike. -->
+  <Style Selector="TextBlock.strong">
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+  </Style>
+
   <Style Selector=":is(TextBlock).mono">
     <Setter Property="FontFamily" Value="{DynamicResource CmFontMono}" />
     <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
@@ -659,6 +664,35 @@
     <Setter Property="LabelBrush" Value="{DynamicResource CmTextMuted}" />
     <Setter Property="LabelFont" Value="{DynamicResource CmFontMono}" />
     <Setter Property="LabelSize" Value="11" />
+  </Style>
+  <!-- First Aid's verdict banner and log (volume-tools.md §5). -->
+  <Style Selector="Border.verdict-banner">
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadius}" />
+    <Setter Property="Padding" Value="12,10" />
+  </Style>
+  <Style Selector="Border.verdict-banner.ok">
+    <Setter Property="Background" Value="{DynamicResource CmSuccessTint}" />
+  </Style>
+  <Style Selector="Border.verdict-banner.warning">
+    <Setter Property="Background" Value="{DynamicResource CmWarningTint}" />
+  </Style>
+  <Style Selector="Border.verdict-banner.error">
+    <Setter Property="Background" Value="{DynamicResource CmErrorTint}" />
+  </Style>
+  <Style Selector="Border.first-aid-log">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadius}" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="MaxHeight" Value="160" />
+  </Style>
+  <Style Selector="Border.first-aid-log TextBlock.log-line">
+    <Setter Property="LineHeight" Value="20" />
+  </Style>
+  <Style Selector="Border.first-aid-log TextBlock.log-heading">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="Margin" Value="0,4,0,0" />
   </Style>
   <Style Selector="Border.inline-note">
     <Setter Property="CornerRadius" Value="{DynamicResource CmRadius}" />

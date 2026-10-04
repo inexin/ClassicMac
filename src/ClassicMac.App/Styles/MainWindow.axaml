@@ -906,9 +906,6 @@
     <Setter Property="BorderThickness" Value="0,0,0,1" />
     <Setter Property="Padding" Value="12,8" />
   </Style>
-  <Style Selector="TextBlock.strong">
-    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
-  </Style>
 
   <!-- View ▸ Screen Depth: one radio item per depth. -->
   <Style Selector="MenuItem.depths > MenuItem" x:DataType="vm:ScreenDepthChoice">

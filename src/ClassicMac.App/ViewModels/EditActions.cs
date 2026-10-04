@@ -75,7 +75,7 @@ public interface IEditDialogs
     Task<string?> NewFolderAsync(string initial);
 
     /// <summary>First Aid's window: what a check or repair found; true when Repair is clicked (offered only when it can).</summary>
-    Task<bool> FirstAidAsync(FirstAidView view);
+    Task FirstAidAsync(FirstAidViewModel model);
 
     /// <summary>Resize's dialog, which runs the model; done when it closes.</summary>
     Task ResizeAsync(ResizeViewModel model);
@@ -83,12 +83,6 @@ public interface IEditDialogs
     /// <summary>Defragment's dialog, which runs the model and shows what it did; done when it closes.</summary>
     Task DefragmentAsync(DefragmentViewModel model);
 }
-
-/// <summary>
-/// First Aid's window (Volume ▸ First Aid…): the volume, the lines (problems, or the repairs made and what is left), the
-/// verdict, and whether Repair is offered.
-/// </summary>
-public sealed record FirstAidView(string Volume, IReadOnlyList<string> Lines, string Summary, bool CanRepair);
 
 /// <summary>Get Info's subject (design/boards/dialogs.md): the icon tile's PNG (null: a plain glyph), the name and "Icon family in Finder · 2,240 bytes".</summary>
 public sealed record DialogSubject(string Name, string Line, byte[]? IconPng);

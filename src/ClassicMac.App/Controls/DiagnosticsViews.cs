@@ -37,7 +37,16 @@ internal sealed class SeverityIcon : Control
     public static readonly StyledProperty<DiagnosticSeverity> SeverityProperty =
         AvaloniaProperty.Register<SeverityIcon, DiagnosticSeverity>(nameof(Severity));
 
-    static SeverityIcon() => AffectsRender<SeverityIcon>(SeverityProperty);
+    /// <summary>A filled CmSuccess circle with a check instead (First Aid's OK verdict).</summary>
+    public static readonly StyledProperty<bool> IsSuccessProperty = AvaloniaProperty.Register<SeverityIcon, bool>(nameof(IsSuccess));
+
+    static SeverityIcon() => AffectsRender<SeverityIcon>(SeverityProperty, IsSuccessProperty);
+
+    public bool IsSuccess
+    {
+        get => GetValue(IsSuccessProperty);
+        set => SetValue(IsSuccessProperty, value);
+    }
 
     public SeverityIcon()
     {
@@ -56,6 +65,22 @@ internal sealed class SeverityIcon : Control
     public override void Render(DrawingContext context)
     {
         var knockout = new Pen(Token("CmPaneBackground"), 1.6, lineCap: PenLineCap.Round);
+        if (IsSuccess)
+        {
+            context.DrawEllipse(Token("CmSuccess"), null, new Point(7, 7), 6.5, 6.5);
+            var check = new StreamGeometry();
+            using (var g = check.Open())
+            {
+                g.BeginFigure(new Point(4.2, 7.2), false);
+                g.LineTo(new Point(6.2, 9.2));
+                g.LineTo(new Point(9.9, 5.1));
+                g.EndFigure(false);
+            }
+
+            context.DrawGeometry(null, new Pen(knockout.Brush, 1.6, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round), check);
+            return;
+        }
+
         switch (Severity)
         {
             case DiagnosticSeverity.Error:

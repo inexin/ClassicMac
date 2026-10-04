@@ -277,23 +277,116 @@ public class DialogTests
         Assert.True(dialog.Result);
     });
 
-    [Fact]
-    public void First_Aid_lists_the_problems_and_offers_repair_only_when_it_can() => OnUiThread(() =>
+    // A floppy, sound or with its drFilCnt one too many (Disk First Aid repairs that).
+    private static byte[] Floppy(bool damaged)
     {
-        var dialog = Show(DialogViews.FirstAid(new FirstAidView("Macintosh HD", ["Problem:  Invalid PEOF, 18, 2"],
-            "The volume “Macintosh HD” needs to be repaired.", CanRepair: true)));
-        AssertFrame(dialog.Window, "First Aid", "Repair", "Done");
-        var texts = dialog.Window.GetVisualDescendants().OfType<TextBlock>().ToList();
-        Assert.Contains("mono", texts.Single(t => t.Text == "Problem:  Invalid PEOF, 18, 2").Classes);
-        Assert.Contains(texts, t => t.Text == "The volume “Macintosh HD” needs to be repaired.");
-        Footer(dialog.Window, "Repair").Command!.Execute(null);
-        Assert.True(dialog.Result);
+        var image = Files.Hfs.HfsWriter.Format(800 * 1024, "Macintosh HD");
+        image = Files.Hfs.HfsWriter.CreateFile(ForkData.FromBytes(image), "Read Me", "hello"u8.ToArray(), Array.Empty<byte>(), Files.FinderInfo.Empty);
+        if (damaged)
+        {
+            image[1024 + 0x57]++;
+        }
 
-        var ok = Show(DialogViews.FirstAid(new FirstAidView("Macintosh HD", [], "The volume “Macintosh HD” appears to be OK.", CanRepair: false)));
-        Assert.False(Footer(ok.Window, "Repair").IsEffectivelyEnabled);
-        Assert.True(Footer(ok.Window, "Done").IsCancel);
-        Footer(ok.Window, "Done").Command!.Execute(null);
-        Assert.False(ok.Result);
+        return image;
+    }
+
+    private static FirstAidViewModel Checking(byte[] image) => new("Macintosh HD",
+        (progress, token) => Task.FromResult(Files.Hfs.HfsFirstAid.Verify(ForkData.FromBytes(image), progress, token)),
+        (progress, token) => Task.FromResult(Files.Hfs.HfsFirstAid.Repair(ForkData.FromBytes(image), progress, token)));
+
+    [Fact]
+    public void First_Aid_checks_as_it_opens_and_says_the_verdict() => OnUiThread(() =>
+    {
+        var dialog = Show(DialogViews.FirstAid(Checking(Floppy(damaged: false))));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains(dialog.Window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "First Aid · “Macintosh HD”");
+        var banner = Named<Border>(dialog.Window, "VerdictBanner");
+        Assert.True(banner.IsEffectivelyVisible);
+        Assert.Contains("ok", banner.Classes);
+        Assert.True(Named<SeverityIcon>(dialog.Window, "VerdictIcon").IsSuccess);
+        Assert.Contains("Appears to be OK", Texts(dialog.Window));
+        Assert.Contains("First Aid found no problems.", Texts(dialog.Window));
+        Assert.False(Named<Border>(dialog.Window, "FirstAidLog").IsVisible);
+        Assert.Equal(["Copy report", "Done"], Visible(dialog.Window));
+        Assert.True(Footer(dialog.Window, "Done").IsDefault);
+        Footer(dialog.Window, "Done").Command!.Execute(null);
+        Assert.False(dialog.Window.IsVisible);
+    });
+
+    [Fact]
+    public void First_Aid_repairs_and_keeps_one_log() => OnUiThread(() =>
+    {
+        var model = Checking(Floppy(damaged: true));
+        var dialog = Show(DialogViews.FirstAid(model));
+        Dispatcher.UIThread.RunJobs();
+        var banner = Named<Border>(dialog.Window, "VerdictBanner");
+        Assert.Contains("warning", banner.Classes);
+        Assert.Contains("Needs repair", Texts(dialog.Window));
+        Assert.Contains("Problems found", Texts(dialog.Window));
+        Assert.Contains("mono", dialog.Window.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text?.StartsWith("Problem:", StringComparison.Ordinal) == true).Classes);
+        Assert.Equal(["Copy report", "Done", "Repair"], Visible(dialog.Window));
+        Assert.True(Footer(dialog.Window, "Repair").IsDefault);
+
+        Footer(dialog.Window, "Repair").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(FirstAidOutcome.Repaired, model.Outcome);
+        Assert.Contains("ok", banner.Classes);
+        var texts = Texts(dialog.Window);
+        Assert.Contains("Repaired · the volume appears to be OK", texts);
+        Assert.Contains("Repaired", texts);
+        Assert.Contains("Checked again", texts);
+        Assert.Equal(["Copy report", "Done"], Visible(dialog.Window));
+        dialog.Window.Close();
+    });
+
+    [Fact]
+    public void First_Aid_offers_Extract_All_when_it_cannot_repair() => OnUiThread(() =>
+    {
+        var model = Checking(new byte[800 * 1024]);
+        model.ExtractAll = () => Task.CompletedTask;
+        var dialog = Show(DialogViews.FirstAid(model));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains("error", Named<Border>(dialog.Window, "VerdictBanner").Classes);
+        Assert.Equal(["Copy report", "Done", "Extract All…"], Visible(dialog.Window));
+        dialog.Window.Close();
+    });
+
+    [Fact]
+    public void First_Aid_draws_its_verdicts() => OnUiThread(() =>
+    {
+        var baselines = new List<string>();
+        var model = Checking(Floppy(damaged: true));
+        var dialog = Show(DialogViews.FirstAid(model));
+        Dispatcher.UIThread.RunJobs();
+        Baselines.Check(dialog.Window, "dialog-first-aid", baselines, Baselines.All);
+        Footer(dialog.Window, "Repair").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Baselines.Check(dialog.Window, "dialog-first-aid-repaired", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+        dialog.Window.Close();
+
+        var broken = Checking(new byte[800 * 1024]);
+        broken.ExtractAll = () => Task.CompletedTask;
+        var cannot = Show(DialogViews.FirstAid(broken));
+        Dispatcher.UIThread.RunJobs();
+        Baselines.Check(cannot.Window, "dialog-first-aid-cannot", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+        cannot.Window.Close();
+
+        var started = new TaskCompletionSource();
+        var slow = new FirstAidViewModel("Macintosh HD", async (progress, token) =>
+        {
+            progress.Report(new VolumeProgress(3, 10, "Checking the catalog B-tree."));
+            await Task.Delay(Timeout.Infinite, token);
+            return null!;
+        }, (_, _) => throw new InvalidOperationException());
+        var checking = Show(DialogViews.FirstAid(slow));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(["Cancel"], Visible(checking.Window));
+        Baselines.Check(checking.Window, "dialog-first-aid-checking", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+        Footer(checking.Window, "Cancel").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(checking.Window.IsVisible);                                          // a cancelled check closes
+        Baselines.Verify(baselines);
     });
 
     private static ResizeViewModel Resizing(Func<long, uint?, IProgress<VolumeProgress>, CancellationToken, Task>? resize = null) =>
@@ -516,10 +609,6 @@ public class DialogTests
         var import = Show(DialogViews.Import("art.png", [.. ImageImport.Types, ImportActions.IconFamily], new ImportChoice("PICT", 128, ""), Art));
         Baselines.Check(import.Window, "dialog-import", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
         import.Window.Close();
-        var firstAid = Show(DialogViews.FirstAid(new FirstAidView("Macintosh HD",
-            ["Problem:  Invalid PEOF, 18, 2", "Problem:  MountCheck found minor errors."], "The volume “Macintosh HD” needs to be repaired.", CanRepair: true)));
-        Baselines.Check(firstAid.Window, "dialog-first-aid", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
-        firstAid.Window.Close();
         Baselines.Verify(baselines);
     });
 }

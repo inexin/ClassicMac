@@ -618,18 +618,18 @@ public sealed class EditTests : EditTestsBase
 
         await model.VolumeActions.FirstAidCommand.ExecuteAsync(null);              // Done
         var report = Assert.Single(dialogs.FirstAidShown);
-        Assert.Equal(("Volume", true), (report.Volume, report.CanRepair));
-        Assert.Contains("Problem:  Master Directory Block needs minor repair, 2, 0", report.Lines);
+        Assert.Equal(("Volume", true), (report.Volume, report.RepairCommand.CanExecute(null)));
+        Assert.Contains("Problem:  Master Directory Block needs minor repair, 2, 0", report.Sections[0].Lines);
         Assert.Equal("The volume “Volume” needs to be repaired.", report.Summary);
         Assert.False(model.EditActions.HasUnsavedChanges);
 
-        dialogs.FirstAid = _ => true;                                              // Repair
+        dialogs.FirstAid = Dialogs.Repairing;
         await model.VolumeActions.FirstAidCommand.ExecuteAsync(null);
         var repaired = dialogs.FirstAidShown[^1];
-        Assert.Equal(3, dialogs.FirstAidShown.Count);
-        Assert.False(repaired.CanRepair);
+        Assert.Equal(2, dialogs.FirstAidShown.Count);
+        Assert.False(repaired.RepairCommand.CanExecute(null));
         Assert.Equal("The volume “Volume” was repaired successfully.", repaired.Summary);
-        Assert.Contains(repaired.Lines, l => l.Contains("master directory block", StringComparison.Ordinal));
+        Assert.Contains(repaired.Sections[1].Lines, l => l.Contains("master directory block", StringComparison.Ordinal));
         Assert.True(model.EditActions.HasUnsavedChanges);
         Assert.EndsWith("•", input.Title);
         Assert.Equal(image, File.ReadAllBytes(path));                              // nothing written until Save As
@@ -785,7 +785,7 @@ public sealed class EditTests : EditTestsBase
         image[1024 + 35]++;                                                        // fileCount one too many
         var path = Path.Combine(folder, "Plus.img");
         File.WriteAllBytes(path, image);
-        var dialogs = new Dialogs { FirstAid = _ => true };
+        var dialogs = new Dialogs { FirstAid = Dialogs.Repairing };
         var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
         var input = (await model.OpenAsync(path))!;
         model.Selected = input;

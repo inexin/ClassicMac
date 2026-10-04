@@ -89,8 +89,20 @@ public abstract class EditTestsBase : IDisposable
         public Task<string?> NewFolderAsync(string initial) => Task.FromResult(FolderName);
 
         // First Aid's window: each one shown, and whether Repair is clicked.
-        public Func<FirstAidView, bool> FirstAid { get; set; } = _ => false;
-        public List<FirstAidView> FirstAidShown { get; } = [];
+        // Checks, as the dialog does when it opens, then Done; Repairing also clicks Repair when offered.
+        public Func<FirstAidViewModel, Task> FirstAid { get; set; } = Checking;
+        public List<FirstAidViewModel> FirstAidShown { get; } = [];
+
+        public static Task Checking(FirstAidViewModel model) => model.CheckCommand.ExecuteAsync(null);
+
+        public static async Task Repairing(FirstAidViewModel model)
+        {
+            await Checking(model);
+            if (model.RepairCommand.CanExecute(null))
+            {
+                await model.RepairCommand.ExecuteAsync(null);
+            }
+        }
 
         public List<DefragmentViewModel> DefragmentShown { get; } = [];
 
@@ -114,10 +126,10 @@ public abstract class EditTestsBase : IDisposable
             return Resize(model);
         }
 
-        public Task<bool> FirstAidAsync(FirstAidView view)
+        public Task FirstAidAsync(FirstAidViewModel model)
         {
-            FirstAidShown.Add(view);
-            return Task.FromResult(FirstAid(view));
+            FirstAidShown.Add(model);
+            return FirstAid(model);
         }
     }
 

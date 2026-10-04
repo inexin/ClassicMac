@@ -470,7 +470,7 @@ public class WindowTests
         public Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial, ImportSource source) => throw new NotSupportedException();
         public Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial) => throw new NotSupportedException();
         public Task<string?> NewFolderAsync(string initial) => throw new NotSupportedException();
-        public Task<bool> FirstAidAsync(FirstAidView view) => throw new NotSupportedException();
+        public Task FirstAidAsync(FirstAidViewModel model) => throw new NotSupportedException();
         public Task ResizeAsync(ResizeViewModel model) => throw new NotSupportedException();
         public Task DefragmentAsync(DefragmentViewModel model) => throw new NotSupportedException();
     }

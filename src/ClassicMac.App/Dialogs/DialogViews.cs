@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -552,35 +553,116 @@ internal static class DialogViews
     }
 
     /// <summary>
-    /// First Aid: the volume in the header, its lines in a scrolling list (monospaced, as Disk First Aid prints them), the
-    /// verdict, and Done with Repair when it can repair.
+    /// First Aid (volume-tools.md §5): it checks as it opens (the progress state), then shows the verdict banner (icon,
+    /// headline, sentence; never colour alone) over one mono log with muted section headings; Copy report on the left,
+    /// Done on the right with Repair when it can repair or Extract All… when it can't.
     /// </summary>
-    public static Dialog<bool> FirstAid(FirstAidView view)
+    public static Dialog<bool> FirstAid(FirstAidViewModel model)
     {
-        var window = NewWindow("First Aid");
+        ArgumentNullException.ThrowIfNull(model);
+        var window = NewWindow(model.Title);
         var dialog = new Dialog<bool>(window, false);
-        var list = new StackPanel { Spacing = 2 };
-        foreach (var line in view.Lines)
+
+        var icon = new SeverityIcon { Name = "VerdictIcon", VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 2, 0, 0) };
+        var headline = new TextBlock { Name = "VerdictHeadline", Classes = { "strong" }, TextWrapping = TextWrapping.Wrap };
+        var sentence = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var words = new StackPanel { Spacing = 2, Children = { headline, sentence } };
+        Grid.SetColumn(words, 1);
+        var banner = new Border
         {
-            list.Children.Add(new TextBlock { Text = line, Classes = { "mono" }, TextWrapping = TextWrapping.Wrap });
+            Name = "VerdictBanner",
+            Classes = { "verdict-banner" },
+            Child = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 10, Children = { icon, words } },
+        };
+
+        var lines = new StackPanel();
+        var log = new Border { Name = "FirstAidLog", Classes = { "first-aid-log" }, Child = new ScrollViewer { Content = lines } };
+        IReadOnlyList<FirstAidSection>? shown = null;
+        void Fill()
+        {
+            lines.Children.Clear();
+            foreach (var section in model.Sections)
+            {
+                lines.Children.Add(new TextBlock { Text = section.Heading, Classes = { "muted", "log-heading" } });
+                foreach (var line in section.Lines)
+                {
+                    lines.Children.Add(new TextBlock { Text = line, Classes = { "mono", "log-line" }, TextWrapping = TextWrapping.Wrap });
+                }
+            }
         }
 
-        var body = new StackPanel { Spacing = 10, Width = 480 };
-        body.Children.Add(new TextBlock { Text = $"“{view.Volume}”", Classes = { "alert-question" } });
-        if (view.Lines.Count > 0)
-        {
-            body.Children.Add(new ScrollViewer { Name = "FirstAidLines", MaxHeight = 240, Content = list });
-        }
+        var error = Line("error");
+        var result = new StackPanel { Spacing = 10, Children = { banner, log, error } };
+        var (running, updateRunning) = Running(model);
+        var body = new StackPanel { Width = 360, Spacing = 10, Children = { result, running } };
 
-        body.Children.Add(new TextBlock { Name = "FirstAidSummary", Text = view.Summary, TextWrapping = TextWrapping.Wrap });
-        var done = Button("Done", window.Close);
-        var repair = Button("Repair", () =>
+        var copy = Button("Copy report", () =>
         {
-            dialog.Result = true;
-            window.Close();
+            if (TopLevel.GetTopLevel(window)?.Clipboard is { } clipboard)
+            {
+                _ = clipboard.SetTextAsync(model.ReportText);
+            }
         });
-        repair.IsEnabled = view.CanRepair;
-        Compose(window, Header(window, "First Aid", () => { }), body, Footer(done, repair, null));
+        copy.Name = "CopyReport";
+        DockPanel.SetDock(copy, Dock.Left);
+        var cancel = Button("Cancel", () => model.CancelCommand.Execute(null));
+        var done = Button("Done", window.Close);
+        var repair = new Button { Content = "Repair", MinWidth = 76, HorizontalContentAlignment = HorizontalAlignment.Center, Classes = { "accent" }, Command = model.RepairCommand };
+        var extract = Button("Extract All…", () =>
+        {
+            window.Close();
+            model.ExtractAllCommand.Execute(null);
+        }, "accent");
+        var right = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { cancel, done, repair, extract } };
+        DockPanel.SetDock(right, Dock.Right);
+        var footer = new Border { Name = "DialogFooter", Classes = { "dialog-footer" }, Child = new DockPanel { LastChildFill = false, Children = { copy, right } } };
+
+        void Update()
+        {
+            bool busy = model.IsRunning, known = model.HasOutcome;
+            result.IsVisible = !busy && known;
+            banner.Classes.Set("ok", model.Outcome is FirstAidOutcome.Ok or FirstAidOutcome.Repaired);
+            banner.Classes.Set("warning", model.Outcome == FirstAidOutcome.NeedsRepair);
+            banner.Classes.Set("error", model.Outcome == FirstAidOutcome.CannotRepair);
+            icon.IsSuccess = model.Outcome is FirstAidOutcome.Ok or FirstAidOutcome.Repaired;
+            icon.Severity = model.Outcome == FirstAidOutcome.CannotRepair ? DiagnosticSeverity.Error : DiagnosticSeverity.Warning;
+            headline.Text = model.Headline;
+            sentence.Text = model.Sentence;
+            Avalonia.Automation.AutomationProperties.SetName(banner, $"{model.Headline}. {model.Sentence}");
+            if (!ReferenceEquals(shown, model.Sections))
+            {
+                shown = model.Sections;
+                Fill();
+            }
+
+            log.IsVisible = model.HasLog;
+            error.IsVisible = model.HasError;
+            error.Text = model.Error;
+            copy.IsVisible = !busy && known;
+            cancel.IsVisible = cancel.IsCancel = busy;
+            done.IsVisible = done.IsCancel = !busy;
+            repair.IsVisible = repair.IsDefault = !busy && model.Outcome == FirstAidOutcome.NeedsRepair;
+            extract.IsVisible = extract.IsDefault = !busy && model.Outcome == FirstAidOutcome.CannotRepair && model.ExtractAll is not null;
+            done.IsDefault = !repair.IsVisible && !extract.IsVisible;
+            done.Classes.Set("accent", done.IsDefault);
+            updateRunning();
+        }
+
+        Update();
+        model.PropertyChanged += (_, _) => Update();
+        window.Opened += async (_, _) =>
+        {
+            if (model.CheckCommand.CanExecute(null))
+            {
+                await model.CheckCommand.ExecuteAsync(null);
+                if (!model.HasOutcome && !model.HasError)
+                {
+                    window.Close();                                     // the check was cancelled
+                }
+            }
+        };
+        window.Closing += (_, _) => model.CancelCommand.Execute(null);
+        Compose(window, Header(window, model.Title, () => model.CancelCommand.Execute(null)), body, footer);
         return dialog;
     }
 
@@ -605,10 +687,12 @@ internal static class DialogViews
         var bar = new ShareBar { Name = "OperationProgress", Classes = { "fork-bar" } };
         Avalonia.Automation.AutomationProperties.SetName(bar, "Progress");
         var detail = Line("muted");
-        var panel = new StackPanel { Spacing = 8, Children = { step, bar, detail, new TextBlock { Text = model.CancelNote, Classes = { "muted" }, TextWrapping = TextWrapping.Wrap } } };
+        var note = Line("muted");
+        var panel = new StackPanel { Spacing = 8, Children = { step, bar, detail, note } };
         return (panel, () =>
         {
             panel.IsVisible = model.IsRunning;
+            note.Text = model.CancelNote;
             step.Text = model.StepText;
             bar.Value = model.Progress;
             detail.Text = model.DetailText;

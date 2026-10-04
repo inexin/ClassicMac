@@ -283,7 +283,12 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
             return;
         }
 
-        string volume = "";
+        string volume = "", name = input.BaseTitle;
+        if (input.VolumeOf(selected) is { } own)
+        {
+            name = VolumeName(own.Root);
+        }
+
         if (input.VolumeSession.PartitionNames.Count > 0)
         {
             if (input.VolumeOf(selected) is not { } partition)
@@ -295,23 +300,32 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
             volume = partition.Name;
         }
 
-        var report = await Task.Run(() => HfsFirstAid.Verify(ForkData.FromBytes(input.VolumeSession.VolumeOf(volume))));
-        appServices.Status = report.Summary;
-        if (appServices.EditDialogs is not { } dialogs
-            || !await dialogs.FirstAidAsync(new FirstAidView(report.VolumeName, Lines(report), report.Summary, report.Verdict == FirstAidVerdict.NeedsRepair)))
+        if (appServices.EditDialogs is not { } dialogs)
         {
             return;
         }
 
-        FirstAidRepairResult? result = null;
-        if (!ChangeVolume(input, session => result = session.Repair(volume), "repair the volume") || result is null)
-        {
-            return;
-        }
+        var session = input.VolumeSession;
+        var model = new FirstAidViewModel(name,
+            (progress, token) => Task.Run(() => HfsFirstAid.Verify(ForkData.FromBytes(session.VolumeOf(volume)), progress, token), token),
+            async (progress, token) =>
+            {
+                var result = await Task.Run(() => session.Repair(volume, progress, token), token);
+                if (result.Written)
+                {
+                    Edited(input);
+                }
 
-        appServices.Status = result.Written ? $"{result.Summary} Save As ▸ HFS Volume Image writes the repairs." : result.Summary;
-        var lines = result.Changes.Select(c => c.Detail).Concat(Lines(result.After)).ToList();
-        await dialogs.FirstAidAsync(new FirstAidView(result.After.VolumeName, lines, result.Summary, CanRepair: false));
+                return result;
+            })
+        {
+            ExtractAll = () => appParts.ExportActions.ExtractAllCommand.CanExecute(null) ? appParts.ExportActions.ExtractAllCommand.ExecuteAsync(null) : Task.CompletedTask,
+        };
+        await dialogs.FirstAidAsync(model);
+        if (model.HasOutcome)
+        {
+            appServices.Status = model.Written ? $"{model.Summary} Save As ▸ HFS Volume Image writes the repairs." : model.Summary;
+        }
     }
 
     private bool CanDefragment() => !appParts.ExportActions.IsExporting && appSelection.Selected is { } selected
@@ -417,8 +431,6 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
                 $"Resized the volume to {resized:N0} bytes; Save As ▸ HFS Volume Image writes it.");
         }
     }
-
-    private static List<string> Lines(FirstAidReport report) => [.. report.Problems.Select(p => p.ToString())];
 
     private static IEnumerable<NodeViewModel> Descendants(NodeViewModel node) =>
         TreeLayout.Contents(node).SelectMany(c => Descendants(c).Prepend(c));
