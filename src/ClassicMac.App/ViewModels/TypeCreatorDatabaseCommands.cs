@@ -90,7 +90,7 @@ public sealed partial class MainViewModel
     {
         TreeDisplay.KindDatabase = database;
         HasTypeCreatorDatabase = database is not null;
-        Details = DetailsViewModel.For(Selected, ProblemsIn(Selected), SelectedAlias);
+        Details = DetailsViewModel.For(Selected, DetailsActions.ProblemsIn(Selected), SelectedAlias);
         OnPropertyChanged(nameof(Header));
     }
 }

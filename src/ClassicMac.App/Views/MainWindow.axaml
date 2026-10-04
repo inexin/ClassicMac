@@ -1402,7 +1402,7 @@
                             <Button Classes="link problems" Padding="0" FontSize="{DynamicResource CmFontSizeMeta}"
                                     Content="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).Details.ProblemsText, FallbackValue={x:Null}}"
                                     IsVisible="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).Details.HasProblems, FallbackValue=False}"
-                                    Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).ShowProblemsCommand, FallbackValue={x:Null}}"
+                                    Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).DetailsActions.ShowProblemsCommand, FallbackValue={x:Null}}"
                                     ToolTip.Tip="Show them in the diagnostics" />
                           </Panel>
                           <ItemsControl Classes="chain" ItemsSource="{Binding Chain}">
@@ -1432,7 +1432,7 @@
                                 <StackPanel Grid.Column="1" Spacing="4">
                                   <SelectableTextBlock Text="{Binding Value}" TextWrapping="Wrap" Classes.mono="{Binding Mono}" IsVisible="{Binding !Link}" />
                                   <Button Classes="link in" Padding="0" FontSize="{DynamicResource CmFontSizeBody}" HorizontalAlignment="Left" Content="{Binding Value}" IsVisible="{Binding Link}"
-                                          Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).GoToInCommand, FallbackValue={x:Null}}"
+                                          Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).DetailsActions.GoToInCommand, FallbackValue={x:Null}}"
                                           ToolTip.Tip="Select it in the tree" />
                                   <ProgressBar Classes="fork-bar" Value="{Binding Bar, FallbackValue=0}" IsVisible="{Binding HasBar}" />
                                 </StackPanel>
@@ -1449,7 +1449,7 @@
               </ScrollViewer.Resources>
               <StackPanel Spacing="4">
                 <DockPanel Margin="0,0,0,4">
-                  <Button x:Name="CopyDetails" DockPanel.Dock="Right" Content="Copy all" Command="{Binding CopyDetailsCommand}"
+                  <Button x:Name="CopyDetails" DockPanel.Dock="Right" Content="Copy all" Command="{Binding DetailsActions.CopyDetailsCommand}"
                           VerticalAlignment="Center" ToolTip.Tip="Copy the details as plain text" />
                   <TextBlock Text="{Binding Details.Heading}" FontSize="{DynamicResource CmFontSizeHeading}"
                              FontWeight="{DynamicResource CmFontWeightStrong}" TextWrapping="Wrap" VerticalAlignment="Center" />

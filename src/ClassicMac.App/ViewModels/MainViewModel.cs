@@ -67,6 +67,14 @@ public interface IFilePicker
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    // For the window's parts: raises PropertyChanged for one of this view model's properties.
+    internal void RaisePropertyChanged(string name) => OnPropertyChanged(name);
+
+    private DetailsActions? detailsActions;
+
+    /// <summary>The Details tab's actions: Copy all, the File card's In link, the chain card's link to problems.</summary>
+    public DetailsActions DetailsActions => detailsActions ??= new(this);
+
     // (The constructors are in TreeDisplay.cs: the settings they read come first.)
 
     public ObservableCollection<InputNode> Roots { get; } = [];
@@ -145,8 +153,15 @@ public sealed partial class MainViewModel : ObservableObject
     internal Task DraftTask { get; private set; } = Task.CompletedTask;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CopyDetailsCommand), nameof(GoToInCommand), nameof(ShowProblemsCommand))]
     private DetailsViewModel details = DetailsViewModel.Empty;
+
+    // The Details tab's actions follow its content.
+    partial void OnDetailsChanged(DetailsViewModel value)
+    {
+        DetailsActions.CopyDetailsCommand.NotifyCanExecuteChanged();
+        DetailsActions.GoToInCommand.NotifyCanExecuteChanged();
+        DetailsActions.ShowProblemsCommand.NotifyCanExecuteChanged();
+    }
 
     [ObservableProperty]
     private DiagnosticEntry? selectedDiagnostic;
@@ -306,7 +321,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         TakeHexEdit();                       // unchanged bytes (changed ones were applied or discarded before the move)
         SelectedAlias = Aliases.Of(value, Roots);
-        Details = DetailsViewModel.For(value, ProblemsIn(value), SelectedAlias);
+        Details = DetailsViewModel.For(value, DetailsActions.ProblemsIn(value), SelectedAlias);
         OnSelectionChangedForInspector();
         // The hex view comes once the preview is known: only a resource without one shows its bytes.
         Hex = HexViewModel.Empty;

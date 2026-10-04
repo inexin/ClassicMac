@@ -253,7 +253,7 @@ public sealed class DetailsTests : IDisposable
         Assert.Equal("1 problem", model.Details.ProblemsText);
         Assert.True(model.Details.HasProblems);
         model.DiagnosticsPanel.IsExpanded = false;
-        model.ShowProblemsCommand.Execute(null);
+        model.DetailsActions.ShowProblemsCommand.Execute(null);
         Assert.True(model.DiagnosticsPanel.IsExpanded);
         Assert.Equal(realmz.Source, model.DiagnosticsPanel.Search);
 
@@ -296,7 +296,7 @@ public sealed class DetailsTests : IDisposable
         var (model, _, realmz, _) = await Open();
         var shell = (FakeShell)model.Shell!;
         model.Selected = realmz;
-        await model.CopyDetailsCommand.ExecuteAsync(null);
+        await model.DetailsActions.CopyDetailsCommand.ExecuteAsync(null);
         var lines = shell.Copied!.Split('\n');
         Assert.Contains("Name: Realmz", lines);
         Assert.Contains("Type / creator: 'APPL' / 'RLMZ'", lines);
@@ -304,10 +304,10 @@ public sealed class DetailsTests : IDisposable
         Assert.Contains("Read as: Disk.img → HFS volume → Realmz · both forks", lines);
         Assert.Contains("Problems: No problems found in this file", lines);
         Assert.Equal(model.Details.CopyText, shell.Copied);
-        Assert.False(model.CopyDetailsCommand.CanExecute(null) && model.Details.Groups.Count == 0);
+        Assert.False(model.DetailsActions.CopyDetailsCommand.CanExecute(null) && model.Details.Groups.Count == 0);
 
         model.Selected = null;
-        Assert.False(model.CopyDetailsCommand.CanExecute(null));
+        Assert.False(model.DetailsActions.CopyDetailsCommand.CanExecute(null));
     }
 
     [Fact]
@@ -369,7 +369,7 @@ public sealed class DetailsTests : IDisposable
     {
         var (model, _, realmz, _) = await Open();
         model.Selected = realmz;
-        await model.GoToInCommand.ExecuteAsync(null);
+        await model.DetailsActions.GoToInCommand.ExecuteAsync(null);
         Assert.Same(realmz.Parent, model.Selected);
     }
 }

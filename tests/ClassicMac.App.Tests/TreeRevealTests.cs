@@ -128,7 +128,7 @@ public sealed class TreeRevealTests : IDisposable
             AssertInView(window, file);
             Headless.Pump(model.PreviewTask);
             Assert.NotNull(model.Details.InNode);
-            Headless.Pump(model.GoToInCommand.ExecuteAsync(null));
+            Headless.Pump(model.DetailsActions.GoToInCommand.ExecuteAsync(null));
             Render(window);
             Assert.Equal("Delta", model.Selected!.Title);
             AssertInView(window, model.Selected);
