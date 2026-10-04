@@ -1,0 +1,843 @@
+<!--
+  The read-then-edit host (boards/read-then-edit.md, E1) with every form's templates: read only first, then edited in
+  place with Cancel and Apply.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             xmlns:views="using:ClassicMac.App.Views"
+             x:Class="ClassicMac.App.Views.FormHostPane"
+             x:DataType="vm:MainViewModel">
+  <DockPanel x:Name="FormHost" Classes="form-host" Classes.editing="{Binding FormEditing.IsEditingForm}" IsVisible="{Binding FormEditing.ShowsForm}">
+    <Border x:Name="FormFooter" DockPanel.Dock="Bottom" Classes="host-footer">
+      <Panel>
+        <StackPanel x:Name="ReadOnlyFooter" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !FormEditing.IsEditingForm}">
+          <PathIcon Classes="lock" Data="M4,7 V5 A4,4 0 0 1 12,5 V7 H13 V15 H3 V7 Z M6,7 H10 V5 A2,2 0 0 0 6,5 Z" />
+          <TextBlock Text="{Binding FormEditing.FormReadOnlyNote}" Classes="muted" />
+          <TextBlock Text="{Binding FormEditing.LastApplied}" Classes="applied" IsVisible="{Binding FormEditing.LastApplied, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+        <DockPanel x:Name="EditingFooter" IsVisible="{Binding FormEditing.IsEditingForm}">
+          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+            <Button Content="Cancel" Command="{Binding FormEditing.CancelFormCommand}" ToolTip.Tip="Esc" />
+            <Button Classes="accent" Content="Apply" Command="{Binding Forms.ApplyFormCommand}" IsDefault="False" ToolTip.Tip="Ctrl+Enter" />
+          </StackPanel>
+          <StackPanel Spacing="2" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <TextBlock Text="{Binding FormEditing.FormHint}" Classes="muted" VerticalAlignment="Center" />
+              <CheckBox x:Name="TemplateBox" Content="Edit with template" IsChecked="{Binding Forms.UseTemplate}" IsVisible="{Binding Forms.HasTemplateChoice}" />
+            </StackPanel>
+            <StackPanel x:Name="FormErrorLine" Orientation="Horizontal" Spacing="6"
+                        IsVisible="{Binding FormLivePreview.FormError, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <views:SeverityIcon Severity="Error" Width="12" Height="12" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding FormLivePreview.FormError}" Classes="error form-error" TextWrapping="Wrap" />
+            </StackPanel>
+          </StackPanel>
+        </DockPanel>
+      </Panel>
+    </Border>
+    <Border Classes="host-values">
+    <DockPanel>
+    <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" AllowAutoHide="False" Margin="16,0,16,0" MaxWidth="560"
+                  IsVisible="{Binding FormLivePreview.ShowsHostDialog}">
+      <views:DialogView Dialog="{Binding FormLivePreview.FormDialog}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
+    </ScrollViewer>
+    <ContentControl Classes="form-content" Content="{Binding Forms.Form}">
+      <ContentControl.DataTemplates>
+        <!-- Strings, string lists, text and version (boards/read-then-edit.md, E5): read as text (a double-click
+             anywhere on it edits), edited with the inputs. -->
+        <DataTemplate DataType="vm:StringForm">
+          <Panel>
+            <Border x:Name="StringRead" Classes="read-view form-row" IsVisible="{Binding !IsEditing}">
+              <StackPanel Spacing="6">
+                <TextBlock Classes="caption" Text="STRING" />
+                <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" IsVisible="{Binding !IsEmpty}" />
+                <TextBlock Classes="muted" Text="Empty" IsVisible="{Binding IsEmpty}" />
+              </StackPanel>
+            </Border>
+            <StackPanel Spacing="6" IsVisible="{Binding IsEditing}">
+              <TextBlock Text="String (at most 255 Mac OS Roman characters)" Classes="muted" />
+              <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+            </StackPanel>
+          </Panel>
+        </DataTemplate>
+        <DataTemplate DataType="vm:StringListForm">
+          <Panel>
+            <ScrollViewer IsVisible="{Binding !IsEditing}">
+              <StackPanel Spacing="6">
+                <TextBlock Classes="caption" Text="{Binding Summary, StringFormat={}{0}}" />
+                <ItemsControl x:Name="StringRows" ItemsSource="{Binding Strings}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:StringItem">
+                      <Border Classes="table-row form-row" Classes.selected="{Binding IsSelected}">
+                        <Panel>
+                          <Border Classes="bar" />
+                          <Grid ColumnDefinitions="36,*">
+                            <TextBlock Classes="muted mono" Text="{Binding Number}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                          </Grid>
+                        </Panel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+            <DockPanel IsVisible="{Binding IsEditing}">
+              <Button DockPanel.Dock="Bottom" Content="Add String" Command="{Binding AddCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+              <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding Strings}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:StringItem">
+                      <Grid ColumnDefinitions="36,*,Auto,Auto" Margin="0,2">
+                        <TextBlock Classes="muted mono" Text="{Binding Number}" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" Classes.selected="{Binding IsSelected}" Text="{Binding Text}" />
+                        <Button Grid.Column="2" Content="↑" Margin="4,0,0,0"
+                                Command="{Binding $parent[ItemsControl].((vm:StringListForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
+                        <Button Grid.Column="3" Content="Remove" Margin="4,0,0,0"
+                                Command="{Binding $parent[ItemsControl].((vm:StringListForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </Panel>
+        </DataTemplate>
+        <DataTemplate DataType="vm:TextForm">
+          <Panel>
+            <ScrollViewer IsVisible="{Binding !IsEditing}">
+              <Border x:Name="TextRead" Classes="read-view form-row">
+                <views:StyledTextView Styled="{Binding Styled}" TextWrapping="Wrap" />
+              </Border>
+            </ScrollViewer>
+            <DockPanel IsVisible="{Binding IsEditing}">
+              <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" Classes="muted"
+                         Text="Text (Mac OS Roman). Its 'styl' runs follow your edits; new text takes the style where the change starts."
+                         IsVisible="{Binding HasStyles}" TextWrapping="Wrap" />
+              <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" />
+            </DockPanel>
+          </Panel>
+        </DataTemplate>
+        <DataTemplate DataType="vm:VersionForm">
+          <Panel>
+            <Border x:Name="VersionRead" Classes="read-view form-row" IsVisible="{Binding !IsEditing}">
+              <Grid Classes="labelled" ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                <TextBlock Classes="muted" Text="Version" />
+                <TextBlock Grid.Column="1" Classes="mono strong-value" Text="{Binding NumberText}" />
+                <TextBlock Grid.Row="1" Classes="muted" Text="Stage" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StageText}" />
+                <TextBlock Grid.Row="2" Classes="muted" Text="Region code" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Classes="mono" Text="{Binding RegionText}" />
+                <TextBlock Grid.Row="3" Classes="muted" Text="Short version" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ShortVersion}" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="4" Classes="muted" Text="Long version" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding LongVersion}" TextWrapping="Wrap" />
+              </Grid>
+            </Border>
+            <Grid IsVisible="{Binding IsEditing}" ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+              <TextBlock Text="Major" VerticalAlignment="Center" />
+              <NumericUpDown Grid.Column="1" Value="{Binding Major}" Minimum="0" Maximum="99" FormatString="0" Width="140" HorizontalAlignment="Left" />
+              <TextBlock Grid.Row="1" Text="Minor" VerticalAlignment="Center" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Minor}" Minimum="0" Maximum="15" FormatString="0" Width="140" HorizontalAlignment="Left" />
+              <TextBlock Grid.Row="2" Text="Bug fix" VerticalAlignment="Center" />
+              <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding BugFix}" Minimum="0" Maximum="15" FormatString="0" Width="140" HorizontalAlignment="Left" />
+              <TextBlock Grid.Row="3" Text="Stage" VerticalAlignment="Center" />
+              <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{x:Static vm:VersionForm.Stages}" SelectedItem="{Binding Stage}" Width="140" />
+              <TextBlock Grid.Row="4" Text="Non-release" VerticalAlignment="Center" />
+              <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding NonRelease}" Minimum="0" Maximum="99" FormatString="0" Width="140" HorizontalAlignment="Left" />
+              <TextBlock Grid.Row="5" Text="Region code" VerticalAlignment="Center" />
+              <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding Region}" Minimum="-32768" Maximum="32767" FormatString="0" Width="140" HorizontalAlignment="Left" />
+              <TextBlock Grid.Row="6" Text="Short version" VerticalAlignment="Center" />
+              <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding ShortVersion}" />
+              <TextBlock Grid.Row="7" Text="Long version" VerticalAlignment="Center" />
+              <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding LongVersion}" />
+            </Grid>
+          </Panel>
+        </DataTemplate>
+        <!-- The window and dialog form (boards/window-alert.md, E4): property cards, text read only and inputs while
+             editing; the bounds on a screen on the right. -->
+        <DataTemplate DataType="vm:WindowForm">
+          <Grid x:Name="WindowCards" ColumnDefinitions="*,Auto">
+            <ScrollViewer>
+              <StackPanel Classes="cards">
+                <Border Classes="card">
+                  <StackPanel>
+                    <TextBlock Classes="card-title" Text="Bounds" />
+                    <Border Classes="card-line">
+                      <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                        <TextBlock Classes="label" Text="Top, left" />
+                        <TextBlock Grid.Column="1" Classes="mono" Text="{Binding TopLeftText}" IsVisible="{Binding !IsEditing}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
+                          <NumericUpDown Value="{Binding Top}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Top" />
+                          <NumericUpDown Value="{Binding Left}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Left" />
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                    <Border Classes="card-line">
+                      <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                        <TextBlock Classes="label" Text="Bottom, right" />
+                        <TextBlock Grid.Column="1" Classes="mono" Text="{Binding BottomRightText}" IsVisible="{Binding !IsEditing}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
+                          <NumericUpDown Value="{Binding Bottom}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Bottom" />
+                          <NumericUpDown Value="{Binding Right}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Right" />
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                    <Border Classes="card-line last">
+                      <Grid Classes="card-row last" ColumnDefinitions="150,*">
+                        <TextBlock Classes="label" Text="Size" />
+                        <TextBlock Grid.Column="1" Text="{Binding SizeText}" />
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+                </Border>
+                <Border Classes="card">
+                  <StackPanel>
+                    <TextBlock Classes="card-title" Text="Window" />
+                    <Border Classes="card-line">
+                      <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                        <TextBlock Classes="label" Text="Title" />
+                        <TextBlock Grid.Column="1" Text="{Binding TitleText}" IsVisible="{Binding !IsEditing}" />
+                        <TextBox Grid.Column="1" Text="{Binding Title}" MaxWidth="320" HorizontalAlignment="Left" MinWidth="200" IsVisible="{Binding IsEditing}" />
+                      </Grid>
+                    </Border>
+                    <Border Classes="card-line">
+                      <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                        <TextBlock Classes="label" Text="Definition" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditing}">
+                          <TextBlock Text="{Binding DefinitionName}" />
+                          <TextBlock Classes="mono muted" Text="{Binding DefinitionCode}" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding Definitions}" SelectedItem="{Binding SelectedDefinition}" MinWidth="220" IsVisible="{Binding IsEditing}" />
+                      </Grid>
+                    </Border>
+                    <Border Classes="card-line" IsVisible="{Binding IsDialog}">
+                      <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                        <TextBlock Classes="label" Text="Item list" />
+                        <Button Grid.Column="1" Classes="link" Content="{Binding ItemsText}" IsVisible="{Binding !IsEditing}"
+                                Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormEditing.ShowItemListCommand, FallbackValue={x:Null}}" CommandParameter="{Binding}" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding ItemsId}" FormatString="0" Classes="coord" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
+                      </Grid>
+                    </Border>
+                    <Border Classes="card-line">
+                      <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                        <TextBlock Classes="label" Text="Visible" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsEditing}">
+                          <Ellipse Classes="dot" Classes.on="{Binding Visible}" />
+                          <TextBlock Text="{Binding VisibleText}" />
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" IsChecked="{Binding Visible}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Visible" />
+                      </Grid>
+                    </Border>
+                    <Border Classes="card-line">
+                      <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                        <TextBlock Classes="label" Text="Close box" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsEditing}">
+                          <Ellipse Classes="dot" Classes.on="{Binding GoAway}" />
+                          <TextBlock Text="{Binding GoAwayText}" />
+                        </StackPanel>
+                        <CheckBox Grid.Column="1" IsChecked="{Binding GoAway}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Close box" />
+                      </Grid>
+                    </Border>
+                    <Border Classes="card-line">
+                      <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                        <TextBlock Classes="label" Text="Reference constant" />
+                        <TextBlock Grid.Column="1" Classes="mono" Text="{Binding RefConText}" IsVisible="{Binding !IsEditing}" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding RefCon}" FormatString="0" Classes="coord wide" HorizontalAlignment="Left" Minimum="-2147483648" Maximum="2147483647" IsVisible="{Binding IsEditing}" />
+                      </Grid>
+                    </Border>
+                    <Border Classes="card-line last">
+                      <Grid Classes="card-row form-row last" ColumnDefinitions="150,*">
+                        <TextBlock Classes="label" Text="Auto-position" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditing}">
+                          <TextBlock Text="{Binding PositionName}" />
+                          <TextBlock Classes="mono muted" Text="{Binding PositionCode}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsEditing}">
+                          <CheckBox IsChecked="{Binding HasPosition}" AutomationProperties.Name="Positioning word" />
+                          <ComboBox ItemsSource="{x:Static vm:CardForm.Positions}" SelectedItem="{Binding SelectedPosition}" MinWidth="260" IsEnabled="{Binding HasPosition}" />
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </ScrollViewer>
+            <Border Grid.Column="1" Classes="screen-panel" IsVisible="{Binding !IsDialog}">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="caption" Text="{Binding ScreenTitle}" />
+                <views:ScreenBoundsView Top="{Binding Top}" Left="{Binding Left}" Bottom="{Binding Bottom}" Right="{Binding Right}"
+                                        Definition="{Binding Definition}" ScreenWidth="{Binding SelectedScreen.Width}" ScreenHeight="{Binding SelectedScreen.Height}"
+                                        HorizontalAlignment="Left" />
+                <ComboBox ItemsSource="{x:Static vm:WindowForm.Screens}" SelectedItem="{Binding SelectedScreen}" MinWidth="200" AutomationProperties.Name="Screen" />
+              </StackPanel>
+            </Border>
+          </Grid>
+        </DataTemplate>
+        <!-- The alert form (E4): a card, then the stages table; selecting a stage redraws the preview with its
+             default button. -->
+        <DataTemplate DataType="vm:AlertForm">
+          <ScrollViewer>
+            <StackPanel x:Name="AlertCards" Classes="cards">
+              <Border Classes="card">
+                <StackPanel>
+                  <Border Classes="card-line">
+                    <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Bounds" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditing}">
+                        <TextBlock Classes="mono" Text="{Binding BoundsText}" />
+                        <TextBlock Classes="muted" Text="{Binding SizeText}" />
+                      </StackPanel>
+                      <WrapPanel Grid.Column="1" ItemSpacing="6" LineSpacing="6" Margin="0,6" IsVisible="{Binding IsEditing}">
+                        <NumericUpDown Value="{Binding Top}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Top" />
+                        <NumericUpDown Value="{Binding Left}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Left" />
+                        <NumericUpDown Value="{Binding Bottom}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Bottom" />
+                        <NumericUpDown Value="{Binding Right}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Right" />
+                      </WrapPanel>
+                    </Grid>
+                  </Border>
+                  <Border Classes="card-line">
+                    <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Item list" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditing}">
+                        <Button Classes="link" Content="{Binding ItemsText}"
+                                Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormEditing.ShowItemListCommand, FallbackValue={x:Null}}" CommandParameter="{Binding}" />
+                        <TextBlock Classes="muted" Text="{Binding ItemCountText}" VerticalAlignment="Center" />
+                      </StackPanel>
+                      <NumericUpDown Grid.Column="1" Value="{Binding ItemsId}" FormatString="0" Classes="coord" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
+                    </Grid>
+                  </Border>
+                  <Border Classes="card-line last">
+                    <Grid Classes="card-row form-row last" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Auto-position" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditing}">
+                        <TextBlock Text="{Binding PositionName}" />
+                        <TextBlock Classes="mono muted" Text="{Binding PositionCode}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsEditing}">
+                        <CheckBox IsChecked="{Binding HasPosition}" AutomationProperties.Name="Positioning word" />
+                        <ComboBox ItemsSource="{x:Static vm:CardForm.Positions}" SelectedItem="{Binding SelectedPosition}" MinWidth="260" IsEnabled="{Binding HasPosition}" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </StackPanel>
+              </Border>
+              <Border Classes="card">
+                <StackPanel>
+                  <TextBlock Classes="card-title" Text="Stages" />
+                  <TextBlock Classes="muted card-note" Text="What happens the 1st to 4th time the alert is shown in a row" />
+                  <Grid Classes="card-columns" ColumnDefinitions="70,*,90,120">
+                    <TextBlock Classes="caption" Text="STAGE" />
+                    <TextBlock Grid.Column="1" Classes="caption" Text="DEFAULT BUTTON" />
+                    <TextBlock Grid.Column="2" Classes="caption" Text="DRAWN" />
+                    <TextBlock Grid.Column="3" Classes="caption" Text="SOUND" />
+                  </Grid>
+                  <!-- The stages: table rows (a click selects one, through the host's row selection). -->
+                  <ItemsControl x:Name="AlertStages" ItemsSource="{Binding Stages}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="vm:AlertStage">
+                        <Border Classes="table-row form-row" Classes.selected="{Binding IsSelected}">
+                          <Panel>
+                            <Border Classes="bar" />
+                            <Grid Classes="stage-row" ColumnDefinitions="70,*,90,120">
+                              <TextBlock Text="{Binding Ordinal}" />
+                              <TextBlock Grid.Column="1" Text="{Binding DefaultText}"
+                                         IsVisible="{Binding !$parent[ItemsControl].((vm:AlertForm)DataContext).IsEditing, FallbackValue=True}" />
+                              <ComboBox Grid.Column="1" ItemsSource="{Binding DefaultChoices}" SelectedIndex="{Binding DefaultIndex}" MinWidth="180"
+                                        IsVisible="{Binding $parent[ItemsControl].((vm:AlertForm)DataContext).IsEditing, FallbackValue=False}" AutomationProperties.Name="Default button" />
+                              <TextBlock Grid.Column="2" Text="{Binding DrawnText}"
+                                         IsVisible="{Binding !$parent[ItemsControl].((vm:AlertForm)DataContext).IsEditing, FallbackValue=True}" />
+                              <CheckBox Grid.Column="2" IsChecked="{Binding Drawn}"
+                                        IsVisible="{Binding $parent[ItemsControl].((vm:AlertForm)DataContext).IsEditing, FallbackValue=False}" AutomationProperties.Name="Drawn" />
+                              <TextBlock Grid.Column="3" Text="{Binding SoundName}"
+                                         IsVisible="{Binding !$parent[ItemsControl].((vm:AlertForm)DataContext).IsEditing, FallbackValue=True}" />
+                              <ComboBox Grid.Column="3" ItemsSource="{x:Static vm:AlertStage.Sounds}" SelectedIndex="{Binding SoundIndex}" MinWidth="110"
+                                        IsVisible="{Binding $parent[ItemsControl].((vm:AlertForm)DataContext).IsEditing, FallbackValue=False}" AutomationProperties.Name="Sound" />
+                            </Grid>
+                          </Panel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock x:Name="StageNote" Classes="muted card-note" Text="{Binding StageNote}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </DataTemplate>
+        <!-- The dialog item list form (boards/dialog-item-list.md, E3): a table read only, inputs while editing; the
+             preview on the right (the dialog that uses the list, live from the values), its outlined item the
+             selected row, a click on an item selecting its row. -->
+        <DataTemplate DataType="vm:DialogItemsForm">
+          <Grid x:Name="ItemListForm" Classes="menu-form ditl-form" Classes.editing="{Binding IsEditing}" ColumnDefinitions="*,Auto">
+            <Border Grid.Column="1" Classes="preview-panel ditl-preview">
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Classes="preview-header">
+                  <DockPanel>
+                    <TextBlock DockPanel.Dock="Right" Classes="muted" Text="1× · Mac OS 8/9" />
+                    <TextBlock x:Name="ItemListPreviewTitle" Classes="strong"
+                               Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormEditing.FormPreviewTitle, FallbackValue=Preview}" />
+                  </DockPanel>
+                </Border>
+                <TextBlock DockPanel.Dock="Top" Classes="muted preview-note"
+                           Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormLivePreview.FormDialogNote, FallbackValue={x:Null}}" />
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" AllowAutoHide="False" Background="{DynamicResource CmCheckerboard}">
+                  <views:DialogView x:Name="ItemListPreview" Dialog="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormLivePreview.FormDialog, FallbackValue={x:Null}}"
+                                    SelectedIndex="{Binding PreviewIndex, Mode=TwoWay}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                </ScrollViewer>
+              </DockPanel>
+            </Border>
+            <ScrollViewer Padding="18,12" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Classes="menu-table" Classes.editing="{Binding IsEditing}">
+                <Grid Classes="menu-columns read-only" ColumnDefinitions="24,96,*,132,56">
+                  <TextBlock Classes="caption" Text="#" />
+                  <TextBlock Grid.Column="1" Classes="caption" Text="KIND" />
+                  <TextBlock Grid.Column="2" Classes="caption" Text="TEXT OR RESOURCE" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="3" Classes="caption" Text="TOP, LEFT, BOTTOM, RIGHT" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="4" Classes="caption" Text="ENABLED" />
+                </Grid>
+                <Grid Classes="menu-columns editing" ColumnDefinitions="24,136,*,160,24,24">
+                  <TextBlock Classes="caption" Text="#" />
+                  <TextBlock Grid.Column="1" Classes="caption" Text="KIND" />
+                  <TextBlock x:Name="ItemTextCaption" Grid.Column="2" Classes="caption" Text="TEXT OR RESOURCE ID" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="3" Classes="caption" Text="TOP, LEFT, BOTTOM, RIGHT" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="4" Classes="caption" Text="ON" />
+                </Grid>
+                <ItemsControl x:Name="ItemRows" ItemsSource="{Binding Items}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:DialogItemRow">
+                      <Border Classes="table-row ditl-row form-row" Classes.selected="{Binding IsSelected}">
+                        <Panel>
+                          <Border Classes="bar" />
+                          <Grid Classes="read-only" ColumnDefinitions="24,96,*,132,56">
+                            <TextBlock Classes="muted mono" Text="{Binding Number}" />
+                            <TextBlock Grid.Column="1" Text="{Binding KindName}" />
+                            <TextBlock Grid.Column="2" Text="{Binding Content}" Classes.muted="{Binding HasNoContent}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="3" Classes="mono" Text="{Binding BoundsText}" />
+                            <TextBlock Grid.Column="4" Text="{Binding EnabledText}" Classes.muted="{Binding IsDimmed}" />
+                          </Grid>
+                          <Grid Classes="editing" ColumnDefinitions="24,136,*,160,24,24">
+                            <TextBlock Classes="muted mono" Text="{Binding Number}" VerticalAlignment="Center" />
+                            <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:DialogItemRow.Kinds}" SelectedItem="{Binding Kind}" AutomationProperties.Name="Kind" />
+                            <TextBox x:Name="ItemText" Grid.Column="2" Text="{Binding Text}" IsVisible="{Binding HasText}" AutomationProperties.Name="Text" />
+                            <NumericUpDown Grid.Column="2" Classes="mono" Value="{Binding ResourceId}" FormatString="0" ShowButtonSpinner="False"
+                                           Minimum="-32768" Maximum="32767" IsVisible="{Binding HasResource}" AutomationProperties.Name="Resource ID" />
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
+                              <TextBox x:Name="TopBox" Classes="mono bound" Text="{Binding TopText}" AutomationProperties.Name="Top" />
+                              <TextBox x:Name="LeftBox" Classes="mono bound" Text="{Binding LeftText}" AutomationProperties.Name="Left" />
+                              <TextBox x:Name="BottomBox" Classes="mono bound" Text="{Binding BottomText}" AutomationProperties.Name="Bottom" />
+                              <TextBox x:Name="RightBox" Classes="mono bound" Text="{Binding RightText}" AutomationProperties.Name="Right" />
+                            </StackPanel>
+                            <CheckBox Grid.Column="4" IsChecked="{Binding Enabled}" AutomationProperties.Name="Enabled" />
+                            <Button Grid.Column="5" Classes="flat row-tool remove" Content="×" ToolTip.Tip="Remove" AutomationProperties.Name="Remove"
+                                    Command="{Binding $parent[ItemsControl].((vm:DialogItemsForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                          </Grid>
+                        </Panel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Classes="editing" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                  <Button Content="Add item" Command="{Binding AddCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </Grid>
+        </DataTemplate>
+        <!-- The menu form (boards/read-then-edit.md, E2): a summary and a table read only, inputs while
+             editing; the live preview on the right, its highlighted item the selected row. -->
+        <DataTemplate DataType="vm:MenuForm">
+          <Grid x:Name="MenuForm" Classes="menu-form menu-edit-form" Classes.editing="{Binding IsEditing}" ColumnDefinitions="*,Auto">
+            <Border Grid.Column="1" Classes="preview-panel menu-preview">
+              <DockPanel>
+                <Border DockPanel.Dock="Top" Classes="preview-header">
+                  <WrapPanel>
+                    <TextBlock x:Name="PreviewTitle" Classes="strong" Margin="0,0,10,0" TextWrapping="Wrap"
+                               Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormEditing.FormPreviewTitle, FallbackValue=Preview}" />
+                    <TextBlock Classes="muted" Text="2× · Mac OS 8/9" />
+                  </WrapPanel>
+                </Border>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" AllowAutoHide="False" Background="{DynamicResource CmCheckerboard}">
+                  <views:MenuView x:Name="MenuPreview" Menu="{Binding Preview}" SelectedIndex="{Binding PreviewIndex, Mode=TwoWay}" Scale="2"
+                                  HorizontalAlignment="Left" VerticalAlignment="Top" />
+                </ScrollViewer>
+              </DockPanel>
+            </Border>
+            <ScrollViewer Padding="18,12">
+              <StackPanel Spacing="12">
+                <WrapPanel Classes="menu-summary" IsVisible="{Binding !IsEditing}">
+                  <TextBlock Classes="muted" Text="Menu title" />
+                  <TextBlock Classes="value" Text="{Binding Title}" />
+                  <TextBlock Classes="muted" Text="Enabled" />
+                  <TextBlock Classes="value" Text="{Binding EnabledText}" />
+                  <TextBlock Classes="muted" Text="Menu ID" />
+                  <TextBlock Classes="value mono" Text="{Binding IdText}" />
+                  <TextBlock Classes="muted" Text="MDEF" />
+                  <TextBlock Classes="value mono" Text="{Binding DefinitionText}" />
+                </WrapPanel>
+                <WrapPanel Classes="menu-fields" IsVisible="{Binding IsEditing}">
+                  <StackPanel>
+                    <TextBlock Classes="muted" Text="Title" />
+                    <TextBox Text="{Binding Title}" Width="130" AutomationProperties.Name="Menu title" />
+                  </StackPanel>
+                  <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
+                  <StackPanel>
+                    <TextBlock Classes="muted" Text="ID" />
+                    <NumericUpDown Classes="mono" Value="{Binding Id}" FormatString="0" Width="68" ShowButtonSpinner="False"
+                                   Minimum="-32768" Maximum="32767" AutomationProperties.Name="Menu ID" />
+                  </StackPanel>
+                  <StackPanel>
+                    <TextBlock Classes="muted" Text="MDEF" />
+                    <NumericUpDown Classes="mono" Value="{Binding Definition}" FormatString="0" Width="68" ShowButtonSpinner="False"
+                                   Minimum="-32768" Maximum="32767" AutomationProperties.Name="MDEF" />
+                  </StackPanel>
+                </WrapPanel>
+                <StackPanel Classes="menu-table" Classes.editing="{Binding IsEditing}">
+                  <Grid Classes="menu-columns read-only" ColumnDefinitions="28,*,52,84,40,120,60">
+                    <TextBlock Classes="caption" Text="#" />
+                    <TextBlock Grid.Column="1" Classes="caption" Text="TEXT" />
+                    <TextBlock Grid.Column="2" Classes="caption" Text="⌘ KEY" />
+                    <TextBlock Grid.Column="3" Classes="caption" Text="MARK" />
+                    <TextBlock Grid.Column="4" Classes="caption" Text="ICON" />
+                    <TextBlock Grid.Column="5" Classes="caption" Text="STYLE" />
+                    <TextBlock Grid.Column="6" Classes="caption" Text="ENABLED" />
+                  </Grid>
+                  <Grid Classes="menu-columns editing" ColumnDefinitions="28,*,40,130,40,126,28,28">
+                    <TextBlock x:Name="MenuTextCaption" Grid.Column="1" Classes="caption" Text="TEXT" />
+                    <TextBlock Grid.Column="2" Classes="caption" Text="⌘ KEY" />
+                    <TextBlock Grid.Column="3" Classes="caption" Text="MARK" />
+                    <TextBlock Grid.Column="4" Classes="caption" Text="ICON" />
+                    <TextBlock Grid.Column="5" Classes="caption" Text="STYLE" />
+                    <TextBlock Grid.Column="6" Classes="caption" Text="ON" />
+                  </Grid>
+                  <ItemsControl x:Name="MenuRows" ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="vm:MenuItemRow">
+                        <Border Classes="table-row form-row" Classes.selected="{Binding IsSelected}" Classes.dimmed="{Binding IsDimmed}"
+                                Classes.divider="{Binding IsDivider}">
+                          <Panel>
+                            <Border Classes="bar" />
+                            <Grid Classes="read-only" ColumnDefinitions="28,*,52,84,40,120,60">
+                              <TextBlock Classes="muted mono" Text="{Binding Number}" />
+                              <TextBlock Grid.Column="1" Classes="item-text" Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
+                              <StackPanel Grid.Column="1" Classes="divider-mark" Orientation="Horizontal" Spacing="8">
+                                <Border Classes="rule" />
+                                <TextBlock Classes="muted" Text="divider" />
+                              </StackPanel>
+                              <TextBlock Grid.Column="2" Classes="mono cell" Text="{Binding KeyText}" />
+                              <TextBlock Grid.Column="3" Classes="cell" Text="{Binding MarkText}" />
+                              <TextBlock Grid.Column="4" Classes="mono cell" Text="{Binding IconText}" />
+                              <TextBlock Grid.Column="5" Classes="cell" Text="{Binding StyleText}" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Grid.Column="6" Classes="cell" Text="{Binding EnabledText}" />
+                            </Grid>
+                            <Grid Classes="editing" ColumnDefinitions="28,*,40,130,40,126,28,28">
+                              <StackPanel Classes="move">
+                                <!-- Chevron icons, not glyphs (boards/read-then-edit.md); Alt+Up and Alt+Down move the selected row. -->
+                                <Button Classes="flat row-tool" ToolTip.Tip="Move up (Alt+Up)" AutomationProperties.Name="Move up"
+                                        Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}">
+                                  <PathIcon Classes="row-chevron" Data="M1,6.5 L5,2.5 L9,6.5 L7.6,7.9 L5,5.3 L2.4,7.9 Z" />
+                                </Button>
+                                <Button Classes="flat row-tool" ToolTip.Tip="Move down (Alt+Down)" AutomationProperties.Name="Move down"
+                                        Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
+                                  <PathIcon Classes="row-chevron" Data="M1,3.5 L5,7.5 L9,3.5 L7.6,2.1 L5,4.7 L2.4,2.1 Z" />
+                                </Button>
+                              </StackPanel>
+                              <TextBox x:Name="MenuItemText" Grid.Column="1" Text="{Binding Text}" AutomationProperties.Name="Text" />
+                              <TextBox Grid.Column="2" Classes="mono key" Classes.conflict="{Binding HasKeyConflict}" Text="{Binding Key}"
+                                       HorizontalContentAlignment="Center" AutomationProperties.Name="Command key" />
+                              <!-- The marks in words; the list adds each one's Mac character code. Other… shows a code field. -->
+                              <Grid Grid.Column="3" ColumnDefinitions="*,Auto">
+                                <ComboBox Classes="mark" ItemsSource="{Binding MarkChoices}" SelectedItem="{Binding MarkChoice}" AutomationProperties.Name="Mark"
+                                          HorizontalAlignment="Stretch">
+                                  <ComboBox.ItemTemplate>
+                                    <DataTemplate DataType="vm:MarkChoice">
+                                      <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{Binding Label}" />
+                                        <TextBlock Classes="mono muted" Text="{Binding Code}" />
+                                      </StackPanel>
+                                    </DataTemplate>
+                                  </ComboBox.ItemTemplate>
+                                  <ComboBox.SelectionBoxItemTemplate>
+                                    <DataTemplate DataType="vm:MarkChoice">
+                                      <TextBlock Text="{Binding ShortLabel}" />
+                                    </DataTemplate>
+                                  </ComboBox.SelectionBoxItemTemplate>
+                                </ComboBox>
+                                <TextBox Grid.Column="1" Classes="mono mark-code" Width="40" Margin="4,0,0,0" Text="{Binding MarkCode}"
+                                         IsVisible="{Binding IsOtherMark}" PlaceholderText="$2A" AutomationProperties.Name="Mark code" />
+                              </Grid>
+                              <NumericUpDown Grid.Column="4" Classes="mono" Value="{Binding Icon}" FormatString="0" ShowButtonSpinner="False"
+                                             Minimum="0" Maximum="255" AutomationProperties.Name="Icon" />
+                              <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="2">
+                                <ToggleButton Classes="style-bit" Content="B" FontWeight="Bold" IsChecked="{Binding Bold}" ToolTip.Tip="Bold" />
+                                <ToggleButton Classes="style-bit" Content="I" FontStyle="Italic" IsChecked="{Binding Italic}" ToolTip.Tip="Italic" />
+                                <ToggleButton Classes="style-bit" ToolTip.Tip="Underline" IsChecked="{Binding Underline}">
+                                  <TextBlock Text="U" TextDecorations="Underline" />
+                                </ToggleButton>
+                                <Button Classes="style-bit more" Classes.on="{Binding HasMoreStyles}" Content="More" ToolTip.Tip="Outline, Shadow, Condense, Extend">
+                                  <Button.Flyout>
+                                    <Flyout Placement="BottomEdgeAlignedLeft">
+                                      <StackPanel Spacing="4">
+                                        <CheckBox Content="Outline" IsChecked="{Binding Outline}" />
+                                        <CheckBox Content="Shadow" IsChecked="{Binding Shadow}" />
+                                        <CheckBox Content="Condense" IsChecked="{Binding Condense}" />
+                                        <CheckBox Content="Extend" IsChecked="{Binding Extend}" />
+                                      </StackPanel>
+                                    </Flyout>
+                                  </Button.Flyout>
+                                </Button>
+                              </StackPanel>
+                              <CheckBox Grid.Column="6" IsChecked="{Binding Enabled}" AutomationProperties.Name="Enabled" />
+                              <Button Grid.Column="7" Classes="flat row-tool remove" Content="×" ToolTip.Tip="Remove" AutomationProperties.Name="Remove"
+                                      Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                            </Grid>
+                          </Panel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <StackPanel Classes="editing" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                    <Button Content="Add item" Command="{Binding AddCommand}" />
+                    <Button Content="Add divider" Command="{Binding AddDividerCommand}" />
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </Grid>
+        </DataTemplate>
+        <!-- The control form (E4): property cards like a window's. -->
+        <DataTemplate DataType="vm:ControlForm">
+          <ScrollViewer>
+            <StackPanel x:Name="ControlCards" Classes="cards">
+              <Border Classes="card">
+                <StackPanel>
+                  <TextBlock Classes="card-title" Text="Bounds" />
+                  <Border Classes="card-line">
+                    <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Top, left" />
+                      <TextBlock Grid.Column="1" Classes="mono" Text="{Binding TopLeftText}" IsVisible="{Binding !IsEditing}" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
+                        <NumericUpDown Value="{Binding Top}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Top" />
+                        <NumericUpDown Value="{Binding Left}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Left" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                  <Border Classes="card-line">
+                    <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Bottom, right" />
+                      <TextBlock Grid.Column="1" Classes="mono" Text="{Binding BottomRightText}" IsVisible="{Binding !IsEditing}" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
+                        <NumericUpDown Value="{Binding Bottom}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Bottom" />
+                        <NumericUpDown Value="{Binding Right}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Right" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                  <Border Classes="card-line last">
+                    <Grid Classes="card-row last" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Size" />
+                      <TextBlock Grid.Column="1" Text="{Binding SizeText}" />
+                    </Grid>
+                  </Border>
+                </StackPanel>
+              </Border>
+              <Border Classes="card">
+                <StackPanel>
+                  <TextBlock Classes="card-title" Text="Control" />
+                  <Border Classes="card-line">
+                    <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Title" />
+                      <TextBlock Grid.Column="1" Text="{Binding TitleText}" IsVisible="{Binding !IsEditing}" />
+                      <TextBox Grid.Column="1" Text="{Binding Title}" MinWidth="200" MaxWidth="320" HorizontalAlignment="Left" IsVisible="{Binding IsEditing}" />
+                    </Grid>
+                  </Border>
+                  <Border Classes="card-line">
+                    <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Definition" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditing}">
+                        <TextBlock Text="{Binding DefinitionName}" />
+                        <TextBlock Classes="mono muted" Text="{Binding DefinitionCode}" />
+                      </StackPanel>
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding Definitions}" SelectedItem="{Binding SelectedDefinition}" MinWidth="240" IsVisible="{Binding IsEditing}" />
+                    </Grid>
+                  </Border>
+                  <Border Classes="card-line">
+                    <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Value" />
+                      <TextBlock Grid.Column="1" Classes="mono" Text="{Binding ValueText}" IsVisible="{Binding !IsEditing}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding Value}" FormatString="0" Classes="coord" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
+                    </Grid>
+                  </Border>
+                  <Border Classes="card-line">
+                    <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Minimum, maximum" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" IsVisible="{Binding !IsEditing}">
+                        <TextBlock Classes="mono" Text="{Binding MinimumText}" />
+                        <TextBlock Classes="mono" Text="–" />
+                        <TextBlock Classes="mono" Text="{Binding MaximumText}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
+                        <NumericUpDown Value="{Binding Minimum}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Minimum" />
+                        <NumericUpDown Value="{Binding Maximum}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Maximum" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                  <Border Classes="card-line">
+                    <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Visible" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsEditing}">
+                        <Ellipse Classes="dot" Classes.on="{Binding Visible}" />
+                        <TextBlock Text="{Binding VisibleText}" />
+                      </StackPanel>
+                      <CheckBox Grid.Column="1" IsChecked="{Binding Visible}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Visible" />
+                    </Grid>
+                  </Border>
+                  <Border Classes="card-line last">
+                    <Grid Classes="card-row form-row last" ColumnDefinitions="150,*">
+                      <TextBlock Classes="label" Text="Reference constant" />
+                      <TextBlock Grid.Column="1" Classes="mono" Text="{Binding RefConText}" IsVisible="{Binding !IsEditing}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding RefCon}" FormatString="0" Classes="coord wide" HorizontalAlignment="Left" Minimum="-2147483648" Maximum="2147483647" IsVisible="{Binding IsEditing}" />
+                    </Grid>
+                  </Border>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </DataTemplate>
+        <!-- The template form (boards/template-form.md, E6): the note banner, the fields in a card, each list as a
+             heading and item cards (a list inside an item as a compact table); the template panel on the right. -->
+        <DataTemplate DataType="vm:TemplateForm">
+          <Grid x:Name="TemplateCards" ColumnDefinitions="*,Auto">
+            <DockPanel>
+              <Border x:Name="TemplateNote" DockPanel.Dock="Top" Classes="note-banner" IsVisible="{Binding HasNote}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <views:SeverityIcon Severity="Warning" Width="14" Height="14" VerticalAlignment="Top" />
+                  <TextBlock Text="{Binding Note}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                <Border Classes="card">
+                  <ItemsControl ItemsSource="{Binding Fields}" Margin="0,4" />
+                </Border>
+              </ScrollViewer>
+            </DockPanel>
+            <Border Grid.Column="1" Classes="template-panel">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="caption" Text="TEMPLATE" />
+                <TextBlock Text="{Binding Source}" TextWrapping="Wrap" />
+                <TextBlock Classes="muted note" Text="{x:Static vm:TemplateForm.SourceRule}" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding Outline}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:TemplateOutlineLine">
+                      <Grid ColumnDefinitions="*,Auto" Margin="{Binding Indent, Converter={x:Static views:TemplateViews.Indent}}">
+                        <TextBlock Classes="outline" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Classes="outline muted" Text="{Binding Type}" Margin="8,0,0,0" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="muted note" Text="“Edit with template” off: the resource opens in Hex only." TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </Grid>
+        </DataTemplate>
+        <DataTemplate DataType="vm:TemplateScalarRow">
+          <Border Classes="card-line">
+            <Grid Classes="card-row form-row template-field" ColumnDefinitions="180,*,Auto">
+              <TextBlock Classes="label" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+              <!-- Dock panels, not stack panels: a long value (a hex field) wraps within the column instead of
+                   running under the type code. -->
+              <DockPanel Grid.Column="1" IsVisible="{Binding !IsEditing}">
+                <TextBlock DockPanel.Dock="Left" Classes="value" Classes.code="{Binding IsCode}" Text="{Binding DisplayText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <TextBlock Classes="muted count-note" Text="{Binding CountNote}" IsVisible="{Binding IsReadOnly}" Margin="8,0,0,0" />
+              </DockPanel>
+              <DockPanel Grid.Column="1" IsVisible="{Binding IsEditing}">
+                <Panel DockPanel.Dock="Left">
+                  <TextBox Text="{Binding Text}" IsVisible="{Binding IsEditableText}" MinWidth="160" HorizontalAlignment="Left" TextWrapping="Wrap" AutomationProperties.Name="{Binding Label}" />
+                  <CheckBox IsChecked="{Binding Flag}" IsVisible="{Binding IsFlag}" AutomationProperties.Name="{Binding Label}" />
+                  <TextBlock Classes="value" Text="{Binding DisplayText}" IsVisible="{Binding IsReadOnly}" VerticalAlignment="Center" />
+                </Panel>
+                <TextBlock Classes="muted count-note" Text="{Binding CountNote}" IsVisible="{Binding IsReadOnly}" Margin="8,0,0,0" />
+              </DockPanel>
+              <TextBlock Grid.Column="2" Classes="type-code" Text="{Binding Type}" />
+            </Grid>
+          </Border>
+        </DataTemplate>
+        <DataTemplate DataType="vm:TemplateListRow">
+          <StackPanel Classes="template-list" Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Classes="list-heading" Text="{Binding Heading}" />
+              <TextBlock Classes="muted" Text="{Binding Summary}" VerticalAlignment="Center" />
+              <Button Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsVisible="{Binding IsEditing}" />
+            </StackPanel>
+            <!-- Top-level lists: a card per item. -->
+            <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding !IsCompact}" />
+            <!-- A list inside an item: a compact table. -->
+            <StackPanel Classes="compact-table" IsVisible="{Binding IsCompact}">
+              <ItemsControl ItemsSource="{Binding Columns}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Classes="caption table-cell" Text="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:TemplateItemRow">
+                    <StackPanel Classes="form-row" Orientation="Horizontal">
+                      <ItemsControl ItemsSource="{Binding Fields}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="vm:TemplateRow">
+                            <Panel Classes="table-cell">
+                              <TextBlock Text="{Binding $parent[Panel].((vm:TemplateScalarRow)DataContext).DisplayText, FallbackValue={x:Null}}"
+                                         IsVisible="{Binding !IsEditing}" />
+                              <TextBox Text="{Binding $parent[Panel].((vm:TemplateScalarRow)DataContext).Text, FallbackValue={x:Null}}"
+                                       IsVisible="{Binding IsEditing}" MinWidth="0" Width="104" />
+                            </Panel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <Button Classes="link danger" Content="Remove" Command="{Binding List.RemoveCommand}" CommandParameter="{Binding}"
+                              IsVisible="{Binding List.IsEditing}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </StackPanel>
+        </DataTemplate>
+        <DataTemplate DataType="vm:TemplateItemRow">
+          <Border Classes="card item-card">
+            <StackPanel>
+              <Border Classes="item-header form-row">
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" IsVisible="{Binding List.IsEditing}">
+                    <Button Classes="link" Content="Insert before" Command="{Binding List.InsertCommand}" CommandParameter="{Binding}" />
+                    <Button Classes="link danger" Content="Remove" Command="{Binding List.RemoveCommand}" CommandParameter="{Binding}" />
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="muted" Text="{Binding Title}" />
+                    <TextBlock Classes="item-key" Text="{Binding KeyText}" />
+                    <TextBlock Classes="muted" Text="{Binding ItemSummary}" />
+                  </StackPanel>
+                </DockPanel>
+              </Border>
+              <ItemsControl ItemsSource="{Binding Fields}" Margin="0,2" />
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+    </DockPanel>
+    </Border>
+  </DockPanel>
+</UserControl>

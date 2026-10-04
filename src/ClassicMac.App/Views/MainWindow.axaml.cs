@@ -17,8 +17,7 @@ namespace ClassicMac.App.Views;
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "A window is not disposed: the audio player is disposed when it closes.")]
 internal sealed partial class MainWindow : Window, IFilePicker
 {
-    // The window's parts: the form host's keys, the playhead's timer, the help page's web view, the shell.
-    private readonly FormHostInput formHostInput;
+    // The window's parts: the playhead's timer, the help page's web view, the shell.
     private readonly PlayheadFollower playhead;
     private readonly HelpWebView helpWebView;
     private readonly WindowShell shell;
@@ -26,7 +25,6 @@ internal sealed partial class MainWindow : Window, IFilePicker
     public MainWindow()
     {
         InitializeComponent();
-        formHostInput = new FormHostInput(FormHost);
         playhead = new PlayheadFollower(this);
         helpWebView = new HelpWebView(this, HelpHost);
         shell = new WindowShell(this, WindowMenu);
@@ -306,9 +304,9 @@ internal sealed partial class MainWindow : Window, IFilePicker
                 Tree.SelectedItem = model.Selected;
             }
 
-            if (property == nameof(Forms.UseTemplate) && TemplateBox.IsChecked != model.Forms.UseTemplate)
+            if (property == nameof(Forms.UseTemplate) && FormHostPane.TemplateBox.IsChecked != model.Forms.UseTemplate)
             {
-                TemplateBox.IsChecked = model.Forms.UseTemplate;
+                FormHostPane.TemplateBox.IsChecked = model.Forms.UseTemplate;
             }
         });
     }
