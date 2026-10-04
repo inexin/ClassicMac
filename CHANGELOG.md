@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- HFS: map nodes the writer adds to a growing B-tree now go at the tree's old end with a backward link of 0, as Mac OS 9
+  writes them (they linked back to the previous map node, which ClassicMac's own readers flagged); the writer's checks no
+  longer read map nodes' backward links (hfs.md §1.8).
 - HFS: the writer's dates come from one clock (`TimeProvider`), which tests set per flow, so an edit's output can be
   pinned and reproduced.
 - Robustness (second review): damaged legacy StuffIt and PackIt entries whose lengths add up past `int` are refused as

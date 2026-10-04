@@ -142,6 +142,30 @@ public sealed class BTreeFileTests
         Assert.False(new BTreeFile(tree, 512, wordKeyLength: false).TryReadMap(out _, out _));
     }
 
+    // The writer adds map nodes as Mac OS does (hfs.md §1.8): at the old end of the tree, chained by forward links from
+    // the last, each a map node of one record whose backward link stays 0 [Verified: Mac OS 9.0; Doc: Apple's hfs
+    // sources, BTreeAllocate.c].
+    [Theory]
+    [InlineData(2048u)]   // the header's 256-byte map exactly full
+    [InlineData(2000u)]   // room left in it
+    public void Map_nodes_the_writer_adds_go_at_the_old_end_with_no_backward_link(uint Old)
+    {
+        // Grown to 8,000 nodes: two map nodes needed.
+        const uint New = 8000;
+        var tree = Tree(512, (int)New, 256);
+        BinaryPrimitives.WriteUInt32BigEndian(tree.AsSpan(14 + 22), Old);
+
+        uint added = HfsWriter.ExtendBTreeNodeMap(tree, Old, New);
+
+        var file = new BTreeFile(tree, 512, wordKeyLength: false);
+        Assert.True(file.TryReadMap(out var map, out var problem), problem);
+        Assert.Equal(2u, added);
+        Assert.Equal([Old, Old + 1], map.MapNodes);
+        Assert.All(map.MapNodes, node => Assert.Equal((0u, BTreeNode.MapKind, (byte)0, 1), (file.Node(node).BLink, file.Node(node).Kind, file.Node(node).Height, file.Node(node).RecordCount)));
+        Assert.All(map.MapNodes, node => Assert.True(map.IsAllocated(node)));
+        Assert.False(map.IsAllocated(Old + 2));                                       // the first new node past them, free
+    }
+
     // HFS Plus nodes are larger; the header's map record grows with them.
     [Fact]
     public void Larger_nodes_have_larger_maps()

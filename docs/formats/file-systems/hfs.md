@@ -208,8 +208,13 @@ manager written for Mac OS 8.1's File Manager, which serves HFS and HFS Plus; no
 - **Growth.** Before an insert, replace or delete (of a node's first record), when `bthFree` < depth + 1, the tree file
   is extended to at least (`bthNNodes` + depth + 1 − `bthFree`) nodes (one more when the map is too small) through the
   file system's set-EOF routine, whose clump and contiguity are the File Manager's (not traced); every node of the new
-  length counts. New map nodes go at the old end, chained from the last map node, their own bits set. A tree file never
-  shrinks.
+  length counts. New map nodes go at the old end, one after another, chained by forward links from the last map node,
+  their own bits set; each is a map node (kind 2, height 0) of one record, offsets 14 and nodeSize − 6 (a record of
+  nodeSize − 20 bytes), and its backward link stays 0. Mac OS 9.0 extending a full 6,000-node catalog did exactly this
+  (node 6000, backward link 0), grew the file by one clump (64 KB), and rewrote the catalog's extents in both the MDB
+  and the alternate MDB [Verified: Mac OS 9.0]. Readers take a map record's length from its offsets. A tree file never
+  shrinks. ClassicMac's writer adds map nodes so, and does not read their backward links (Disk First Aid's map check
+  does not either [Code: Disk First Aid 8.5.5]).
 
 ClassicMac's writer edits the catalog by these rules (§5.5).
 

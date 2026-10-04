@@ -824,7 +824,7 @@ public static partial class HfsWriter
         rebuilt.CopyTo(tree, 0);
     }
 
-    private static uint ExtendBTreeNodeMap(byte[] tree, uint oldNodeCount, uint newNodeCount)
+    internal static uint ExtendBTreeNodeMap(byte[] tree, uint oldNodeCount, uint newNodeCount)
     {
         var treeReader = new BigEndianReader(tree);
         int headerStart = U16(treeReader, NodeSize - 6);
@@ -868,16 +868,17 @@ public static partial class HfsWriter
         var writer = new BigEndianWriter(tree);
         while (mapCapacity < newNodeCount)
         {
-            uint number = mapCapacity;
+            // At the old end of the tree, one after another, as Mac OS places them [Verified: Mac OS 9.0].
+            uint number = oldNodeCount + (uint)newMapNodes.Count;
             int at = checked((int)number * NodeSize);
-            if (number < oldNodeCount || at + NodeSize > tree.Length)
+            if (number >= newNodeCount || at + NodeSize > tree.Length)
             {
                 throw new InvalidDataException("The HFS B-tree has no node available for another map record.");
             }
 
             writer.WriteUInt32At(lastMapNode == 0 ? 0 : checked((int)lastMapNode * NodeSize), number);
             tree[at + 8] = 2;
-            writer.WriteUInt32At(at + 4, lastMapNode);
+            // The backward link stays 0, as Apple's ExtendBTree leaves it [Doc: Apple's hfs sources, BTreeAllocate.c].
             writer.WriteUInt16At(at + 10, 1);
             writer.WriteUInt16At(at + NodeSize - 2, 14);
             writer.WriteUInt16At(at + NodeSize - 4, NodeSize - 6);
@@ -1054,36 +1055,15 @@ public static partial class HfsWriter
             throw new InvalidDataException($"The HFS {treeKind} B-tree header records have invalid offsets.");
         }
 
-        var mapRecords = new List<(int Offset, int Length)> { (mapStart, mapEnd - mapStart) };
-        var usedNodes = new HashSet<uint> { 0 };
-        uint mapNode = U32(treeReader, 0);
-        uint previousMapNode = 0;
-        while (mapNode != 0)
+        // The node map; a map node's backward link is not read (Apple's ExtendBTree leaves it 0; DFA's BTMapChk ignores
+        // it) (hfs.md §1.8).
+        if (!new BTreeFile(tree, NodeSize, wordKeyLength: false).TryReadMap(out var map, out var mapProblem))
         {
-            if (mapNode >= nodeCount || !usedNodes.Add(mapNode))
-            {
-                throw new InvalidDataException($"The HFS {treeKind} B-tree map-node chain is invalid.");
-            }
-
-            int offset = checked((int)mapNode * NodeSize);
-            if (tree[offset + 8] != 2 || U16(treeReader, offset + 10) != 1 ||
-                U32(treeReader, offset + 4) != previousMapNode)
-            {
-                throw new InvalidDataException($"The HFS {treeKind} B-tree has an invalid map node.");
-            }
-
-            int start = U16(treeReader, offset + NodeSize - 2);
-            int end = U16(treeReader, offset + NodeSize - 4);
-            if (start < 14 || end <= start || end > NodeSize - 4)
-            {
-                throw new InvalidDataException($"The HFS {treeKind} B-tree map node has invalid record offsets.");
-            }
-
-            mapRecords.Add((offset + start, end - start));
-            previousMapNode = mapNode;
-            mapNode = U32(treeReader, offset);
+            throw new InvalidDataException($"The HFS {treeKind} B-tree node map is invalid: {mapProblem}");
         }
-        if (mapRecords.Aggregate<(int Offset, int Length), ulong>(0, (total, record) => total + (ulong)record.Length * 8) < nodeCount)
+
+        var usedNodes = new HashSet<uint>(map.MapNodes) { 0 };
+        if (map.Capacity < nodeCount)
         {
             throw new InvalidDataException($"The HFS {treeKind} B-tree node map is truncated.");
         }
@@ -1133,33 +1113,15 @@ public static partial class HfsWriter
         uint actualFreeNodes = 0;
         for (uint node = 0; node < nodeCount; node++)
         {
-            int mapByte = checked((int)(node >> 3));
-            int bit = (int)(node & 7);
-            bool found = false;
-            foreach (var (offset, length) in mapRecords)
+            bool allocated = map.IsAllocated(node);
+            if (allocated != usedNodes.Contains(node))
             {
-                if (mapByte >= length)
-                {
-                    mapByte -= length;
-                    continue;
-                }
-                bool allocated = (tree[offset + mapByte] & (0x80 >> bit)) != 0;
-                if (allocated != usedNodes.Contains(node))
-                {
-                    throw new InvalidDataException($"The HFS {treeKind} B-tree node map disagrees with its node graph.");
-                }
-
-                if (!allocated)
-                {
-                    actualFreeNodes++;
-                }
-
-                found = true;
-                break;
+                throw new InvalidDataException($"The HFS {treeKind} B-tree node map disagrees with its node graph.");
             }
-            if (!found)
+
+            if (!allocated)
             {
-                throw new InvalidDataException($"The HFS {treeKind} B-tree node map is truncated.");
+                actualFreeNodes++;
             }
         }
         if (actualFreeNodes != U32(treeReader, 14 + 26))
