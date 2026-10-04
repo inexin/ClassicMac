@@ -4,6 +4,7 @@ using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Editing;
+using ClassicMac.Files.Hfs;
 
 namespace ClassicMac.Cli;
 
@@ -16,7 +17,8 @@ internal sealed class PathNotFound(string message) : WriteRefused(message);
 /// <summary>
 /// The write commands' changes (docs/cli.md §3), shared by the CLI and the MCP server: each resolves its Mac path in
 /// a tree of the input, checks it, and returns the change to make on an <see cref="InputEditSession"/> of that input
-/// (paths inside the volume, so the change can be made again on another session of the same input).
+/// (paths inside the volume, so the change can be made again on another session of the same input; on a disk with
+/// several partitions they start with the partition's name).
 /// </summary>
 internal static class MacEdits
 {
@@ -105,7 +107,7 @@ internal static class MacEdits
     public static Action<InputEditSession> Bless(MacPathTree tree, string rest)
     {
         var entry = Existing(tree, rest);
-        if (entry == tree.Root || !IsVolumeFolder(tree, entry))
+        if (VolumeOf(tree, entry) == entry || !IsVolumeFolder(tree, entry))
         {
             throw new WriteRefused($"{entry.Path} is not a folder of the volume.");
         }
@@ -154,41 +156,75 @@ internal static class MacEdits
         return session => session.DeleteResource(file, type, id);
     }
 
-    // Whether an entry is the volume's root or a folder in it, not in a container inside it.
-    private static bool IsVolumeFolder(MacPathTree tree, MacPathEntry entry) =>
-        (entry == tree.Root || entry.Kind == MacPathKind.Folder) && InVolume(tree, entry);
-
-    // Whether every entry between the root and this one is a folder (the path does not go into a nested container).
-    private static bool InVolume(MacPathTree tree, MacPathEntry entry)
+    /// <summary>
+    /// The volume to repair: "" for the input's own, or on a disk with several partitions the partition the path names.
+    /// </summary>
+    public static Action<InputEditSession> Repair(MacPathTree tree, string rest, Action<FirstAidRepairResult> repaired)
     {
-        for (var at = entry.Parent; at is not null && at != tree.Root; at = at.Parent)
+        var volume = "";
+        if (Partitioned(tree))
         {
-            if (at.Kind != MacPathKind.Folder)
+            var entry = Existing(tree, rest);
+            if (entry.Parent != tree.Root || entry.Kind != MacPathKind.Container)
             {
-                return false;
+                throw new WriteRefused("Give the partition to repair: the disk's path and the partition's name.");
             }
+
+            volume = entry.Name;
         }
 
-        return true;
+        return session => repaired(session.Repair(volume));
     }
 
-    // An item's path in the volume: its folders and its name, as Mac OS Roman text (empty for the root).
-    private static string VolumePath(MacPathTree tree, MacPathEntry entry)
+    // Whether the input is a disk with several partitions, each a container under it named by its partition.
+    private static bool Partitioned(MacPathTree tree) => tree.Root.Format == PartitionMapReader.Instance.FormatName;
+
+    // The entry an item's volume is: the input itself, or on a disk with several partitions the partition the item is in;
+    // null when the item is in a container inside the volume, or is a partitioned disk's own top level.
+    private static MacPathEntry? VolumeOf(MacPathTree tree, MacPathEntry entry)
     {
         if (entry == tree.Root)
         {
-            return "";
+            return Partitioned(tree) ? null : entry;
         }
 
-        if (!InVolume(tree, entry) || entry.Kind is not (MacPathKind.Folder or MacPathKind.File or MacPathKind.Container))
+        var top = entry;
+        while (top.Parent != tree.Root)
+        {
+            top = top.Parent!;
+        }
+
+        // Every entry between the volume and this one is a folder (the path does not go into a nested container).
+        var volume = Partitioned(tree) ? top : tree.Root;
+        for (var at = entry == volume ? volume : entry.Parent; at != volume; at = at!.Parent)
+        {
+            if (at!.Kind != MacPathKind.Folder)
+            {
+                return null;
+            }
+        }
+
+        return volume;
+    }
+
+    // Whether an entry is a volume's root or a folder in it, not in a container inside it.
+    private static bool IsVolumeFolder(MacPathTree tree, MacPathEntry entry) =>
+        VolumeOf(tree, entry) is { } volume && (entry == volume || entry.Kind == MacPathKind.Folder);
+
+    // An item's path in the volume: its folders and its name, as Mac OS Roman text (empty for the root), after its
+    // partition's name on a disk with several.
+    private static string VolumePath(MacPathTree tree, MacPathEntry entry)
+    {
+        if (VolumeOf(tree, entry) is not { } volume || entry != volume && entry.Kind is not (MacPathKind.Folder or MacPathKind.File or MacPathKind.Container))
         {
             throw new WriteRefused($"{entry.Path} is not a file or folder of the volume ClassicMac can change.");
         }
 
-        var names = entry.Kind == MacPathKind.Folder
-            ? entry.FolderPath!.Select(n => n.ToMacRoman())
+        var prefix = volume == tree.Root ? [] : new[] { volume.Name };
+        var names = entry == volume ? []
+            : entry.Kind == MacPathKind.Folder ? entry.FolderPath!.Select(n => n.ToMacRoman())
             : entry.File!.FolderPath.Select(n => n.ToMacRoman()).Append(entry.File.Name.ToMacRoman());
-        return string.Join(":", names);
+        return string.Join(":", prefix.Concat(names));
     }
 
     // A file's or folder's path for a session: in a volume, its path; for a single-file input, "".

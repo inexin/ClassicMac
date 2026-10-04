@@ -256,8 +256,9 @@ Each write command changes one thing on a Mac path, through the library's `Input
 
 ### 3.1 What can be written
 
-- **A plain HFS volume image** (the host file is the volume, with no disk image wrapper), or **a partitioned disk**
-  whose map holds one Mac volume partition, a plain HFS one (edited in place within the partition,
+- **A plain HFS volume image** (the host file is the volume, with no disk image wrapper), or **a partitioned disk**'s
+  HFS partitions (each edited in place within its partition; on a disk with several Mac volume partitions a path names
+  the partition first, `disk.img:Two:Docs`,
   [partition-map.md §5](formats/file-systems/partition-map.md#5-classicmac)), or **a Disk Copy 4.2 image** of an HFS
   disk (edited in place, its checksum made again, [diskcopy42.md §3](formats/disk-images/diskcopy42.md#3-writing)), or
   **an NDIF (Disk Copy 6) image** of an HFS disk as an AppleDouble pair, Basilisk II entry, MacBinary, AppleSingle or
@@ -285,7 +286,7 @@ Each write command changes one thing on a Mac path, through the library's `Input
 | `set` | `<Mac path> [--type T] [--creator C] [--flags F]` | Sets a file's type and creator; `--flags` replaces the Finder flags: a number (`0x4000`, `$4000`, `16384`) or flag names joined with commas (`Invisible,HasBundle`; `IsInvisible` too) |
 | `res-add` | `<file>:#rsrc:<type>:<ID> <data file> [--name N] [--replace]` | Adds a resource with the data file's bytes; one that exists is replaced only with `--replace` |
 | `res-rm` | `<file>:#rsrc:<type>:<ID>` | Deletes a resource |
-| `repair` | `<volume>` | Repairs an HFS volume as Disk First Aid would ([hfs.md §5.6](formats/file-systems/hfs.md#56-first-aid)), then verifies it again: one `repair` change per fix, then `first aid: ` and the problems left and the last line (`The volume “X” was repaired successfully.`, or the verify's verdict). A volume that appears to be OK, or that First Aid cannot repair, is not written (`Nothing to repair: nothing written.` / `Nothing written.`). Exit 0 when the volume ends OK, 1 when problems remain. JSON adds `firstAidBefore` and `firstAid` (§2.7's shape, `summary` the last line) |
+| `repair` | `<volume>` (on a disk with several partitions, `disk.img:<partition>`) | Repairs an HFS volume as Disk First Aid would ([hfs.md §5.6](formats/file-systems/hfs.md#56-first-aid)), then verifies it again: one `repair` change per fix, then `first aid: ` and the problems left and the last line (`The volume “X” was repaired successfully.`, or the verify's verdict). A volume that appears to be OK, or that First Aid cannot repair, is not written (`Nothing to repair: nothing written.` / `Nothing written.`). Exit 0 when the volume ends OK, 1 when problems remain. JSON adds `firstAidBefore` and `firstAid` (§2.7's shape, `summary` the last line) |
 
 Every command takes:
 

@@ -40,7 +40,8 @@ public sealed record PlannedChange(string Action, string Path, string Detail)
 /// An edit session on an opened input: files and folders added, deleted and renamed in a plain HFS volume, Finder
 /// info set, resources set and deleted, all in memory; then saved to a new file (verified, the input untouched), or in
 /// place only when asked (the original kept as <c>.orig</c>). The app's Volume menu and Save commands and the CLI's
-/// write commands share it. Paths are inside the volume, without its name (<c>Docs:Letter</c>).
+/// write commands share it. Paths are inside the volume, without its name (<c>Docs:Letter</c>); on a partitioned disk
+/// with several Mac volume partitions they start with the partition's name (<c>Two:Docs:Letter</c>).
 /// </summary>
 public sealed class InputEditSession
 {
@@ -50,10 +51,8 @@ public sealed class InputEditSession
     private readonly SaveLocation? location;
     private readonly SaveAsFormat singleFormat;
     private readonly bool forkInDataFork;
-    private HfsVolume? overlay;
+    private readonly List<EditedVolume> volumes = [];
     private bool resized;
-    private readonly MacPartition? partition;
-    private readonly HfsImageRegion? region;
     private readonly MacFile? ndif;
     private readonly HostFile host;
     private MacFile? single;
@@ -68,23 +67,27 @@ public sealed class InputEditSession
         // one the reader refused, which First Aid may still repair.
         if (DataFileIsDisk(host) && root.Volume?.Format is "HFS" or "HFS Plus" or null && VolumeKind(host.File.DataFork) is { } plain)
         {
+            volumes.Add(new EditedVolume(plain, null, null, ""));
             Kind = plain;
             return;
         }
 
-        // A partitioned disk whose map holds one Mac volume, a plain HFS one: that partition is edited and put back in
-        // place (partition-map.md §5). A disk with more is not written.
+        // A partitioned disk: each HFS or HFS Plus partition is edited and put back in place (partition-map.md §5). On a
+        // disk with several Mac volume partitions, each is a folder named after it, which paths start with.
         if (DataFileIsDisk(host) && PartitionMapReader.Partitions(host.File.DataFork) is { Count: > 0 } partitions)
         {
-            if (partitions is [var only] && VolumeKind(host.File.DataFork.Slice(only.Offset, only.Length)) is { } kind)
+            foreach (var partition in partitions)
             {
-                partition = only;
-                region = new HfsImageRegion(only.Offset, only.Length);
-                Kind = kind;
-                return;
+                if (VolumeKind(host.File.DataFork.Slice(partition.Offset, partition.Length)) is { } kind)
+                {
+                    volumes.Add(new EditedVolume(kind, partition, new HfsImageRegion(partition.Offset, partition.Length),
+                        partitions.Count == 1 ? "" : partition.Name));
+                }
             }
 
-            Kind = InputEditKind.ReadOnly;
+            Kind = volumes.Any(v => v.Kind == InputEditKind.HfsVolume) ? InputEditKind.HfsVolume
+                : volumes.Count > 0 ? InputEditKind.HfsPlusVolume
+                : InputEditKind.ReadOnly;
             return;
         }
 
@@ -95,7 +98,7 @@ public sealed class InputEditSession
             long dataSize = new BigEndianReader(host.File.DataFork.ReadPrefix(84)).ReadUInt32At(0x40);
             if (84 + dataSize <= host.File.DataFork.Length && VolumeKind(host.File.DataFork.Slice(84, dataSize)) is { } kind)
             {
-                region = new HfsImageRegion(84, dataSize, DiskCopy42: true);
+                volumes.Add(new EditedVolume(kind, null, new HfsImageRegion(84, dataSize, DiskCopy42: true), ""));
                 Kind = kind;
                 return;
             }
@@ -121,6 +124,7 @@ public sealed class InputEditSession
             {
                 ndif = image.File;
                 singleFormat = chosen;
+                volumes.Add(new EditedVolume(kind, null, null, ""));
                 Kind = kind;
                 return;
             }
@@ -157,8 +161,24 @@ public sealed class InputEditSession
     /// <summary>The input, as a full path.</summary>
     public string Path { get; }
 
-    /// <summary>What the input lets the session change.</summary>
+    /// <summary>
+    /// What the input lets the session change. A disk with several Mac volume partitions is <see
+    /// cref="InputEditKind.HfsVolume"/> when one of them is HFS; <see cref="KindOf"/> tells each partition's.
+    /// </summary>
     public InputEditKind Kind { get; }
+
+    /// <summary>
+    /// On a disk with several Mac volume partitions, the HFS and HFS Plus ones the session edits, by name: the first
+    /// name of every path. Empty for any other input.
+    /// </summary>
+    public IReadOnlyList<string> PartitionNames => [.. volumes.Where(v => v.Name.Length > 0).Select(v => v.Name)];
+
+    /// <summary>What the session can change at a path: its partition's kind on a disk with several (read only when it names none), else <see cref="Kind"/>.</summary>
+    public InputEditKind KindOf(string macPath)
+    {
+        ArgumentNullException.ThrowIfNull(macPath);
+        return PartitionNames.Count == 0 ? Kind : Find(macPath) is { } found ? found.Volume.Kind : InputEditKind.ReadOnly;
+    }
 
     /// <summary>The changes made so far, in order.</summary>
     public IReadOnlyList<PlannedChange> Changes => changes;
@@ -170,22 +190,51 @@ public sealed class InputEditSession
     /// A volume's image with the item changes made so far (the input's own bytes before any; for a partitioned disk, its
     /// HFS partition's), made whole in memory: the session itself holds only the sectors it changed.
     /// </summary>
-    public byte[] Volume => Overlay.ToArray();
+    public byte[] Volume => VolumeOf("");
 
-    /// <summary>How many bytes the session's changes hold (the sectors written over the input's volume).</summary>
-    public long ChangedBytes => (overlay?.Sectors.Count ?? 0) * 512L;
+    /// <summary>The volume holding <paramref name="macPath"/>, as <see cref="Volume"/> gives it: on a disk with several partitions, the partition the path names.</summary>
+    public byte[] VolumeOf(string macPath)
+    {
+        ArgumentNullException.ThrowIfNull(macPath);
+        return Overlay(Route(macPath, "have a volume image").Volume).ToArray();
+    }
+
+    /// <summary>How many bytes the session's changes hold (the sectors written over the input's volumes).</summary>
+    public long ChangedBytes => volumes.Sum(v => (v.Overlay?.Sectors.Count ?? 0) * 512L);
+
+    /// <summary>For a partitioned disk with one Mac volume partition, that partition; null otherwise.</summary>
+    public MacPartition? Partition => volumes is [var only] ? only.Partition : null;
+
+    /// <summary>
+    /// Where the volume lies in the input when it is not the whole file (a partition, a Disk Copy image's disk); null for
+    /// a whole file, and on a disk with several partitions.
+    /// </summary>
+    public HfsImageRegion? Region => volumes is [var only] ? only.Region : null;
+
+    // A volume the session edits: the input's (a plain image, a Disk Copy or NDIF image's disk, a partitioned disk's
+    // only Mac volume), or one partition of a disk with several, named by the first name of its paths.
+    private sealed class EditedVolume(InputEditKind kind, MacPartition? partition, HfsImageRegion? region, string name)
+    {
+        public InputEditKind Kind { get; } = kind;
+
+        public MacPartition? Partition { get; } = partition;
+
+        public HfsImageRegion? Region { get; } = region;
+
+        // The partition's name on a disk with several; "" otherwise.
+        public string Name { get; } = name;
+
+        // The volume as edited (the input's, and the sectors written over it), once anything reads or changes it.
+        public HfsVolume? Overlay { get; set; }
+
+        public bool Prepared { get; set; }
+    }
 
     // The volume as edited: the input's, read where it lies (the file, a partition, a Disk Copy disk, the decoded NDIF
     // disk), and the sectors written over it.
-    private HfsVolume Overlay => overlay ??= Kind is InputEditKind.HfsVolume or InputEditKind.HfsPlusVolume ? new HfsVolume(VolumeData()) : throw NotVolume("have a volume image");
+    private HfsVolume Overlay(EditedVolume volume) => volume.Overlay ??= new HfsVolume(VolumeData(volume));
 
-    /// <summary>For a partitioned disk, the HFS partition edited; null for a plain volume image.</summary>
-    public MacPartition? Partition => partition;
-
-    /// <summary>Where the volume lies in the input when it is not the whole file (a partition, a Disk Copy image's disk).</summary>
-    public HfsImageRegion? Region => region;
-
-    private ForkData VolumeData()
+    private ForkData VolumeData(EditedVolume volume)
     {
         if (ndif is not null)
         {
@@ -193,7 +242,34 @@ public sealed class InputEditSession
         }
 
         // The host file as read (on disk, or in memory for a session over changes not saved yet).
-        return region is null ? host.File.DataFork : host.File.DataFork.Slice(region.Offset, region.Length);
+        return volume.Region is not { } region ? host.File.DataFork : host.File.DataFork.Slice(region.Offset, region.Length);
+    }
+
+    // The volume a session path is in, and the path inside it: on a disk with several partitions, the partition its
+    // first name names (compared as the catalog compares names).
+    private (EditedVolume Volume, string Path)? Find(string macPath)
+    {
+        if (volumes is [{ Name: "" } only])
+        {
+            return (only, macPath);
+        }
+
+        var colon = macPath.IndexOf(':', StringComparison.Ordinal);
+        var name = colon < 0 ? macPath : macPath[..colon];
+        return volumes.FirstOrDefault(v => MacPaths.NamesEqual(v.Name, name)) is { } volume
+            ? (volume, colon < 0 ? "" : macPath[(colon + 1)..])
+            : null;
+    }
+
+    private (EditedVolume Volume, string Path) Route(string macPath, string what)
+    {
+        if (volumes.Count == 0)
+        {
+            throw NotVolume(what);
+        }
+
+        return Find(macPath) ?? throw new InvalidOperationException(
+            $"{System.IO.Path.GetFileName(Path)} has several partitions: a path starts with the name of one ClassicMac writes ({string.Join(", ", PartitionNames)}).");
     }
 
     // An HFS volume (signature 'BD') that does not wrap HFS Plus, an HFS Plus or HFSX volume ('H+', 'HX', or 'BD'
@@ -241,40 +317,41 @@ public sealed class InputEditSession
     private InvalidOperationException NotVolume(string what) =>
         new($"{System.IO.Path.GetFileName(Path)} is not a plain HFS volume image, so it does not {what}.");
 
-    private void RequireVolume(string what)
+    // The HFS volume a path is in, prepared, and the path inside it.
+    private (EditedVolume Volume, string Path) RequireVolume(string macPath, string what)
     {
-        if (Kind != InputEditKind.HfsVolume)
+        var (volume, inner) = Route(macPath, what);
+        if (volume.Kind != InputEditKind.HfsVolume)
         {
             throw NotVolume(what);
         }
 
-        Prepare();
+        Prepare(volume);
+        return (volume, inner);
     }
-
-    private bool prepared;
 
     // Before the first change to a volume: what hfsutils writes and Disk First Aid rejects is made as Mac OS writes it
     // (short thread records at full length, file records' reserved fields cleared; hfs.md §1.9), each listed as a
     // change of its own.
-    private void Prepare()
+    private void Prepare(EditedVolume volume)
     {
-        if (prepared || Kind != InputEditKind.HfsVolume)
+        if (volume.Prepared || volume.Kind != InputEditKind.HfsVolume)
         {
             return;
         }
 
-        prepared = true;
-        var (repaired, threads, files) = HfsWriter.RepairCatalog(Overlay);
-        overlay = repaired;
+        volume.Prepared = true;
+        var (repaired, threads, files) = HfsWriter.RepairCatalog(Overlay(volume));
+        volume.Overlay = repaired;
         if (threads > 0)
         {
-            changes.Add(new PlannedChange("repair", "",
+            changes.Add(new PlannedChange("repair", volume.Name,
                 $"{threads} thread record{(threads == 1 ? "" : "s")} written at Mac OS's full length (Disk First Aid rejects shorter ones)"));
         }
 
         if (files > 0)
         {
-            changes.Add(new PlannedChange("repair", "",
+            changes.Add(new PlannedChange("repair", volume.Name,
                 $"{files} file record{(files == 1 ? "'s" : "s'")} reserved fields cleared (Disk First Aid reports them)"));
         }
     }
@@ -291,10 +368,10 @@ public sealed class InputEditSession
     public void AddFile(string macPath, MacFile file)
     {
         ArgumentNullException.ThrowIfNull(file);
-        RequireVolume("hold files");
+        var (volume, inner) = RequireVolume(macPath, "hold files");
         var data = file.DataFork.ToArray();
         var resource = file.ResourceFork.ToArray();
-        overlay = HfsWriter.CreateFile(Overlay, macPath, data, resource, file.FinderInfo, file.Created, file.Modified);
+        volume.Overlay = HfsWriter.CreateFile(Overlay(volume), inner, data, resource, file.FinderInfo, file.Created, file.Modified);
         changes.Add(new PlannedChange("add", macPath,
             $"data {data.Length} bytes, resources {resource.Length} bytes, {file.FinderInfo.Type}/{file.FinderInfo.Creator}"));
     }
@@ -302,8 +379,8 @@ public sealed class InputEditSession
     /// <summary>Adds an empty folder at <paramref name="macPath"/> in a volume.</summary>
     public void AddFolder(string macPath)
     {
-        RequireVolume("hold folders");
-        overlay = HfsWriter.CreateFolder(Overlay, macPath);
+        var (volume, inner) = RequireVolume(macPath, "hold folders");
+        volume.Overlay = HfsWriter.CreateFolder(Overlay(volume), inner);
         changes.Add(new PlannedChange("mkdir", macPath, "a new folder"));
     }
 
@@ -314,8 +391,8 @@ public sealed class InputEditSession
     public void Delete(string macPath, bool recursive = false, IReadOnlyList<string>? warnings = null)
     {
         ArgumentNullException.ThrowIfNull(macPath);
-        RequireVolume("hold files");
-        overlay = HfsWriter.Delete(Overlay, macPath, recursive);
+        var (volume, inner) = RequireVolume(macPath, "hold files");
+        volume.Overlay = HfsWriter.Delete(Overlay(volume), inner, recursive);
         foreach (var key in forks.Keys.Where(k => Within(k, macPath)).ToList())
         {
             forks.Remove(key);
@@ -342,8 +419,9 @@ public sealed class InputEditSession
             return;
         }
 
-        Prepare();
-        overlay = HfsWriter.Rename(Overlay, macPath, newName);
+        var (volume, inner) = Route(macPath, "hold files");
+        Prepare(volume);
+        volume.Overlay = HfsWriter.Rename(Overlay(volume), inner, newName);
         var parent = macPath.Contains(':') ? macPath[..(macPath.LastIndexOf(':') + 1)] : "";
         var renamed = parent + newName;
         foreach (var key in forks.Keys.Where(k => Within(k, macPath)).ToList())
@@ -358,42 +436,45 @@ public sealed class InputEditSession
     /// <summary>Grows a plain volume image to <paramref name="size"/> bytes (hfs.md §3.2); not a partitioned disk's partition.</summary>
     public void Resize(long size)
     {
-        RequireVolume("have a size to change");
+        if (volumes.Count > 1)
+        {
+            throw PartitionNotResized();
+        }
+
+        var (volume, _) = RequireVolume("", "have a size to change");
         if (ndif is not null)
         {
             throw new InvalidOperationException("An NDIF image's disk cannot be resized yet.");
         }
 
-        if (region is not null)
+        if (volume.Region is not null)
         {
-            throw new InvalidOperationException(partition is not null
-                ? "A partition of a partitioned disk cannot be resized: its map would change."
-                : "A Disk Copy image's disk cannot be resized yet.");
+            throw volume.Partition is not null ? PartitionNotResized() : new InvalidOperationException("A Disk Copy image's disk cannot be resized yet.");
         }
 
         // Resizing rewrites the volume whole: it is held in memory from here, and saved whole.
-        overlay = new HfsVolume(ForkData.FromBytes(HfsWriter.Resize(Overlay.AsForkData(), size)));
+        volume.Overlay = new HfsVolume(ForkData.FromBytes(HfsWriter.Resize(Overlay(volume).AsForkData(), size)));
         resized = true;
         changes.Add(new PlannedChange("resize", "", $"to {size.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} bytes"));
     }
 
+    private static InvalidOperationException PartitionNotResized() => new("A partition of a partitioned disk cannot be resized: its map would change.");
+
     /// <summary>
     /// Repairs the volume as Disk First Aid would, with ClassicMac's safe extras (hfs.md §5.6): the repairs become this
-    /// session's changes; a volume that appears to be OK or cannot be repaired is left as it is.
+    /// session's changes; a volume that appears to be OK or cannot be repaired is left as it is. On a disk with several
+    /// partitions, <paramref name="volume"/> names the partition.
     /// </summary>
-    public FirstAidRepairResult Repair()
+    public FirstAidRepairResult Repair(string volume = "")
     {
+        ArgumentNullException.ThrowIfNull(volume);
         // Not prepared first: the writer's own checks refuse much of what First Aid repairs.
-        if (Kind is not (InputEditKind.HfsVolume or InputEditKind.HfsPlusVolume))
-        {
-            throw NotVolume("have a volume to repair");
-        }
-
-        var result = FirstAidRepairer.Repair(Overlay);
+        var (edited, _) = Route(volume, "have a volume to repair");
+        var result = FirstAidRepairer.Repair(Overlay(edited));
         if (result.Repaired is { } repaired)
         {
-            overlay = repaired;
-            changes.AddRange(result.Changes);
+            edited.Overlay = repaired;
+            changes.AddRange(result.Changes.Select(c => edited.Name.Length == 0 ? c : c with { Path = c.Path.Length == 0 ? edited.Name : edited.Name + ":" + c.Path }));
         }
 
         return result;
@@ -403,8 +484,8 @@ public sealed class InputEditSession
     public void SetLocked(string macPath, bool locked)
     {
         ArgumentNullException.ThrowIfNull(macPath);
-        RequireVolume("hold files");
-        overlay = HfsWriter.SetLocked(Overlay, macPath, locked);
+        var (volume, inner) = RequireVolume(macPath, "hold files");
+        volume.Overlay = HfsWriter.SetLocked(Overlay(volume), inner, locked);
         changes.Add(new PlannedChange(locked ? "lock" : "unlock", macPath, ""));
     }
 
@@ -412,8 +493,8 @@ public sealed class InputEditSession
     public void Bless(string folderPath)
     {
         ArgumentNullException.ThrowIfNull(folderPath);
-        RequireVolume("hold folders");
-        overlay = HfsWriter.Bless(Overlay, folderPath);
+        var (volume, inner) = RequireVolume(folderPath, "hold folders");
+        volume.Overlay = HfsWriter.Bless(Overlay(volume), inner);
         changes.Add(new PlannedChange("bless", folderPath, "as the System Folder"));
     }
 
@@ -425,8 +506,14 @@ public sealed class InputEditSession
     {
         ArgumentNullException.ThrowIfNull(macPath);
         ArgumentNullException.ThrowIfNull(folderPath);
-        RequireVolume("hold folders");
-        overlay = HfsWriter.Move(Overlay, macPath, folderPath);
+        var (volume, inner) = RequireVolume(macPath, "hold folders");
+        var (into, folder) = Route(folderPath, "hold folders");
+        if (into != volume)
+        {
+            throw new InvalidOperationException($"{macPath} cannot be moved to another partition.");
+        }
+
+        volume.Overlay = HfsWriter.Move(Overlay(volume), inner, folder);
         var name = macPath.Contains(':') ? macPath[(macPath.LastIndexOf(':') + 1)..] : macPath;
         var moved = folderPath.Length == 0 ? name : folderPath + ":" + name;
         foreach (var key in forks.Keys.Where(k => Within(k, macPath)).ToList())
@@ -464,10 +551,11 @@ public sealed class InputEditSession
             return;
         }
 
-        if (FileAt(macPath) is { } file)
+        var (volume, inner) = Route(macPath, "hold files");
+        if (FileAt(volume, inner) is { } file)
         {
-            Prepare();
-            overlay = HfsWriter.SetFinderInfo(Overlay, macPath, With(file.FinderInfo, type, creator, flags));
+            Prepare(volume);
+            volume.Overlay = HfsWriter.SetFinderInfo(Overlay(volume), inner, With(file.FinderInfo, type, creator, flags));
         }
         else
         {
@@ -476,8 +564,8 @@ public sealed class InputEditSession
                 throw new InvalidOperationException($"{macPath} is a folder: it has no type or creator.");
             }
 
-            Prepare();
-            overlay = HfsWriter.SetFolderFlags(Overlay, macPath, flags ?? FinderFlags.None);
+            Prepare(volume);
+            volume.Overlay = HfsWriter.SetFolderFlags(Overlay(volume), inner, flags ?? FinderFlags.None);
         }
 
         changes.Add(new PlannedChange("set", macPath, detail));
@@ -536,8 +624,9 @@ public sealed class InputEditSession
             throw new InvalidOperationException("A single-file input's resources are at the path \"\".");
         }
 
-        Prepare();
-        var file = FileAt(macPath) ?? throw new InvalidOperationException($"There is no file {macPath}.");
+        var (volume, inner) = Route(macPath, "hold files");
+        Prepare(volume);
+        var file = FileAt(volume, inner) ?? throw new InvalidOperationException($"There is no file {macPath}.");
         var bytes = file.ResourceFork.ToArray();
         session = new EditSession(bytes.Length == 0 ? new ResourceFork() : ResourceFork.Read(bytes));
         forks[macPath] = session;
@@ -545,8 +634,8 @@ public sealed class InputEditSession
     }
 
     // The file at a path in the volume as edited so far, or null (a folder, or nothing).
-    private MacFile? FileAt(string macPath) =>
-        HfsReader.Instance.Read(Overlay.AsForkData(), new ContainerContext(options))
+    private MacFile? FileAt(EditedVolume volume, string macPath) =>
+        HfsReader.Instance.Read(Overlay(volume).AsForkData(), new ContainerContext(options))
             .FirstOrDefault(f => string.Join(":", f.FolderPath.Select(n => n.ToMacRoman()).Append(f.Name.ToMacRoman())) == macPath);
 
     private static bool Within(string key, string macPath) => key == macPath || key.StartsWith(macPath + ":", StringComparison.Ordinal);
@@ -633,57 +722,64 @@ public sealed class InputEditSession
         }
     }
 
-    // Writes the input with the volume's changes to destination through a temporary file beside it: a streamed copy of
-    // the input with the changed sectors written into it (a resized volume whole), a Disk Copy 4.2 image's checksum
-    // made again; the copy is read back (the writer's checks on its volume, every changed sector compared) and then
-    // moved into place, so destination is never half written.
+    // Writes the input with the volumes' changes to destination through a temporary file beside it: a streamed copy of
+    // the input with each volume's changed sectors written into it where it lies (a resized volume whole), a Disk Copy
+    // 4.2 image's checksum made again; the copy is read back (the writer's checks on each volume changed, every changed
+    // sector compared) and then moved into place, so destination is never half written.
     private void WriteVolume(string destination)
     {
-        var edited = Replacements() is { Count: > 0 } replaced ? ForkSaver.ApplyHfsForks(Overlay, replaced) : Overlay;
+        var edits = EditedVolumes();
         var temporary = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(destination)!, $".classicmac-{Guid.NewGuid():N}.tmp");
-        long at = region?.Offset ?? 0;
         try
         {
             if (resized)
             {
-                File.WriteAllBytes(temporary, edited.ToArray());
+                File.WriteAllBytes(temporary, edits.Single().Edited.ToArray());
             }
             else
             {
                 File.Copy(Path, temporary);
                 using var stream = new FileStream(temporary, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
                 var sector = new byte[512];
-                foreach (var number in edited.Sectors.Order())
+                foreach (var (volume, edited) in edits)
                 {
-                    var length = (int)Math.Min(512, edited.Length - number * 512);
-                    edited.Read(number * 512, sector.AsSpan(0, length));
-                    stream.Position = at + number * 512;
-                    stream.Write(sector, 0, length);
-                }
+                    long at = volume.Region?.Offset ?? 0;
+                    foreach (var number in edited.Sectors.Order())
+                    {
+                        var length = (int)Math.Min(512, edited.Length - number * 512);
+                        edited.Read(number * 512, sector.AsSpan(0, length));
+                        stream.Position = at + number * 512;
+                        stream.Write(sector, 0, length);
+                    }
 
-                if (region is { DiskCopy42: true })
-                {
-                    var sum = new BigEndianWriter(4);
-                    sum.WriteUInt32(DiskCopy42Reader.Sum(edited.AsForkData()));
-                    stream.Position = 0x48;
-                    stream.Write(sum.WrittenSpan);
+                    if (volume.Region is { DiskCopy42: true })
+                    {
+                        var sum = new BigEndianWriter(4);
+                        sum.WriteUInt32(DiskCopy42Reader.Sum(edited.AsForkData()));
+                        stream.Position = 0x48;
+                        stream.Write(sum.WrittenSpan);
+                    }
                 }
             }
 
             var written = ForkData.FromFile(temporary);
-            var disk = region is null ? written : written.Slice(region.Offset, region.Length);
-            // The writer's checks for HFS; an HFS Plus volume, which only First Aid writes, is compared sector by sector.
-            var fault = Kind == InputEditKind.HfsPlusVolume ? null : HfsWriter.Check(disk);
+            string? fault = null;
             var original = new byte[512];
             var copy = new byte[512];
-            foreach (var number in resized ? [] : edited.Sectors)
+            foreach (var (volume, edited) in edits)
             {
-                var length = (int)Math.Min(512, edited.Length - number * 512);
-                edited.Read(number * 512, original.AsSpan(0, length));
-                disk.ReadAt(number * 512, copy.AsSpan(0, length));
-                if (!original.AsSpan(0, length).SequenceEqual(copy.AsSpan(0, length)))
+                var disk = volume.Region is not { } region ? written : written.Slice(region.Offset, region.Length);
+                // The writer's checks for HFS; an HFS Plus volume, which only First Aid writes, is compared sector by sector.
+                fault ??= volume.Kind == InputEditKind.HfsPlusVolume ? null : HfsWriter.Check(disk);
+                foreach (var number in resized ? [] : edited.Sectors)
                 {
-                    fault ??= $"sector {number} reads back differently";
+                    var length = (int)Math.Min(512, edited.Length - number * 512);
+                    edited.Read(number * 512, original.AsSpan(0, length));
+                    disk.ReadAt(number * 512, copy.AsSpan(0, length));
+                    if (!original.AsSpan(0, length).SequenceEqual(copy.AsSpan(0, length)))
+                    {
+                        fault ??= $"sector {number} reads back differently";
+                    }
                 }
             }
 
@@ -705,6 +801,12 @@ public sealed class InputEditSession
             }
         }
     }
+
+    // Each volume read or changed, with its fork edits made (a plain volume always, so a save checks it).
+    private List<(EditedVolume Volume, HfsVolume Edited)> EditedVolumes() =>
+        [.. volumes.Select(v => (Volume: v, Forks: Replacements(v)))
+            .Where(e => e.Volume.Overlay is not null || e.Forks.Count > 0 || volumes.Count == 1)
+            .Select(e => (e.Volume, e.Forks.Count > 0 ? ForkSaver.ApplyHfsForks(Overlay(e.Volume), e.Forks) : Overlay(e.Volume)))];
 
     private IReadOnlyList<HfsForkReplacement> extra = [];
 
@@ -759,7 +861,7 @@ public sealed class InputEditSession
     // The changed sectors name the chunks to store again, so the old disk is not decoded to compare them.
     private MacFile Rewritten()
     {
-        var edited = ForkSaver.ApplyHfsForks(Overlay, Replacements());
+        var edited = ForkSaver.ApplyHfsForks(Overlay(volumes[0]), Replacements(volumes[0]));
         return NdifWriter.Rewrite(ndif!, edited.ToArray(), edited.Sectors.ToHashSet());
     }
 
@@ -814,23 +916,32 @@ public sealed class InputEditSession
             return host.File == ndif ? host with { File = Rewritten() } : null;
         }
 
-        var edited = (Replacements() is { Count: > 0 } replaced ? ForkSaver.ApplyHfsForks(Overlay, replaced) : Overlay).AsForkData();
-        if (region is not null)
+        var whole = host.File.DataFork;
+        foreach (var (volume, changed) in EditedVolumes())
         {
-            var whole = ForkData.Splice(host.File.DataFork, region.Offset, edited);
+            var edited = changed.AsForkData();
+            if (volume.Region is not { } region)
+            {
+                whole = edited;
+                continue;
+            }
+
+            whole = ForkData.Splice(whole, region.Offset, edited);
             if (region.DiskCopy42)
             {
                 var sum = new BigEndianWriter(4);
                 sum.WriteUInt32(DiskCopy42Reader.Sum(edited));
                 whole = ForkData.Splice(whole, 0x48, ForkData.FromBytes(sum.ToArray()));
             }
-
-            edited = whole;
         }
 
-        return host with { File = host.File with { DataFork = edited } };
+        return host with { File = host.File with { DataFork = whole } };
     }
 
-    private List<HfsForkReplacement> Replacements() =>
-        [.. forks.Where(f => f.Value.IsDirty).Select(f => new HfsForkReplacement(f.Key, f.Value.Fork)), .. extra];
+    // The forks edited in a volume, by their paths in it.
+    private List<HfsForkReplacement> Replacements(EditedVolume volume) =>
+        [.. forks.Where(f => f.Value.IsDirty).Select(f => new HfsForkReplacement(f.Key, f.Value.Fork)).Concat(extra)
+            .Select(r => (Replacement: r, At: Route(r.MacPath, "hold files")))
+            .Where(r => r.At.Volume == volume)
+            .Select(r => r.Replacement with { MacPath = r.At.Path })];
 }

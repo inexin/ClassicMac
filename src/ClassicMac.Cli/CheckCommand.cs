@@ -56,7 +56,7 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
             fault = writerChecked ? HfsWriter.Check(opened.Root.File.DataFork) : null;
             firstAid = HfsFirstAid.Verify(opened.Root.File.DataFork);
         }
-        else if (InputEditSession.Open(input.FullName, containerOptions, readOptions) is { Kind: InputEditKind.HfsVolume, Partition: null } session)
+        else if (InputEditSession.Open(input.FullName, containerOptions, readOptions) is { Kind: InputEditKind.HfsVolume, Partition: null, PartitionNames: [] } session)
         {
             // A disk image the writer edits (Disk Copy 4.2, NDIF): its disk gets the writer's checks and First Aid.
             volume = writerChecked = true;

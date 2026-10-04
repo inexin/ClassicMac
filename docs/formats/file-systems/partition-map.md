@@ -152,6 +152,13 @@ number times the stride, and `pmDataCnt` ignored. Each `Apple_HFS` or `Apple_MFS
 after `pmPartName`, whose data fork is the volume's bytes, which the volume readers then open. Every other type is
 skipped and reported.
 
+Writing: each HFS partition is edited as a volume and its changed sectors written back where it lies; the map, the
+drivers, other partitions and the bytes between them stay as they were. A disk with one Mac volume partition is
+edited as that volume (paths inside it, as for a plain image). On a disk with several, each partition is a folder
+named after `pmPartName`, so a path starts with the partition's name (`disk.img:Two:Docs`), compared as HFS compares
+names; when two partitions share a name, only the first is reached. An HFS Plus partition is repaired by First Aid
+only, an MFS partition not written. A partition is never resized, since the map would change.
+
 Where it differs from the driver, knowingly:
 
 - The volume runs from `(pmPyPartStart + pmLgDataStart) × stride` for `pmPartBlkCnt − pmLgDataStart` blocks, so it

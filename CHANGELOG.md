@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Writing to disks with several partitions (partition-map.md §5): each HFS partition is edited by its name
+  (`classicmac mkdir disk.img:Two:New`, `repair disk.img:Two`) and written back in place; in the app each partition
+  node takes the Volume menu, First Aid and resource edits, and Save As writes them all.
 - HFS writing: the extents overflow tree is edited in place by the BTree manager's rules, as the catalog is (a
   deletion changes its leaf and the header, not every node); fork replacement checks the edited file by its own record
   and forks, about twice as fast on a 500 MB volume.

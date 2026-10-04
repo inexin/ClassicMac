@@ -245,14 +245,14 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
     // repair: First Aid's repair of a volume (cli.md §3.2); the verify after it decides the exit code.
     private Command RepairCommand()
     {
-        var path = MacPathArgument("volume", "The volume image (a disk image, or a partitioned disk with one HFS volume)");
+        var path = MacPathArgument("volume", "The volume image (a disk image; on a partitioned disk with several volumes, the disk's path and the partition's name)");
         var options = NewWriteOptions();
         var command = new Command("repair", "Repair an HFS volume as Disk First Aid would, then verify it again") { path };
         AddWriteOptions(command, options);
         command.SetAction(result =>
         {
             var repair = new RepairRun();
-            return RunWrite(result, options, result.GetRequiredValue(path), (_, _, _) => session => repair.Result = session.Repair(), repair);
+            return RunWrite(result, options, result.GetRequiredValue(path), (_, tree, rest) => MacEdits.Repair(tree, rest, r => repair.Result = r), repair);
         });
         return command;
     }

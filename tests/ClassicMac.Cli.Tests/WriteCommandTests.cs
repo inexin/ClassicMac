@@ -124,6 +124,32 @@ public sealed class WriteCommandTests : IDisposable
         Assert.Contains("partition 3 \"Macintosh HD\": passes the writer's checks\n", output.Replace("\r\n", "\n"));
     }
 
+    // A disk with several HFS partitions: a path names the partition first (partition-map.md §5).
+    [Fact]
+    public void A_disk_with_two_HFS_partitions_is_written_by_partition_name()
+    {
+        var volume = File.ReadAllBytes(Disk());
+        var disk = Path.Combine(folder, "two.img");
+        File.WriteAllBytes(disk, Fixtures.PartitionMap(("One", "Apple_HFS", volume), ("Two", "Apple_HFS", volume)));
+
+        var (code, output, error) = Run("rm", disk + ":Two:Read Me", "-o", Out);
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.Contains("delete Two:Read Me", output);
+        Assert.Contains("Read Me", Run("ls", Out + ":One").Output);
+        Assert.DoesNotContain("Read Me", Run("ls", Out + ":Two").Output);
+
+        var second = Path.Combine(folder, "two-2.img");
+        var (mkdir, _, mkdirError) = Run("mkdir", Out + ":One:New", "-o", second);
+        Assert.True(mkdir == ExitCodes.Success, mkdirError);
+        Assert.Contains("New", Run("ls", second + ":One").Output);
+        Assert.Equal(ExitCodes.Success, Run("check", second).Code);
+
+        Assert.Equal(ExitCodes.Usage, Run("mkdir", disk + ":New", "--dry-run").Code);      // the disk's top level is no volume
+        var (repair, repaired, repairError) = Run("repair", disk + ":Two", "--dry-run");
+        Assert.True(repair == ExitCodes.Success, repairError);
+        Assert.Contains("appears to be OK", repaired);
+    }
+
     [Fact]
     public void A_Disk_Copy_4_2_image_is_written_with_its_checksum_made_again()
     {

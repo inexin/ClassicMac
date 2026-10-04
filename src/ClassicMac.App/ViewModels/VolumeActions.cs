@@ -25,10 +25,13 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
     // file), when it is in the input's writable volume and not inside a container held in it.
     private static NodeViewModel? VolumeFolder(NodeViewModel? node)
     {
-        if (node is null or ResourceTypeNode or ResourceNode or LoadingNode || node.Input.VolumeRoot is not { } root)
+        if (node is null or ResourceTypeNode or ResourceNode or LoadingNode || node.Input.VolumeOf(node) is not { } volume
+            || node.Input.VolumeSession.KindOf(volume.Name) != InputEditKind.HfsVolume)
         {
             return null;
         }
+
+        var root = volume.Root;
 
         NodeViewModel? folder = null;
         for (var at = node is ContainerFileNode && node != root ? node.Parent : node; at is not null; at = at.Parent)
@@ -73,7 +76,11 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
         _ => item.BaseTitle,
     };
 
-    private static string MacPathOf(NodeViewModel item) => string.Join(":", FolderNames(TreeLayout.FolderOf(item)!).Append(ItemName(item)));
+    // An item's path in the edit session: its folders and name in the volume (after its partition's name on a disk with several).
+    private static string MacPathOf(NodeViewModel item) => SessionPath(TreeLayout.FolderOf(item)!, ItemName(item));
+
+    private static string SessionPath(NodeViewModel folder, string name) =>
+        folder.Input.SessionPath(folder, string.Join(":", FolderNames(folder).Append(name)));
 
     private bool CanCreateInVolume() => !appParts.ExportActions.IsExporting && VolumeFolder(appSelection.Selected) is not null;
 
@@ -170,7 +177,7 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
             return;
         }
 
-        var path = string.Join(":", FolderNames(folder).Append(name));
+        var path = SessionPath(folder, name);
         if (!ChangeVolume(folder.Input, session => session.AddFolder(path), $"create folder {name}"))
         {
             return;
@@ -216,18 +223,31 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
 
     private bool CanFirstAid() => !appParts.ExportActions.IsExporting && appSelection.Selected?.Input is { IsFirstAidVolume: true };
 
-    // First Aid (hfs.md §5.6): the selected item's volume, as edited so far, is checked and the problems and verdict
-    // shown; Repair repairs it in the session (shown as an edit, written by Save As) and shows what it did. The tree is
-    // not read again: a folder made again shows once the saved volume is opened.
+    // First Aid (hfs.md §5.6): the selected item's volume (on a disk with several partitions, the partition it is in), as
+    // edited so far, is checked and the problems and verdict shown; Repair repairs it in the session (shown as an edit,
+    // written by Save As) and shows what it did. The tree is not read again: a folder made again shows once the saved
+    // volume is opened.
     [RelayCommand(CanExecute = nameof(CanFirstAid))]
     private async Task FirstAid()
     {
-        if (appSelection.Selected?.Input is not { IsFirstAidVolume: true } input)
+        if (appSelection.Selected is not { Input: { IsFirstAidVolume: true } input } selected)
         {
             return;
         }
 
-        var report = await Task.Run(() => HfsFirstAid.Verify(ForkData.FromBytes(input.VolumeSession.Volume)));
+        string volume = "";
+        if (input.VolumeSession.PartitionNames.Count > 0)
+        {
+            if (input.VolumeOf(selected) is not { } partition)
+            {
+                appServices.Status = "Select a partition, or an item in one, for First Aid to check.";
+                return;
+            }
+
+            volume = partition.Name;
+        }
+
+        var report = await Task.Run(() => HfsFirstAid.Verify(ForkData.FromBytes(input.VolumeSession.VolumeOf(volume))));
         appServices.Status = report.Summary;
         if (appServices.EditDialogs is not { } dialogs
             || !await dialogs.FirstAidAsync(new FirstAidView(report.VolumeName, Lines(report), report.Summary, report.Verdict == FirstAidVerdict.NeedsRepair)))
@@ -236,7 +256,7 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
         }
 
         FirstAidRepairResult? result = null;
-        if (!ChangeVolume(input, session => result = session.Repair(), "repair the volume") || result is null)
+        if (!ChangeVolume(input, session => result = session.Repair(volume), "repair the volume") || result is null)
         {
             return;
         }
@@ -254,7 +274,7 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
     private void AddFile(NodeViewModel folder, MacFile file)
     {
         var folderPath = FolderNames(folder);
-        var path = string.Join(":", folderPath.Append(file.Name.ToMacRoman()));
+        var path = SessionPath(folder, file.Name.ToMacRoman());
         var data = file.DataFork.ToArray();
         var resource = file.ResourceFork.ToArray();
         var added = file with { DataFork = ForkData.FromBytes(data), ResourceFork = ForkData.FromBytes(resource) };

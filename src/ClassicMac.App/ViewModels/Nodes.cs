@@ -376,7 +376,7 @@ public sealed class InputNode : NodeViewModel
 
     /// <summary>
     /// Whether the input holds an HFS volume whose files and folders can be created and deleted: a plain volume image,
-    /// a partitioned disk with one HFS partition, or a Disk Copy 4.2 or NDIF image of an HFS disk.
+    /// a partitioned disk with an HFS partition, or a Disk Copy 4.2 or NDIF image of an HFS disk.
     /// </summary>
     public bool IsWritableHfs => VolumeSession.Kind == InputEditKind.HfsVolume;
 
@@ -390,10 +390,35 @@ public sealed class InputNode : NodeViewModel
     public byte[]? EditedVolume => VolumeSession.HasChanges ? VolumeSession.Volume : null;
 
     /// <summary>
-    /// The node the volume's files and folders are under: the input for a plain volume image, else the disk's node (a
-    /// partition, a Disk Copy disk) under the input's wrappers; null when the input is no writable volume.
+    /// The volume a node is in: the node the volume's files and folders are under, and the name its paths in the edit
+    /// session start with ("" for the input's only volume; on a disk with several partitions, the partition's name, its
+    /// node under the input); null when the node is in no volume the session edits.
     /// </summary>
-    internal NodeViewModel? VolumeRoot
+    internal (NodeViewModel Root, string Name)? VolumeOf(NodeViewModel node)
+    {
+        if (VolumeSession.PartitionNames.Count == 0)
+        {
+            return VolumeRoot is { } root ? (root, "") : null;
+        }
+
+        var top = node;
+        while (top.Parent is { } parent && parent != this)
+        {
+            top = parent;
+        }
+
+        return top is ContainerFileNode partition && top.Parent == this && VolumeSession.PartitionNames.Contains(partition.File.Name.ToMacRoman())
+            ? (top, partition.File.Name.ToMacRoman())
+            : null;
+    }
+
+    /// <summary>A path in the volume a node is in, as the edit session takes it: after the partition's name on a disk with several.</summary>
+    internal string SessionPath(NodeViewModel node, string pathInVolume) =>
+        VolumeOf(node) is { Name.Length: > 0 } volume ? pathInVolume.Length == 0 ? volume.Name : volume.Name + ":" + pathInVolume : pathInVolume;
+
+    // The node the input's only volume's files and folders are under: the input for a plain volume image, else the
+    // disk's node (a partition, a Disk Copy disk) under the input's wrappers; null when the input is no writable volume.
+    private NodeViewModel? VolumeRoot
     {
         get
         {

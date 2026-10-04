@@ -3,6 +3,7 @@ using ClassicMac.Core;
 using ClassicMac.Files.Containers;
 using ClassicMac.Files.Editing;
 using ClassicMac.Files.Hfs;
+using ClassicMac.Resources;
 using static ClassicMac.Files.Tests.Fixtures;
 
 namespace ClassicMac.Files.Tests;
@@ -87,11 +88,84 @@ public sealed class PartitionedVolumeTests : IDisposable
         Assert.Equal(original, File.ReadAllBytes(path + ".orig"));
     }
 
+    // A disk with several Mac volume partitions: each is a folder named after it, so a path in the session starts with
+    // the partition's name (partition-map.md §5).
     [Fact]
-    public void An_image_with_two_HFS_partitions_is_not_written()
+    public void A_disk_with_two_HFS_partitions_edits_each_by_its_name()
+    {
+        var one = HfsVolume("One");
+        var two = HfsVolume("Two");
+        var path = Image(("Driver", "Apple_Driver43", Driver), ("One", "Apple_HFS", one), ("Two", "Apple_HFS", two));
+        var original = File.ReadAllBytes(path);
+        var session = InputEditSession.Open(path);
+        Assert.Equal(InputEditKind.HfsVolume, session.Kind);
+        Assert.Equal(["One", "Two"], session.PartitionNames);
+        Assert.Null(session.Partition);
+
+        session.Delete("One:Read Me");
+        session.AddFolder("Two:Docs:New");
+        session.SetResource("Two:Read Me", FourCC.FromString("STR "), 128, "hi"u8.ToArray());
+        var target = Path.Combine(directory, "out.img");
+        session.SaveAs(target);
+
+        var written = File.ReadAllBytes(target);
+        Assert.Equal(original.Length, written.Length);
+        var partitions = PartitionMapReader.Partitions(ForkData.FromBytes(original));
+        var first = partitions[0].Offset;
+        Assert.Equal(original.AsSpan(0, (int)first).ToArray(), written.AsSpan(0, (int)first).ToArray());   // the map and the driver
+        byte[] Slice(byte[] image, MacPartition p) => image.AsSpan((int)p.Offset, (int)p.Length).ToArray();
+        Assert.Equal(["Docs:Letter"], Files(Slice(written, partitions[0])).Select(f => f.MacPath));
+        Assert.Equal(["Docs:Letter", "Read Me"], Files(Slice(written, partitions[1])).Select(f => f.MacPath).Order());
+        Assert.Contains(HfsReader.Instance.ReadFolders(ForkData.FromBytes(Slice(written, partitions[1])), new ContainerContext()), f => f.MacPath == "Docs:New");
+        Assert.NotNull(ResourceFork.Read(Files(Slice(written, partitions[1])).Single(f => f.MacPath == "Read Me").ResourceFork.ToArray()).Find(FourCC.FromString("STR "), 128));
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(Slice(written, partitions[0]))));
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(Slice(written, partitions[1]))));
+        var current = session.Current()!.File.DataFork.ToArray();                  // as saved (its fork edits made again, at a new time)
+        Assert.Equal(["Docs:Letter", "Read Me"], Files(Slice(current, partitions[1])).Select(f => f.MacPath).Order());
+        Assert.Equal(Slice(written, partitions[0]), Slice(current, partitions[0]));
+        Assert.Contains(HfsReader.Instance.ReadFolders(ForkData.FromBytes(session.VolumeOf("Two")), new ContainerContext()), f => f.MacPath == "Docs:New");
+
+        session.SaveInPlace();
+        Assert.Equal(written, File.ReadAllBytes(path));
+        Assert.Equal(original, File.ReadAllBytes(path + ".orig"));
+    }
+
+    [Fact]
+    public void A_path_on_a_disk_with_several_partitions_must_name_one()
     {
         var path = Image(("One", "Apple_HFS", HfsVolume("One")), ("Two", "Apple_HFS", HfsVolume("Two")));
+        var session = InputEditSession.Open(path);
 
-        Assert.Equal(InputEditKind.ReadOnly, InputEditSession.Open(path).Kind);
+        Assert.Contains("One, Two", Assert.Throws<InvalidOperationException>(() => session.AddFolder("Three:New")).Message);
+        Assert.Throws<InvalidOperationException>(() => session.Volume);
+        Assert.Throws<InvalidOperationException>(() => session.Move("One:Read Me", "Two:Docs"));
+        Assert.Throws<InvalidOperationException>(() => session.Resize(10_000_000));
+        session.AddFolder("one:New");                                        // names compare as the catalog compares them
+        Assert.Equal(InputEditKind.HfsVolume, session.KindOf("Two:Docs"));
+        Assert.Equal(InputEditKind.ReadOnly, session.KindOf("Three"));
+    }
+
+    [Fact]
+    public void An_HFS_Plus_partition_beside_an_HFS_one_is_repaired_by_its_name()
+    {
+        var builder = new HfsPlusBuilder();
+        builder.File(HfsPlusBuilder.Root, "Plus File", "plus"u8.ToArray(), []);
+        var plus = builder.Build("Plus");
+        Array.Clear(plus, plus.Length - 1024, 512);                          // the alternate volume header lost
+        var path = Image(("One", "Apple_HFS", HfsVolume("One")), ("Plus", "Apple_HFS", plus));
+        var session = InputEditSession.Open(path);
+        Assert.Equal(InputEditKind.HfsPlusVolume, session.KindOf("Plus"));
+
+        Assert.Throws<InvalidOperationException>(() => session.AddFolder("Plus:New"));
+        Assert.Equal(FirstAidVerdict.AppearsOk, session.Repair("One").After.Verdict);
+        var repaired = session.Repair("Plus");
+
+        Assert.True(repaired.Written);
+        Assert.All(session.Changes, c => Assert.StartsWith("Plus", c.Path, StringComparison.Ordinal));
+        var target = Path.Combine(directory, "out.img");
+        session.SaveAs(target);
+        var partition = PartitionMapReader.Partitions(ForkData.FromBytes(File.ReadAllBytes(target)))[1];
+        Assert.Equal(FirstAidVerdict.AppearsOk,
+            HfsFirstAid.Verify(ForkData.FromBytes(File.ReadAllBytes(target).AsSpan((int)partition.Offset, (int)partition.Length).ToArray())).Verdict);
     }
 }

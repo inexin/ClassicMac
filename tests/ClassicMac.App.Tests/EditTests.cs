@@ -743,6 +743,53 @@ public sealed class EditTests : EditTestsBase
         Assert.Empty(HfsReader.Instance.Read(ForkData.FromBytes(session.Volume), new ContainerContext()));
     }
 
+    // A disk with several partitions: each partition node is a volume of its own for the Volume menu and First Aid, and
+    // Save As writes each partition back in place.
+    [Fact]
+    public async Task Each_partition_of_a_disk_with_several_is_edited_on_its_own()
+    {
+        var volume = HfsWriter.Format(800 * 1024, "Floppy");
+        volume = HfsWriter.CreateFile(ForkData.FromBytes(volume), "Read Me", "hello"u8.ToArray(), new ResourceFork().ToArray(), FinderInfo.Empty);
+        var path = Path.Combine(folder, "Disk.img");
+        File.WriteAllBytes(path, Fixtures.PartitionMap(("One", "Apple_HFS", volume), ("Two", "Apple_HFS", volume)));
+        var dialogs = new Dialogs();
+        var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
+        var input = (await model.OpenAsync(path))!;
+        var partitions = input.Children.OfType<ContainerFileNode>().ToList();
+        Assert.Equal(2, partitions.Count);
+        await partitions[0].EnsureLoadedAsync();
+        await partitions[1].EnsureLoadedAsync();
+
+        model.Selected = input;
+        Assert.False(model.VolumeActions.NewFolderCommand.CanExecute(null));      // the disk's top level is no volume
+        model.Selected = partitions[1];
+        dialogs.FolderName = "Docs";
+        await model.VolumeActions.NewFolderCommand.ExecuteAsync(null);
+        Assert.IsType<FolderNode>(model.Selected);
+        model.Selected = partitions[0].Children.Single(n => n.Title == "Read Me");
+        dialogs.Confirm = true;
+        await model.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
+        model.Selected = partitions[0];
+        await model.VolumeActions.FirstAidCommand.ExecuteAsync(null);
+        Assert.Equal("Floppy", dialogs.FirstAidShown[^1].Volume);
+        model.Selected = partitions[1].Children.Single(n => n.Title == "Read Me");      // a fork edit, saved into its partition
+        await model.Selected.EnsureLoadedAsync();
+        Assert.True(model.EditActions.NewResourceCommand.CanExecute(null));
+        dialogs.Info = i => i with { Type = "STR ", Id = 300 };
+        await model.EditActions.NewResourceCommand.ExecuteAsync(null);
+
+        model.Selected = input;
+        await model.EditActions.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        var saved = File.ReadAllBytes(Path.Combine(folder, "Disk-edited.img"));
+        var map = PartitionMapReader.Partitions(ForkData.FromBytes(saved));
+        ForkData Partition(int i) => ForkData.FromBytes(saved.AsSpan((int)map[i].Offset, (int)map[i].Length).ToArray());
+        Assert.Empty(HfsReader.Instance.Read(Partition(0), new ContainerContext()));
+        Assert.Equal(["Read Me"], HfsReader.Instance.Read(Partition(1), new ContainerContext()).Select(f => f.MacPath));
+        Assert.Contains(HfsReader.Instance.ReadFolders(Partition(1), new ContainerContext()), f => f.MacPath == "Docs");
+        var readMe = HfsReader.Instance.Read(Partition(1), new ContainerContext()).Single();
+        Assert.NotNull(ResourceFork.Read(readMe.ResourceFork.ToArray()).Find(FourCC.FromString("STR "), 300));
+    }
+
     [Fact]
     public async Task Volume_commands_refuse_bad_names_and_other_containers()
     {
