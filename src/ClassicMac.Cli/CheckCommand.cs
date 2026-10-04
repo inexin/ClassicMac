@@ -15,7 +15,8 @@ namespace ClassicMac.Cli;
 // printed as results; a plain HFS volume also gets the checks the writer makes before an edit (HfsWriter.Check).
 internal sealed class CheckCommand(TextWriter output, TextWriter error)
 {
-    public int Run(FileInfo input, ContainerReadOptions containerOptions, ReadOptions readOptions, bool strict, bool quiet, bool json, bool deep = false)
+    public int Run(FileInfo input, ContainerReadOptions containerOptions, ReadOptions readOptions, bool strict, bool quiet, bool json, bool deep = false,
+        string? partitionName = null)
     {
         var found = new List<(string Source, Diagnostic Diagnostic)>();
         Input opened;
@@ -80,6 +81,17 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
                 catch (InvalidDataException)
                 {
                 }
+            }
+        }
+
+        // A partition named after the disk: that partition alone.
+        if (partitionName is not null)
+        {
+            partitions.RemoveAll(p => !MacPaths.NamesEqual(p.Partition.Name, partitionName));
+            if (partitions.Count == 0)
+            {
+                error.WriteLine($"{input.Name}:{partitionName}: names no HFS partition of the disk.");
+                return ExitCodes.NotFound;
             }
         }
 

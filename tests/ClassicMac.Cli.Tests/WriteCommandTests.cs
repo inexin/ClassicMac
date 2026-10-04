@@ -150,6 +150,25 @@ public sealed class WriteCommandTests : IDisposable
         Assert.Contains("appears to be OK", repaired);
     }
 
+    // check on a partitioned disk: each skipped partition reported once; a path naming one partition checks it alone.
+    [Fact]
+    public void Check_reports_a_skipped_partition_once_and_checks_a_partition_by_name()
+    {
+        var volume = File.ReadAllBytes(Disk());
+        var disk = Path.Combine(folder, "three.img");
+        File.WriteAllBytes(disk, Fixtures.PartitionMap(("Macintosh", "Apple_Driver43", new byte[1024]), ("One", "Apple_HFS", volume), ("Two", "Apple_HFS", volume), ("Extra", "Apple_Free", new byte[1024])));
+
+        var (code, output, _) = Run("check", disk);
+        Assert.Equal(ExitCodes.Success, code);
+        Assert.Single(output.Split('\n'), l => l.Contains("(Apple_Free)", StringComparison.Ordinal));
+
+        var (one, oneOutput, oneError) = Run("check", disk + ":Two");
+        Assert.True(one == ExitCodes.Success, oneError);
+        Assert.Contains("\"Two\": passes the writer's checks", oneOutput);
+        Assert.DoesNotContain("\"One\"", oneOutput);
+        Assert.Equal(ExitCodes.NotFound, Run("check", disk + ":Four").Code);
+    }
+
     [Fact]
     public void A_Disk_Copy_4_2_image_is_written_with_its_checksum_made_again()
     {

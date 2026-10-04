@@ -236,7 +236,8 @@ found is shown as `volume: <fault>`, or `volume: passes the writer's checks`. Ea
 of a partitioned disk, is also checked as Disk First Aid checks it ([hfs.md §5.6](formats/file-systems/hfs.md#56-first-aid)):
 its problem lines and verdict come before the `volume:` line, as `first aid: Problem:  Invalid PEOF, 18, 2` and
 `first aid: The volume “Macintosh HD” needs to be repaired.` (a partition's as `partition 3 "Macintosh HD" first aid:
-…`). The last line counts the errors and warnings; a volume or partition the writer refuses, or that First Aid does
+…`). `check disk.img:Two` checks the partition named Two alone (exit 5 when the disk has no HFS partition of that
+name). The last line counts the errors and warnings; a volume or partition the writer refuses, or that First Aid does
 not find OK, counts as one error (in JSON's `errors` too).
 
 Exit 0 when nothing is wrong (warnings allowed, unless `--strict`), 1 when there is an error or a volume fault, 4 when

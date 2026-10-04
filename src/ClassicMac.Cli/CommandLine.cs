@@ -206,16 +206,35 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
 
     private Command CheckCommand()
     {
-        var input = InputArgument();
+        // The input, or a partitioned disk and a partition's name (disk.img:Two).
+        var input = new Argument<string>("input")
+        {
+            Description = "A Mac file or a container holding them, as for info; or a partitioned disk and the name of one of its partitions (disk.img:Two)",
+        };
         var json = JsonOption();
         var deep = new Option<bool>("--deep") { Description = "Also open the archives and disk images stored in the input, and check inside them" };
         var command = new Command("check", "Check the input's own structures and report their damage; a volume ClassicMac writes also gets the writer's checks")
         {
             input, json, deep,
         };
-        command.SetAction(result => new CheckCommand(output, error).Run(
-            result.GetRequiredValue(input), ContainerOptionsFrom(result), ReadOptionsFrom(result), result.GetValue(strict),
-            result.GetValue(quiet), result.GetValue(json), result.GetValue(deep)));
+        command.SetAction(result =>
+        {
+            var path = result.GetRequiredValue(input);
+            if (File.Exists(path))
+            {
+                return new CheckCommand(output, error).Run(new FileInfo(path), ContainerOptionsFrom(result), ReadOptionsFrom(result),
+                    result.GetValue(strict), result.GetValue(quiet), result.GetValue(json), result.GetValue(deep));
+            }
+
+            if (MacPaths.SplitHost(path) is not var (host, rest) || MacPaths.Split(rest) is not [var partition])
+            {
+                error.WriteLine($"{path}: no such file, nor a partitioned disk and a partition's name.");
+                return ExitCodes.NotFound;
+            }
+
+            return new CheckCommand(output, error).Run(new FileInfo(host), ContainerOptionsFrom(result), ReadOptionsFrom(result),
+                result.GetValue(strict), result.GetValue(quiet), result.GetValue(json), result.GetValue(deep), partition);
+        });
         return command;
     }
 
