@@ -11,8 +11,8 @@ and JSON.
 | --- | --- |
 | Identified by | Type `'AIFF'` or `'AIFC'`; the data fork starts with `'FORM'`, a length, and `'AIFF'` or `'AIFC'`; extensions `.aif`, `.aiff`, `.aifc` |
 | ClassicMac | Reads and converts; `ClassicMac.Resources.Decoders.Sound` (`AiffFile`, the `sound.aiff` document converter) |
-| Verified against | Nothing yet |
-| Sources | Apple, *Audio Interchange File Format "AIFF"*, version 1.3 (1989); Apple, *AIFF-C*, draft of 26 August 1991; *Inside Macintosh: Sound* |
+| Verified against | Nothing yet (the Sound Manager's readers traced, not run) |
+| Sources | Apple, *Audio Interchange File Format "AIFF"*, version 1.3 (1989); Apple, *AIFF-C*, draft of 26 August 1991; *Inside Macintosh: Sound*; the Sound Manager extension of Mac OS 9.0 (ParseAIFFHeader and the file-play reader), traced |
 
 Contents
 
@@ -58,7 +58,7 @@ A file holds at most one of each chunk below except `'ANNO'` and `'APPL'`, which
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
 | +$00 | 2 | numChannels | `i16`; 1 mono, 2 stereo, more for multichannel |
-| +$02 | 4 | numSampleFrames | `u32`; frames in the sound data chunk (AIFF-C: see §2 step 5) |
+| +$02 | 4 | numSampleFrames | `u32`; frames in the sound data chunk; packets for MACE and IMA 4:1 (§2) |
 | +$06 | 2 | sampleSize | `i16`; bits a sample, 1 to 32 for uncompressed data |
 | +$08 | 10 | sampleRate | IEEE 754 80-bit extended: a sign bit and 15-bit exponent (bias 16383), then a 64-bit mantissa with an explicit integer bit |
 | +$12 | 4 | compressionType | AIFF-C only: `'NONE'`, or a codec (§4.1) |
@@ -113,19 +113,36 @@ bits zero. The chunk may be absent when numSampleFrames is 0 [Doc].
 
 ## 2. Reading
 
-1. The data must start with `'FORM'` and a formType of `'AIFF'` or `'AIFC'` [Doc].
+The specification's reading [Doc]:
+
+1. The data must start with `'FORM'` and a formType of `'AIFF'` or `'AIFC'`.
 2. Walk the chunks from +$0C to the end of the FORM: each next chunk is at `ckSize + (ckSize & 1)` bytes past the
-   current chunk's data. Chunks of unknown types are skipped [Doc].
-3. `'COMM'` gives the shape. AIFF-C's adds the compression type and name [Doc].
-4. The sample rate is the extended number's value: mantissa × 2^(exponent − 16383 − 63), negated when the sign is set
-   [Doc].
+   current chunk's data. Chunks of unknown types are skipped.
+3. `'COMM'` gives the shape; AIFF-C's adds the compression type and name.
+4. The sample rate is the extended number's value: mantissa × 2^(exponent − 16383 − 63), negated when the sign is set.
 5. The samples begin `offset` bytes into the SSND data. Uncompressed, a frame is `ceil(sampleSize / 8) × numChannels`
-   bytes and numSampleFrames frames are read. For the packet codecs (MACE, IMA 4:1) numSampleFrames is taken to count
-   packets, as a compressed `'snd '` header's numFrames does
-   ([sound.md §2.5](../resources/sound.md#25-compressionid-format-and-packets)); the specification is silent and the
-   Sound Manager's reading is not traced (§8) [ClassicMac].
-6. A loop: INST's sustain loop when its playMode is not 0, from the position of its beginLoop marker to that of its
-   endLoop marker. The base note is INST's baseNote, middle C (60) without an INST [Doc].
+   bytes.
+
+The Sound Manager of Mac OS 9.0 has two readers of its own, which differ [Code: Sound Manager, Mac OS 9.0]:
+
+| | ParseAIFFHeader | The file-play reader (SndStartFilePlay) |
+| --- | --- | --- |
+| FORM | Walks 8-byte chunk headers from the file's current mark to its end; `'FORM'` must be followed by `'AIFF'` or `'AIFC'` (else paramErr −50); the FORM need not come first, its size is never used, and bytes after it are still walked | `'FORM'` at offset 0 and type `'AIFF'` or `'AIFC'`, else badFileFormat −208; the FORM's size is not checked |
+| Chunk walk | Skips a chunk by `((ckSize + 1) & ~1) + 8`, padded to even, to the end of the file; a repeated COMM or SSND: the last wins | FindChunk scans from offset 12 for each chunk it needs, the first match winning, and skips by the raw ckSize, not padded, so an odd-sized chunk before COMM or SSND breaks the lookup |
+| Required | COMM and SSND, in any order, else −208 | COMM and SSND, else −208 |
+| COMM | AIFF: exactly 26 bytes with the chunk header, so a COMM whose ckSize is not 18 misaligns the walk; the type is `'NONE'`, named "None". AIFF-C: 30 bytes, then the rest of the chunk (rounded up to even) into a 256-byte name buffer, the pstring's length unused and unchecked; an empty name becomes the type's four characters | 26 or 30 bytes; the compression name is not read |
+| Format | `'NONE'` becomes `'twos'`; any other type is passed to GetCompressionInfo(−1, type, channels, size), whose error is returned | |
+| Sample size | Rounded up to a multiple of 8; numChannels and sampleSize are not range-checked | Not range-checked |
+| Sample count | numSampleFrames × the codec's samples per packet: for MACE and IMA 4:1, numSampleFrames counts packets | Not traced |
+| Rate | UnsignedFixed, rounded to nearest: X2Fix(rate) up to 32,767.0, else X2Fix(rate − 32,767) + $7FFF0000 | UnsignedFixed, truncated: rate × 65,536 |
+| SSND | The samples start right after the chunk's 16-byte header: `offset` and `blockSize` are ignored | `offset` is honoured; `blockSize` is ignored |
+| FVER | Not read, so neither required nor checked | Not read |
+| MARK, INST, text | Not read: neither reader uses loops or the base note | Not read |
+
+Either reader passes on the File Manager's errors. The compression types played are those the installed `sdec`
+components know: on a Mac OS 9.0 with QuickTime, `'MAC3'`, `'MAC6'`, `'ima4'`, `'ulaw'`, `'alaw'`, `'fl32'`, `'fl64'`,
+`'in24'`, `'in32'`, `'sowt'` and `'twos'`; the System file alone has fewer
+([sound.md §2.6](../resources/sound.md#26-sample-formats)).
 
 ## 3. Writing
 
@@ -150,11 +167,15 @@ except `'NONE'`, which is AIFF's big-endian integers [Doc]:
 
 ## 5. ClassicMac
 
-- `AiffFile.Read` reads as §2 into a `SampledSound`, the record a `'snd '` header gives, with the sample format of
-  §4.1 (uncompressed samples as `'twos'`, `'in24'` or `'in32'` by their byte width), so the `'snd '` codecs decode it.
-  The rate is kept exactly as well as in Fixed. [ClassicMac]
-- The first `'COMM'`, `'SSND'`, `'MARK'` and `'INST'` are used; the text chunks are kept, several `'ANNO'` as one
-  text, a line each. [ClassicMac]
+- `AiffFile.Read` reads as the file-play reader where it is defined (§2): the FORM at offset 0, the first COMM and
+  SSND, the SSND's `offset` honoured, the rate also in Fixed, truncated; the walk pads odd chunks, as the
+  specification and ParseAIFFHeader do. The samples go into a `SampledSound`, the record a `'snd '` header gives, with
+  the sample format of §4.1 (uncompressed samples as `'twos'`, `'in24'` or `'in32'` by their byte width), so the
+  `'snd '` codecs decode it; numSampleFrames counts packets for MACE and IMA 4:1, as ParseAIFFHeader's sample count
+  does. The exact rate is kept as well. [ClassicMac]
+- The first `'MARK'` and `'INST'` give the loop and base note written to the WAV, though the Sound Manager ignores
+  them; the text chunks are kept, several `'ANNO'` as one text, a line each. A file with no SSND and no frames is read
+  as silence, where both Sound Manager readers fail with −208. [ClassicMac]
 - A FORM length past the data is cut to the data; a chunk running past the end is read as far as it goes. An SSND
   shorter than numSampleFrames gives the frames that are there. [ClassicMac]
 - The `sound.aiff` document converter reads files of type `'AIFF'` or `'AIFC'`, with or without a resource fork, and
@@ -168,13 +189,13 @@ except `'NONE'`, which is AIFF's big-endian integers [Doc]:
 
 | Code | Severity | When | ClassicMac does | The Mac does |
 | --- | --- | --- | --- | --- |
-| `aiff.header` | Warning | The data does not start with a FORM of type AIFF or AIFC | Reads nothing | Not traced |
-| `aiff.no-comm` | Warning | No COMM chunk, or one under 18 bytes | Reads nothing | Not traced |
-| `aiff.no-ssnd` | Warning | COMM counts frames but there is no SSND | Reads no samples | Not traced |
+| `aiff.header` | Warning | The data does not start with a FORM of type AIFF or AIFC | Reads nothing | badFileFormat −208 (file play); paramErr −50 for another FORM type (ParseAIFFHeader) [Code] |
+| `aiff.no-comm` | Warning | No COMM chunk, or one under 18 bytes | Reads nothing | −208 [Code] |
+| `aiff.no-ssnd` | Warning | COMM counts frames but there is no SSND | Reads no samples | −208, with or without frames [Code] |
 | `aiff.short` | Warning | SSND holds fewer frames than COMM counts | Reads the frames there | Not traced |
 | `aiff.truncated` | Warning | A chunk runs past the end of the FORM or the file | Reads it as far as it goes | Not traced |
-| `aiff.unreadable` | Warning | The data fork cannot be read | Converts nothing | Not traced |
-| `sound.codec` | Warning | The compression type is not decoded | Writes the JSON alone | Not traced |
+| `aiff.unreadable` | Warning | The data fork cannot be read | Converts nothing | The File Manager's error [Code] |
+| `sound.codec` | Warning | The compression type is not decoded (`'alaw'`, …) | Writes the JSON alone | GetCompressionInfo's error when no `sdec` component knows the type [Code] |
 
 ## 7. Verification
 
@@ -187,9 +208,9 @@ except `'NONE'`, which is AIFF's big-endian integers [Doc]:
 
 ## 8. Not covered
 
-- How the Sound Manager's `SndStartFilePlay` reads these files (its checks, the chunks it needs, the compression types
-  it plays, its rate conversion) is not traced; the Diagnostics table's last column waits on it.
-- `'alaw'` and the `'COMT'`, `'MIDI'`, `'AESD'` and `'APPL'` chunks are not decoded; the release loop is not used.
+- How the file-play reader bounds the samples, and the limits GetCompressionInfo puts on channels and sample size.
+- `'alaw'` (G.711 A-law, played only with QuickTime's components) and the `'COMT'`, `'MIDI'`, `'AESD'` and `'APPL'`
+  chunks are not decoded; the release loop is not used.
 - Writing AIFF.
 
 ## 9. References
