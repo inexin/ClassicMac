@@ -94,7 +94,9 @@ container     rohd ddsk    1474560          0  1999-07-15 12:00:00  Disk Tools.i
 where the name came from ([finder.md](formats/resources/finder.md)), the forks' sizes, dates, Finder flags, locked, how
 many entries it holds, a resource's type, ID, name and attributes, a fork's source, and the chain of formats it was read
 through from the host file. For a volume (`disk.img:`, or a disk image inside one), its format and name, size and
-free space in bytes and allocation blocks, file and folder counts, its own dates, its blessed System Folder and whether it is locked
+free space in bytes and allocation blocks, file and folder counts, an HFS volume's fragmentation (`Fragmentation: 3 of 42
+files in more than one extent; free space in 5 runs, the largest 1,204 blocks`,
+[hfs.md §5.7](formats/file-systems/hfs.md#57-fragmentation)), its own dates, its blessed System Folder and whether it is locked
 ([hfs.md §5.2](formats/file-systems/hfs.md#52-what-comes-out)). For an alias file, where it points as the Finder's Get Info shows it ("Original:"), and
 whether that resolves on the volume, how, and to which entry:
 
@@ -205,7 +207,8 @@ name"), how it was found (`by its file ID`, `by its folder ID`, `by name in its 
 `state` (`found`, `missing` from its open volume, `volumeNotOpen`, or `network`, [aliases.md §5](formats/resources/aliases.md)),
 `explanation` (the state in a sentence), and `target`, the original's path inside the input when found. A volume adds
 `volume`: `{ "format", "name", "blockSize", "totalBlocks", "totalBytes", "freeBlocks", "freeBytes", "files",
-"folders"?, "created"?, "modified"?, "backedUp"?, "utcAfterCreation", "blessedFolderId"?, "blessedFolder"?,
+"folders"?, "fragmentation"?: { "files", "fragmentedFiles", "fragmentedForks", "mostExtents", "freeRuns",
+"largestFreeRun" } (HFS only), "created"?, "modified"?, "backedUp"?, "utcAfterCreation", "blessedFolderId"?, "blessedFolder"?,
 "softwareLocked", "hardwareLocked" }` (`name`
 null for HFS Plus, `folders` absent for MFS).
 

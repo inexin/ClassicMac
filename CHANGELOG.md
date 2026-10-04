@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fragmentation (hfs.md §5.7): `stat` on an HFS volume shows how many files lie in more than one extent and how the
+  free space lies (JSON `fragmentation`); the app's Volume card shows the block size, size, free space, files and
+  folders, and the fragmentation.
 - Defragmenting (hfs.md §3.4): `classicmac defrag`, the MCP `defrag` tool and Volume ▸ Defragment lay an HFS volume
   out again in its own geometry, every fork in one extent and the free space in one run at the end; a shrink refused
   for want of a free run points to it.

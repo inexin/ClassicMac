@@ -1003,6 +1003,19 @@ number 0, printed `Problem:  <text>.`). They are ClassicMac's rules, not Disk Fi
 | `firstaid.mdb-counts` | `drNmFls` other than the root's files, or `drFreeBks` other than the bitmap's clear bits (Disk First Aid ignores both) | the MDB written (repair step 3) |
 | `firstaid.extent-past-end` | an extent running past `drNmAlBlks` (Disk First Aid checks only its start and count) | none: the volume cannot be repaired |
 
+### 5.7 Fragmentation
+
+`HfsReader.ReadFragmentation` tells how a volume's files and free space lie, for telling whether a defragmentation
+(§3.4) is worth it or why a shrink (§3.3) finds no room [ClassicMac]:
+
+- Each file record's two forks are counted in extents: the descriptors with blocks among its record's three, and among
+  its overflow records' (§1.8). A fork in more than one extent is fragmented, and so is a file with such a fork; the
+  most extents of one fork is given too.
+- The bitmap's first `drNmAlBlks` bits give the runs of free blocks and the longest.
+
+The volume is opened as the writer opens it (§5.5); HFS Plus, a wrapper, and a volume the writer refuses give none. The
+CLI's `stat` shows it for a volume, and the app's Volume card with the block size, size, free space and counts.
+
 ## 6. Diagnostics
 
 "Not traced" means the Mac's behaviour in that case has not been followed in its code. The HFS wrapper's

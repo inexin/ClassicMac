@@ -180,6 +180,26 @@ public sealed class DetailsTests : IDisposable
         Assert.Equal("—", DetailsViewModel.DisplayDate(null, utc: true));
     }
 
+    // The Volume card's space: block size, size and free space, the counts, and an HFS volume's fragmentation.
+    [Fact]
+    public void A_volume_card_shows_its_blocks_space_and_fragmentation()
+    {
+        var volume = new VolumeInfo("HFS", new MacDate(3_000_000_000), null, null)
+        {
+            BlockSize = 2048, TotalBlocks = 1000, FreeBlocks = 250, Files = 42, Folders = 7,
+        };
+        var fragmentation = new VolumeFragmentation(42, 3, 4, 9, 5, 120);
+
+        var group = DetailsViewModel.VolumeGroup(volume, fragmentation);
+
+        Assert.Equal("2,048 bytes", Value(group, "Block size"));
+        Assert.Equal("2,048,000 bytes in 1,000 blocks", Value(group, "Size"));
+        Assert.Equal("512,000 bytes in 250 blocks", Value(group, "Free"));
+        Assert.Equal("42 / 7", Value(group, "Files / folders"));
+        Assert.Equal("3 of 42 (at most 9 extents)", Value(group, "Fragmented files"));
+        Assert.Equal("5 runs, the largest 120 blocks", Value(group, "Free space"));
+    }
+
     [Theory]
     [InlineData("HFS", "Created|Modified|Backed up", "Mac local time, as stored. No time zone.")]
     [InlineData("MFS", "Created|Backed up", "Mac local time, as stored. No time zone.")]

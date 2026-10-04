@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files;
+using ClassicMac.Files.Hfs;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Compression;
 
@@ -177,9 +178,9 @@ public sealed class DetailsViewModel
             groups.Add(Dates(input.Root.File, DateNote(input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "")));
         }
 
-        if (VolumeOf(input.Root) is { } volume)
+        if (VolumeCard(input.Root) is { } volume)
         {
-            groups.Add(VolumeGroup(volume));
+            groups.Add(volume);
         }
 
         groups.Add(new("How it was read", [], Wide: true) { Chain = Chain(input) });
@@ -258,9 +259,9 @@ public sealed class DetailsViewModel
             flags,
         ]);
         // A disk image's file: the volume in it.
-        if (node is ContainerFileNode container && VolumeOf(container.Node) is { } volume)
+        if (node is ContainerFileNode container && VolumeCard(container.Node) is { } volume)
         {
-            groups.Add(VolumeGroup(volume));
+            groups.Add(volume);
         }
 
         groups.Add(new("How it was read", [], Wide: true) { Chain = chain });
@@ -325,13 +326,15 @@ public sealed class DetailsViewModel
     }
 
     // The volume a container holds: its own, or that of the one file it holds (a disk image's disk), and so on down.
-    private static VolumeInfo? VolumeOf(ContainerNode node)
+    private static VolumeInfo? VolumeOf(ContainerNode node) => VolumeNode(node)?.Volume;
+
+    private static ContainerNode? VolumeNode(ContainerNode node)
     {
         for (var at = node; ; at = at.Children[0])
         {
-            if (at.Volume is { } volume)
+            if (at.Volume is not null)
             {
-                return volume;
+                return at;
             }
 
             if (at.Children.Count != 1)
@@ -340,6 +343,12 @@ public sealed class DetailsViewModel
             }
         }
     }
+
+    // The Volume card of the volume a container holds, with an HFS volume's fragmentation.
+    private static DetailGroup? VolumeCard(ContainerNode node) =>
+        VolumeNode(node) is { Volume: { } volume } at
+            ? VolumeGroup(volume, volume.Format == "HFS" ? HfsReader.Instance.ReadFragmentation(at.File.DataFork) : null)
+            : null;
 
     // The volume a file was read from: the nearest input or disk image above it that holds one.
     private static VolumeInfo? VolumeAbove(NodeViewModel node)
@@ -362,14 +371,39 @@ public sealed class DetailsViewModel
     }
 
     /// <summary>
-    /// The Volume card: the volume's format and dates — creation as stored (local time on every Mac volume), the
+    /// The Volume card: the volume's format, its block size, size and free space, its files and folders, an HFS
+    /// volume's fragmentation (hfs.md §5.7), and its dates — creation as stored (local time on every Mac volume), the
     /// others in local time on HFS and MFS and in UTC, shown in local time, on HFS Plus; MFS has no modification date.
     /// </summary>
-    public static DetailGroup VolumeGroup(VolumeInfo volume)
+    public static DetailGroup VolumeGroup(VolumeInfo volume, VolumeFragmentation? fragmentation = null)
     {
         ArgumentNullException.ThrowIfNull(volume);
         var utc = volume.UtcAfterCreation;
-        var rows = new List<DetailRow> { new("Format", $"{volume.Format} volume"), new("Created", DisplayDate(volume.Created, utc: false), Mono: true) };
+        var rows = new List<DetailRow> { new("Format", $"{volume.Format} volume") };
+        if (volume.BlockSize > 0)
+        {
+            static string N(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
+            rows.Add(new("Block size", $"{N(volume.BlockSize)} bytes", Mono: true));
+            rows.Add(new("Size", $"{N(volume.TotalBytes)} bytes in {N(volume.TotalBlocks)} blocks", Mono: true));
+            rows.Add(new("Free", $"{N(volume.FreeBytes)} bytes in {N(volume.FreeBlocks)} blocks", Mono: true));
+        }
+
+        if (volume.Files is { } files)
+        {
+            rows.Add(volume.Folders is { } folders
+                ? new("Files / folders", string.Create(CultureInfo.InvariantCulture, $"{files:N0} / {folders:N0}"), Mono: true)
+                : new("Files", files.ToString("N0", CultureInfo.InvariantCulture), Mono: true));
+        }
+
+        if (fragmentation is { } pieces)
+        {
+            rows.Add(new("Fragmented files", string.Create(CultureInfo.InvariantCulture,
+                $"{pieces.FragmentedFiles:N0} of {pieces.Files:N0}{(pieces.FragmentedFiles > 0 ? $" (at most {pieces.MostExtents:N0} extents)" : "")}"), Mono: true));
+            rows.Add(new("Free space", string.Create(CultureInfo.InvariantCulture,
+                $"{pieces.FreeRuns:N0} {(pieces.FreeRuns == 1 ? "run" : "runs")}, the largest {pieces.LargestFreeRun:N0} blocks"), Mono: true));
+        }
+
+        rows.Add(new("Created", DisplayDate(volume.Created, utc: false), Mono: true));
         if (volume.Format != "MFS")
         {
             rows.Add(new("Modified", DisplayDate(volume.Modified, utc), Mono: true));

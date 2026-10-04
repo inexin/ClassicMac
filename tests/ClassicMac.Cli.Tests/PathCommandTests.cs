@@ -85,6 +85,7 @@ public sealed class PathCommandTests : IDisposable
         Assert.Matches(@"\nSize: [\d,]+ bytes \([\d.]+ [KMG]iB\) in [\d,]+ blocks of [\d,]+ bytes\n", output);
         Assert.Matches(@"\nFree: [\d,]+ bytes \([\d.]+ [KMG]iB\), [\d,]+ blocks\n", output);
         Assert.Matches(@"\nFiles / folders: \d+ / \d+\n", output);
+        Assert.Matches(@"\nFragmentation: \d+ of \d+ files in more than one extent; free space in [\d,]+ runs?, the largest [\d,]+ blocks\n", output);
         Assert.DoesNotContain("Volume locked", output);
         Assert.Contains("Volume: HFS \"Inner\"\n", Run("stat", P("Inner.img")).Output);              // a volume inside the volume
 
@@ -96,6 +97,13 @@ public sealed class PathCommandTests : IDisposable
         Assert.Equal(volume.GetProperty("freeBlocks").GetInt64() * blockSize, volume.GetProperty("freeBytes").GetInt64());
         Assert.True(volume.GetProperty("files").GetInt64() > 0);
         Assert.True(volume.GetProperty("folders").GetInt64() > 0);
+        var fragmentation = volume.GetProperty("fragmentation");
+        Assert.Equal(volume.GetProperty("files").GetInt64(), fragmentation.GetProperty("files").GetInt64());
+        Assert.True(fragmentation.GetProperty("largestFreeRun").GetInt64() <= volume.GetProperty("freeBlocks").GetInt64());
+        foreach (var name in new[] { "fragmentedFiles", "fragmentedForks", "mostExtents", "freeRuns" })
+        {
+            Assert.True(fragmentation.TryGetProperty(name, out _), name);
+        }
         Assert.Equal((false, false), (volume.GetProperty("softwareLocked").GetBoolean(), volume.GetProperty("hardwareLocked").GetBoolean()));
         Assert.False(Json(Run("stat", P("Inner.img:Deep:Note"), "--json").Output).TryGetProperty("volume", out _));
     }

@@ -160,6 +160,18 @@ internal static class MacPathJson
                 w.WriteNumber("folders", folders);
             }
 
+            if (info.Fragmentation is { } pieces)
+            {
+                w.WriteStartObject("fragmentation");
+                w.WriteNumber("files", pieces.Files);
+                w.WriteNumber("fragmentedFiles", pieces.FragmentedFiles);
+                w.WriteNumber("fragmentedForks", pieces.FragmentedForks);
+                w.WriteNumber("mostExtents", pieces.MostExtents);
+                w.WriteNumber("freeRuns", pieces.FreeRuns);
+                w.WriteNumber("largestFreeRun", pieces.LargestFreeRun);
+                w.WriteEndObject();
+            }
+
             Optional(w, "created", volume.Created?.ToDateTime().ToString("s", CultureInfo.InvariantCulture));
             Optional(w, "modified", volume.Modified?.ToDateTime().ToString("s", CultureInfo.InvariantCulture));
             Optional(w, "backedUp", volume.BackedUp?.ToDateTime().ToString("s", CultureInfo.InvariantCulture));
