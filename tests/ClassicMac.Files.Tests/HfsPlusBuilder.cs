@@ -114,6 +114,34 @@ internal sealed class HfsPlusBuilder
         return image;
     }
 
+    /// <summary>
+    /// The volume in an HFS wrapper (TN1150): the wrapper's MDB, with 512-byte blocks from sector 2 and its bitmap at
+    /// sector 3, names the embedded volume as its blocks 4 onward; its alternate MDB follows the volume.
+    /// </summary>
+    public byte[] BuildWrapped(string volumeName)
+    {
+        var embedded = Build(volumeName);
+        const int EmbeddedOffset = 6 * 512;
+        var wrapper = new byte[EmbeddedOffset + embedded.Length + 1024];
+        embedded.CopyTo(wrapper, EmbeddedOffset);
+        var mdb = new BigEndianWriter(wrapper);
+        mdb.WriteUInt16At(1024, (ushort)0x4244);
+        mdb.WriteUInt16At(1024 + 0x0E, (ushort)3);
+        mdb.WriteUInt16At(1024 + 0x12, wrapper.Length / 512 - 4);
+        mdb.WriteUInt32At(1024 + 0x14, 512u);
+        mdb.WriteUInt16At(1024 + 0x1C, (ushort)2);
+        mdb.WriteUInt16At(1024 + 0x7C, (ushort)0x482B);
+        mdb.WriteUInt16At(1024 + 0x7E, (ushort)4);
+        mdb.WriteUInt16At(1024 + 0x80, embedded.Length / 512);
+        for (int block = 4; block < 4 + embedded.Length / 512; block++)
+        {
+            wrapper[3 * 512 + block / 8] |= (byte)(0x80 >> (block % 8));
+        }
+
+        wrapper.AsSpan(1024, 512).CopyTo(wrapper.AsSpan(wrapper.Length - 1024));
+        return wrapper;
+    }
+
     private byte[] Header(uint totalBlocks, uint freeBlocks, uint extentsStart, uint catalogStart)
     {
         var header = new byte[512];

@@ -16,7 +16,7 @@ public class FirstAidPlusRepairTests
         Assert.Equal(FirstAidVerdict.NeedsRepair, result.Before.Verdict);
         Assert.True(result.After.Verdict == FirstAidVerdict.AppearsOk, string.Join("; ", result.After.Problems));
         var context = new ContainerContext();
-        HfsPlusReader.Read(ForkData.FromBytes(result.Volume!), context);
+        HfsReader.Instance.Read(ForkData.FromBytes(result.Volume!), context);
         Assert.True(context.Diagnostics.Count == 0, string.Join("; ", context.Diagnostics.Select(d => d.Message)));
         return result.Volume!;
     }
@@ -161,6 +161,28 @@ public class FirstAidPlusRepairTests
         var repaired = Repaired(image);
 
         Assert.Equal(1u, U32(repaired, Record(repaired, Docs, "Letter") + 168 + 12));
+    }
+
+    // A volume in its HFS wrapper: checked and repaired inside the embedded extent; the wrapper is left as it was.
+    [Fact]
+    public void A_wrapped_volume_is_checked_and_repaired_in_place()
+    {
+        var builder = new HfsPlusBuilder();
+        uint docs = builder.Folder(HfsPlusBuilder.Root, "Docs");
+        builder.File(docs, "Letter", "dear sir"u8.ToArray(), []);
+        var image = builder.BuildWrapped("Wrapped");
+        Assert.Equal(FirstAidVerdict.AppearsOk, Verify(image).Verdict);
+        Assert.Equal("Wrapped", Verify(image).VolumeName);
+        const int Embedded = 6 * 512;
+        var plain = image.AsSpan(Embedded, image.Length - Embedded - 1024).ToArray();
+        int folder = Record(plain, HfsPlusBuilder.Root, "Docs");
+        Put32(image, Embedded + folder + 4, 7);                                    // the valence, inside the wrapper
+
+        var repaired = Repaired(image);
+
+        Assert.Equal(image.AsSpan(0, Embedded).ToArray(), repaired.AsSpan(0, Embedded).ToArray());
+        var inner = repaired.AsSpan(Embedded, image.Length - Embedded - 1024).ToArray();
+        Assert.Equal(1u, U32(inner, Record(inner, HfsPlusBuilder.Root, "Docs") + 4));
     }
 
     [Fact]
