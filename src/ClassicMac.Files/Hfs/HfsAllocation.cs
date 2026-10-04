@@ -37,7 +37,7 @@ internal static class HfsAllocation
             }
 
             var data = new BigEndianReader(record.Data);
-            uint id = U32(data, 20);
+            uint id = data.ReadUInt32At(20);
             foreach (var (kind, offset) in new[] { ((byte)0, 74), ((byte)0xFF, 86) })
             {
                 if (ReferenceEquals(record, target) && id == targetFileId && offset == targetForkOffset)
@@ -133,7 +133,7 @@ internal static class HfsAllocation
         var result = new List<(ushort, ushort)>();
         for (int i = 0; i < 3; i++)
         {
-            ushort start = U16(bytes, offset + i * 4), count = U16(bytes, offset + i * 4 + 2);
+            ushort start = bytes.ReadUInt16At(offset + i * 4), count = bytes.ReadUInt16At(offset + i * 4 + 2);
             if (count != 0)
             {
                 result.Add((start, count));
@@ -148,7 +148,7 @@ internal static class HfsAllocation
         bool emptySeen = false;
         for (int slot = 0; slot < 3; slot++)
         {
-            ushort start = U16(record, slot * 4), count = U16(record, slot * 4 + 2);
+            ushort start = record.ReadUInt16At(slot * 4), count = record.ReadUInt16At(slot * 4 + 2);
             if (count == 0)
             {
                 if (start != 0)

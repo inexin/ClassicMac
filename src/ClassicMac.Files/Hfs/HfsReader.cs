@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -331,12 +332,12 @@ public sealed class HfsReader : IContainerReader, IVolumeReader
                     continue;
                 }
 
-                var parent = new BigEndianReader(key).ReadUInt32At(2);
+                var parent = KeyId(key);
                 var name = new MacString(key.AsSpan(7, Math.Min(key[6], key.Length - 7)));
                 switch (data[0])
                 {
                     case 1 when data.Length >= 70: // folder
-                        uint folderId = new BigEndianReader(data).ReadUInt32At(6);
+                        uint folderId = FolderId(data);
                         if (folderId < 16 && folderId != RootFolderId)
                         {
                             context.Report(DiagnosticSeverity.Warning, "hfs.reserved-id",
@@ -355,7 +356,7 @@ public sealed class HfsReader : IContainerReader, IVolumeReader
                         }
                         break;
                     case 2 when data.Length >= 102: // file
-                        uint fileId = new BigEndianReader(data).ReadUInt32At(20);
+                        uint fileId = FileId(data);
                         if (fileId < 16)
                         {
                             context.Report(DiagnosticSeverity.Warning, "hfs.reserved-id",

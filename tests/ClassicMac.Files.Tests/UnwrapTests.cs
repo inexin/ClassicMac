@@ -280,6 +280,31 @@ public class UnwrapTests
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => throw new OverflowException();
     }
 
+    // A reader that finds its data shorter than its structures say (a truncated image).
+    private sealed class Truncated : IContainerReader
+    {
+        public string FormatName => "truncated";
+
+        public bool CanRead(ForkData input) => input.Length == 1;
+
+        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => throw new EndOfStreamException("The data ends early.");
+    }
+
+    // Data shorter than its structures is damage, as InvalidDataException is: container.unreadable, the file kept.
+    [Fact]
+    public void A_reader_finding_its_data_short_is_reported_as_unreadable()
+    {
+        var diagnostics = new List<Diagnostic>();
+        var root = new ContainerUnwrapper([new Truncated()]).Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("in"), DataFork = ForkData.FromBytes(new byte[] { 1 }) }, "host file",
+            new ContainerContext(null, diagnostics));
+
+        Assert.Empty(root.Children);
+        var unreadable = Assert.Single(diagnostics);
+        Assert.Equal(("container.unreadable", DiagnosticSeverity.Error), (unreadable.Code, unreadable.Severity));
+        Assert.Contains("The data ends early.", unreadable.Message);
+    }
+
     // A reader failing on damaged data with an arithmetic or index exception (a ClassicMac bug) does not end the
     // unwrap: the file becomes a leaf and container.reader-fault says what happened.
     [Fact]

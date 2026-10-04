@@ -8,6 +8,7 @@ using static ClassicMac.Files.Hfs.HfsCatalogEditing;
 using static ClassicMac.Files.Hfs.HfsCatalogKeys;
 using static ClassicMac.Files.Hfs.HfsBTreeWriting;
 using static ClassicMac.Files.Hfs.HfsAllocation;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -62,8 +63,8 @@ internal static class HfsForkWriting
         uint adjacentGrowth = 0;
         if (lastSlot >= 0)
         {
-            ushort lastStart = U16(terminalReader, lastSlot * 4);
-            ushort lastCount = U16(terminalReader, lastSlot * 4 + 2);
+            ushort lastStart = terminalReader.ReadUInt16At(lastSlot * 4);
+            ushort lastCount = terminalReader.ReadUInt16At(lastSlot * 4 + 2);
             uint adjacent = (uint)lastStart + lastCount;
             while (adjacentGrowth < remaining && adjacentGrowth < ushort.MaxValue - lastCount &&
                 adjacent + adjacentGrowth < context.BlockCount &&
@@ -178,9 +179,6 @@ internal static class HfsForkWriting
             throw new InvalidDataException("The extents-overflow B-tree cannot grow beyond its addressable node count.");
         }
 
-        uint oldNodeCount = (uint)(context.ExtentsTree.Length / NodeSize);
-        uint addedNodes = context.AllocationBlockSize / NodeSize;
-        uint newNodeCount = oldNodeCount + addedNodes;
         var runs = AllocateRuns(context.Bitmap, checked((ushort)context.BlockCount), 1, 1);
         ushort newBlock = runs[0].Start;
         var extents = context.ExtentsTreeExtents;
@@ -199,12 +197,7 @@ internal static class HfsForkWriting
             extents.Add((newBlock, 1));
         }
         SetBitmap(context.Bitmap, newBlock, allocated: true);
-        byte[] grown = new byte[checked(context.ExtentsTree.Length + (int)context.AllocationBlockSize)];
-        context.ExtentsTree.CopyTo(grown, 0);
-        uint newMapNodes = ExtendBTreeNodeMap(grown, oldNodeCount, newNodeCount);
-        var header = new BigEndianWriter(grown);
-        header.WriteUInt32At(14 + 22, newNodeCount);
-        header.WriteUInt32At(14 + 26, checked(U32(new BigEndianReader(grown), 14 + 26) + addedNodes - newMapNodes));
+        var grown = GrowBTree(context.ExtentsTree, checked(context.ExtentsTree.Length + (long)context.AllocationBlockSize));
         context.ExtentsTree = grown;
         context.AllocatedTreeBlocks++;
         ValidateExtentsTree(grown);
@@ -221,8 +214,8 @@ internal static class HfsForkWriting
             int lastSlot = LastExtentSlot(overflowData);
             while (lastSlot >= 0 && excess > 0)
             {
-                ushort start = U16(overflowData, lastSlot * 4);
-                ushort count = U16(overflowData, lastSlot * 4 + 2);
+                ushort start = overflowData.ReadUInt16At(lastSlot * 4);
+                ushort count = overflowData.ReadUInt16At(lastSlot * 4 + 2);
                 uint giveBack = (uint)Math.Min(excess, (ulong)count);
                 for (uint block = (uint)start + count - giveBack; block < (uint)start + count; block++)
                 {
@@ -260,8 +253,8 @@ internal static class HfsForkWriting
         int primarySlot = LastExtentSlot(primaryReader);
         while (primarySlot >= 0 && excess > 0)
         {
-            ushort start = U16(primaryReader, primarySlot * 4);
-            ushort count = U16(primaryReader, primarySlot * 4 + 2);
+            ushort start = primaryReader.ReadUInt16At(primarySlot * 4);
+            ushort count = primaryReader.ReadUInt16At(primarySlot * 4 + 2);
             uint giveBack = (uint)Math.Min(excess, (ulong)count);
             for (uint block = (uint)start + count - giveBack; block < (uint)start + count; block++)
             {
@@ -305,12 +298,12 @@ internal static class HfsForkWriting
         result.Read(MdbOffset, resultMdb);
         var sourceReader = new BigEndianReader(sourceMdb);
         var resultReader = new BigEndianReader(resultMdb);
-        uint previousWriteCount = U32(sourceReader, 0x46);
-        ushort previousFreeBlocks = U16(sourceReader, 0x22);
+        uint previousWriteCount = sourceReader.ReadUInt32At(0x46);
+        ushort previousFreeBlocks = sourceReader.ReadUInt16At(0x22);
         ushort expectedFreeBlocks = checked((ushort)((uint)previousFreeBlocks - newlyAllocatedBlocks + releasedBlocks));
-        if (U32(resultReader, 0x06) != macWriteTime ||
-            U32(resultReader, 0x46) != unchecked(previousWriteCount + 1) ||
-            U16(resultReader, 0x22) != expectedFreeBlocks)
+        if (resultReader.ReadUInt32At(0x06) != macWriteTime ||
+            resultReader.ReadUInt32At(0x46) != unchecked(previousWriteCount + 1) ||
+            resultReader.ReadUInt16At(0x22) != expectedFreeBlocks)
         {
             throw new InvalidDataException("The rewritten HFS volume metadata did not record its modification and allocation changes.");
         }
@@ -334,7 +327,7 @@ internal static class HfsForkWriting
             }
         }
 
-        if (U32(now, 0x30) != macWriteTime || U32(now, lengths) != expected.Length)
+        if (now.ReadUInt32At(0x30) != macWriteTime || now.ReadUInt32At(lengths) != expected.Length)
         {
             throw new InvalidDataException($"The rewritten HFS volume changed metadata incorrectly for '{targetPath}'.");
         }
@@ -356,15 +349,15 @@ internal static class HfsForkWriting
     {
         var (length, extentRecord, forkType) = fork == HfsFork.Data ? (0x1A, 0x4A, (byte)0x00) : (0x24, 0x56, (byte)0xFF);
         var reader = new BigEndianReader(record);
-        uint fileId = U32(reader, 0x14);
+        uint fileId = reader.ReadUInt32At(0x14);
         var overflow = new Dictionary<(byte Fork, uint File), List<(ushort Start, byte[] Extents)>>
         {
             [(forkType, fileId)] = [.. overflowRecords
-                .Where(r => r.Key.Length >= 8 && r.Data.Length >= 12 && r.Key[1] == forkType && U32(new BigEndianReader(r.Key), 2) == fileId)
-                .Select(r => (U16(new BigEndianReader(r.Key), 6), r.Data.AsSpan(0, 12).ToArray()))],
+                .Where(r => r.Key.Length >= 8 && r.Data.Length >= 12 && r.Key[1] == forkType && KeyId(r.Key) == fileId)
+                .Select(r => (ExtentsStart(r.Key), r.Data.AsSpan(0, 12).ToArray()))],
         };
         return ReadFork(image, geometry.FirstBlock, geometry.BlockSize, geometry.BlockCount,
-            ParseExtents(new BigEndianReader(record.AsMemory(extentRecord, 12))), U32(reader, length), overflow, forkType, fileId, includeOverflow: true);
+            ParseExtents(new BigEndianReader(record.AsMemory(extentRecord, 12))), reader.ReadUInt32At(length), overflow, forkType, fileId, includeOverflow: true);
     }
 
     internal static bool SameMetadata(MacFile left, MacFile right, bool includeModified) =>

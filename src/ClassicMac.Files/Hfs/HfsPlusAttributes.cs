@@ -26,8 +26,8 @@ internal static class HfsPlusAttributes
         }
 
         var dataReader = new BigEndianReader(data);
-        attributeFileIds.Add(U32(key, 4));
-        uint recordType = U32(dataReader, 0);
+        attributeFileIds.Add(key.ReadUInt32At(4));
+        uint recordType = dataReader.ReadUInt32At(0);
         if (recordType == 0x10)
         {
             const int inlineAttributeHeaderSize = 16;
@@ -36,21 +36,21 @@ internal static class HfsPlusAttributes
                 throw new InvalidDataException("An HFS Plus inline attribute record is truncated.");
             }
 
-            ulong declaredLength = (ulong)inlineAttributeHeaderSize + U32(dataReader, 12);
+            ulong declaredLength = (ulong)inlineAttributeHeaderSize + dataReader.ReadUInt32At(12);
             ulong alignedLength = (declaredLength + 1) & ~1UL;
             if (alignedLength != (ulong)data.Length)
             {
                 throw new InvalidDataException(
                     $"An HFS Plus inline attribute has an invalid length ({data.Length} bytes for " +
-                    $"{U32(dataReader, 12)} data bytes).");
+                    $"{dataReader.ReadUInt32At(12)} data bytes).");
             }
 
             byte[] firstLinkName = Encoding.BigEndianUnicode.GetBytes("com.apple.system.hfs.firstlink");
-            int attributeNameLength = U16(key, 12);
-            if (U32(key, 8) == 0 && key.Source.Span.Slice(14, attributeNameLength * 2).SequenceEqual(firstLinkName))
+            int attributeNameLength = key.ReadUInt16At(12);
+            if (key.ReadUInt32At(8) == 0 && key.Source.Span.Slice(14, attributeNameLength * 2).SequenceEqual(firstLinkName))
             {
-                directoryFirstLinkIds[U32(key, 4)] = data.AsSpan(inlineAttributeHeaderSize,
-                    checked((int)U32(dataReader, 12))).ToArray();
+                directoryFirstLinkIds[key.ReadUInt32At(4)] = data.AsSpan(inlineAttributeHeaderSize,
+                    checked((int)dataReader.ReadUInt32At(12))).ToArray();
             }
 
             return;
@@ -60,7 +60,7 @@ internal static class HfsPlusAttributes
             return;
         }
 
-        var identity = (FileId: U32(key, 4), Name: Convert.ToHexString(key.Source.Span.Slice(14, U16(key, 12) * 2)));
+        var identity = (FileId: key.ReadUInt32At(4), Name: Convert.ToHexString(key.Source.Span.Slice(14, key.ReadUInt16At(12) * 2)));
         if (!attributeForks.TryGetValue(identity, out AttributeForkState? state))
         {
             attributeForks.Add(identity, state = new AttributeForkState());
@@ -74,7 +74,7 @@ internal static class HfsPlusAttributes
                     throw new InvalidDataException("An HFS Plus fork-data attribute has an invalid length.");
                 }
 
-                if (U32(key, 8) != 0 || state.HasForkData)
+                if (key.ReadUInt32At(8) != 0 || state.HasForkData)
                 {
                     throw new InvalidDataException("An HFS Plus attribute fork-data record has an invalid key.");
                 }
@@ -82,8 +82,8 @@ internal static class HfsPlusAttributes
                 ReadOnlyMemory<byte> fork = data.AsMemory(8, 80);
                 var forkReader = new BigEndianReader(fork);
                 state.HasForkData = true;
-                state.LogicalSize = U64(forkReader, 0);
-                state.TotalBlocks = U32(forkReader, 12);
+                state.LogicalSize = forkReader.ReadUInt64At(0);
+                state.TotalBlocks = forkReader.ReadUInt32At(12);
                 ExtentRecordInfo initialRecord = AddExtentRecord(fork[16..], totalBlocks, allocationExtents,
                     "An HFS Plus fork-data attribute lies outside the allocation area.", ordinaryForkExtents);
                 state.InitialBlocks = initialRecord.BlockCount;
@@ -102,7 +102,7 @@ internal static class HfsPlusAttributes
 
                 ExtentRecordInfo extension = AddExtentRecord(data.AsMemory(8, 64), totalBlocks, allocationExtents,
                     "An HFS Plus attribute extension extent lies outside the allocation area.", ordinaryForkExtents);
-                state.Extensions.Add((U32(key, 8), extension));
+                state.Extensions.Add((key.ReadUInt32At(8), extension));
                 return;
         }
     }
@@ -118,10 +118,10 @@ internal static class HfsPlusAttributes
         const int accessControlEntrySize = 24;
 
         var recordReader = new BigEndianReader(record);
-        bool invalid = record.Length < inlineHeaderSize || U32(recordReader, 0) != inlineDataRecord;
+        bool invalid = record.Length < inlineHeaderSize || recordReader.ReadUInt32At(0) != inlineDataRecord;
         if (!invalid)
         {
-            uint valueLength = U32(recordReader, 12);
+            uint valueLength = recordReader.ReadUInt32At(12);
             if (valueLength > int.MaxValue || inlineHeaderSize + (ulong)valueLength > (ulong)record.Length)
             {
                 invalid = true;
@@ -130,10 +130,10 @@ internal static class HfsPlusAttributes
             {
                 ReadOnlyMemory<byte> value = record.Slice(inlineHeaderSize, (int)valueLength);
                 var valueReader = new BigEndianReader(value);
-                invalid = value.Length < fileSecurityHeaderSize || U32(valueReader, 0) != fileSecurityMagic;
+                invalid = value.Length < fileSecurityHeaderSize || valueReader.ReadUInt32At(0) != fileSecurityMagic;
                 if (!invalid)
                 {
-                    uint entryCount = U32(valueReader, 36);
+                    uint entryCount = valueReader.ReadUInt32At(36);
                     ulong expectedLength = entryCount == noAclEntryCount
                         ? fileSecurityHeaderSize
                         : entryCount <= maximumAclEntries
@@ -145,7 +145,7 @@ internal static class HfsPlusAttributes
                         for (uint index = 0; index < entryCount; index++)
                         {
                             int entryOffset = fileSecurityHeaderSize + (int)index * accessControlEntrySize;
-                            uint kind = U32(valueReader, entryOffset + 16) & 0xF;
+                            uint kind = valueReader.ReadUInt32At(entryOffset + 16) & 0xF;
                             if (kind is < 1 or > 4)
                             {
                                 invalid = true;
@@ -211,12 +211,12 @@ internal static class HfsPlusAttributes
     internal static void ValidateAttributeKey(ReadOnlyMemory<byte> key)
     {
         var reader = new BigEndianReader(key);
-        if (key.Length < 14 || U16(reader, 0) != key.Length - 2 || U16(reader, 2) != 0)
+        if (key.Length < 14 || reader.ReadUInt16At(0) != key.Length - 2 || reader.ReadUInt16At(2) != 0)
         {
             throw new InvalidDataException("The HFS Plus attributes B-tree key length or padding is invalid.");
         }
 
-        int nameLength = U16(reader, 12);
+        int nameLength = reader.ReadUInt16At(12);
         if (nameLength > 127 || key.Length != 14 + 2 * nameLength)
         {
             throw new InvalidDataException("The HFS Plus attributes B-tree key name length is invalid.");
@@ -229,14 +229,14 @@ internal static class HfsPlusAttributes
     {
         var leftReader = new BigEndianReader(left);
         var rightReader = new BigEndianReader(right);
-        int comparison = U32(leftReader, 4).CompareTo(U32(rightReader, 4));
+        int comparison = leftReader.ReadUInt32At(4).CompareTo(rightReader.ReadUInt32At(4));
         if (comparison != 0)
         {
             return comparison;
         }
 
-        int leftNameLength = U16(leftReader, 12);
-        int rightNameLength = U16(rightReader, 12);
+        int leftNameLength = leftReader.ReadUInt16At(12);
+        int rightNameLength = rightReader.ReadUInt16At(12);
         comparison = leftNameLength.CompareTo(rightNameLength);
         if (comparison != 0)
         {
@@ -245,14 +245,14 @@ internal static class HfsPlusAttributes
 
         for (int index = 0; index < leftNameLength; index++)
         {
-            comparison = U16(leftReader, 14 + index * 2).CompareTo(U16(rightReader, 14 + index * 2));
+            comparison = leftReader.ReadUInt16At(14 + index * 2).CompareTo(rightReader.ReadUInt16At(14 + index * 2));
             if (comparison != 0)
             {
                 return comparison;
             }
         }
 
-        return U32(leftReader, 8).CompareTo(U32(rightReader, 8));
+        return leftReader.ReadUInt32At(8).CompareTo(rightReader.ReadUInt32At(8));
     }
 
     internal sealed class AttributeForkState

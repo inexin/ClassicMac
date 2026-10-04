@@ -24,7 +24,7 @@ internal static class HfsPlusBTree
         }
 
         var treeReader = new BigEndianReader(tree);
-        if (U32(treeReader, 4) != 0 || tree[9] != 0 || U16(treeReader, 10) != 3)
+        if (treeReader.ReadUInt32At(4) != 0 || tree[9] != 0 || treeReader.ReadUInt16At(10) != 3)
         {
             throw new InvalidDataException($"The HFS Plus {name} B-tree header node is invalid.");
         }
@@ -42,7 +42,7 @@ internal static class HfsPlusBTree
                 throw new InvalidDataException($"The HFS Plus {name} B-tree has an invalid tree type.");
             }
         }
-        uint attributes = U32(treeReader, 14 + 38);
+        uint attributes = treeReader.ReadUInt32At(14 + 38);
         bool variableIndexKeys = (attributes & 0x00000004) != 0;
         bool hasVariableIndexKeys = name is "catalog" or "attributes";
         if ((attributes & 0x00000002) == 0 || variableIndexKeys != hasVariableIndexKeys)
@@ -63,13 +63,13 @@ internal static class HfsPlusBTree
             caseSensitiveCatalog = keyCompareType == 0xBC;
             caseFoldingCatalog = keyCompareType == 0xCF;
         }
-        int nodeSize = U16(treeReader, 32);
+        int nodeSize = treeReader.ReadUInt16At(32);
         if (nodeSize < 512 || nodeSize > 32768 || (nodeSize & (nodeSize - 1)) != 0 || tree.Length % nodeSize != 0)
         {
             throw new InvalidDataException($"The HFS Plus {name} B-tree node size is invalid.");
         }
 
-        int maxKeyLength = U16(treeReader, 34);
+        int maxKeyLength = treeReader.ReadUInt16At(34);
         int definedMaxKeyLength = name switch
         {
             "catalog" => 516,
@@ -89,17 +89,17 @@ internal static class HfsPlusBTree
             throw new InvalidDataException($"The HFS Plus {name} B-tree node size is below the 4 KiB minimum.");
         }
 
-        uint totalNodes = U32(treeReader, 36);
+        uint totalNodes = treeReader.ReadUInt32At(36);
         if (totalNodes == 0 || totalNodes != tree.Length / nodeSize)
         {
             throw new InvalidDataException($"The HFS Plus {name} B-tree node count is invalid.");
         }
 
-        uint first = U32(treeReader, 24);
-        uint last = U32(treeReader, 28);
-        ushort depth = U16(treeReader, 14);
-        uint root = U32(treeReader, 16);
-        uint expectedRecords = U32(treeReader, 20);
+        uint first = treeReader.ReadUInt32At(24);
+        uint last = treeReader.ReadUInt32At(28);
+        ushort depth = treeReader.ReadUInt16At(14);
+        uint root = treeReader.ReadUInt32At(16);
+        uint expectedRecords = treeReader.ReadUInt32At(20);
         if (expectedRecords == 0)
         {
             if (depth == 0 && root == 0 && first == 0 && last == 0)
@@ -109,7 +109,7 @@ internal static class HfsPlusBTree
             }
 
             if (depth != 1 || root == 0 || root >= totalNodes || root != first || root != last ||
-                U16(treeReader, checked((int)root * nodeSize + 10)) != 0)
+                treeReader.ReadUInt16At(checked((int)root * nodeSize + 10)) != 0)
             {
                 throw new InvalidDataException($"The empty HFS Plus {name} B-tree has invalid root or leaf fields.");
             }
@@ -190,8 +190,8 @@ internal static class HfsPlusBTree
                     var keyReader = new BigEndianReader(key);
                     ValidateCatalogKey(keyReader, isHfsX);
                     ReadOnlyMemory<byte> recordData = dataBytes;
-                    if (U16(keyReader, 6) == 0 && recordData.Length >= 2 &&
-                        U16(new BigEndianReader(recordData), 0) is 1 or 2)
+                    if (keyReader.ReadUInt16At(6) == 0 && recordData.Length >= 2 &&
+                        new BigEndianReader(recordData).ReadUInt16At(0) is 1 or 2)
                     {
                         throw new InvalidDataException("An HFS Plus file or folder catalog key has an empty name.");
                     }
@@ -267,10 +267,10 @@ internal static class HfsPlusBTree
     internal static void ValidateHeaderNodeRecordLayout(BigEndianReader headerNode, int nodeSize, string name)
     {
         int freeSpaceOffset = nodeSize - 8;
-        if (U16(headerNode, nodeSize - 2) != 14 ||
-            U16(headerNode, nodeSize - 4) != 14 + 106 ||
-            U16(headerNode, nodeSize - 6) != 14 + 106 + 128 ||
-            U16(headerNode, freeSpaceOffset) != freeSpaceOffset)
+        if (headerNode.ReadUInt16At(nodeSize - 2) != 14 ||
+            headerNode.ReadUInt16At(nodeSize - 4) != 14 + 106 ||
+            headerNode.ReadUInt16At(nodeSize - 6) != 14 + 106 + 128 ||
+            headerNode.ReadUInt16At(freeSpaceOffset) != freeSpaceOffset)
         {
             throw new InvalidDataException($"The HFS Plus {name} B-tree header node has an invalid record layout.");
         }
@@ -279,7 +279,7 @@ internal static class HfsPlusBTree
     internal static void RequireFirstRecordStartsAtNodeDescriptorEnd(BigEndianReader tree, int nodeStart,
         int nodeSize, string name)
     {
-        if (U16(tree, nodeStart + 10) != 0 && U16(tree, nodeStart + nodeSize - 2) != 14)
+        if (tree.ReadUInt16At(nodeStart + 10) != 0 && tree.ReadUInt16At(nodeStart + nodeSize - 2) != 14)
         {
             throw new InvalidDataException($"An HFS Plus {name} B-tree record does not start after its node descriptor.");
         }
@@ -337,7 +337,7 @@ internal static class HfsPlusBTree
             }
 
             AddAtHeight(nodeNumber, expectedHeight);
-            int count = U16(treeReader, start + 10);
+            int count = treeReader.ReadUInt16At(start + 10);
             if (count < 2 || count > (nodeSize - 14) / 2)
             {
                 throw new InvalidDataException($"An HFS Plus {name} B-tree index node has an invalid record count.");
@@ -349,7 +349,7 @@ internal static class HfsPlusBTree
             for (int index = 0; index < count; index++)
             {
                 var (begin, end) = RecordBounds(file, nodeNumber, index, $"An HFS Plus {name} B-tree index record offset is invalid.");
-                int keyLength = U16(treeReader, start + begin);
+                int keyLength = treeReader.ReadUInt16At(start + begin);
                 if (keyLength < 6 || keyLength > maxKeyLength)
                 {
                     throw new InvalidDataException($"An HFS Plus {name} B-tree index key length is invalid.");
@@ -399,7 +399,7 @@ internal static class HfsPlusBTree
                     throw new InvalidDataException($"An HFS Plus {name} B-tree index record has an invalid length.");
                 }
 
-                var childRange = Visit(U32(treeReader, start + childOffset), checked((ushort)(expectedHeight - 1)));
+                var childRange = Visit(treeReader.ReadUInt32At(start + childOffset), checked((ushort)(expectedHeight - 1)));
                 childRanges.Add((indexKey, childRange));
             }
             indexKeyRanges.Add(nodeNumber, (firstIndexKey!, previousIndexKey!));
@@ -453,7 +453,7 @@ internal static class HfsPlusBTree
                 int start = checked((int)nodes[index] * nodeSize);
                 uint expectedForward = index + 1 < nodes.Count ? nodes[index + 1] : 0;
                 uint expectedBackward = index > 0 ? nodes[index - 1] : 0;
-                if (U32(treeReader, start) != expectedForward || U32(treeReader, start + 4) != expectedBackward)
+                if (treeReader.ReadUInt32At(start) != expectedForward || treeReader.ReadUInt32At(start + 4) != expectedBackward)
                 {
                     throw new InvalidDataException(
                         $"The HFS Plus {name} B-tree height-{height} sibling links are invalid.");
@@ -501,7 +501,7 @@ internal static class HfsPlusBTree
         byte[] ReadKey(int index)
         {
             var (begin, end) = RecordBounds(file, node, index, $"An HFS Plus {name} B-tree leaf record offset is invalid.");
-            int keyLength = U16(new BigEndianReader(file.Bytes), file.Offset(node) + begin);
+            int keyLength = new BigEndianReader(file.Bytes).ReadUInt16At(file.Offset(node) + begin);
             if (keyLength < 6 || keyLength > maxKeyLength || begin + 2 + keyLength > end)
             {
                 throw new InvalidDataException($"An HFS Plus {name} B-tree leaf key length is invalid.");
@@ -566,7 +566,7 @@ internal static class HfsPlusBTree
 
             RequireFirstRecordStartsAtNodeDescriptorEnd(treeReader, offset, nodeSize, "node map");
             var descriptor = file.Node(mapNode);
-            if (descriptor.Height != 0 || descriptor.BLink != 0 || U16(treeReader, offset + nodeSize - 4) != nodeSize - 6)
+            if (descriptor.Height != 0 || descriptor.BLink != 0 || treeReader.ReadUInt16At(offset + nodeSize - 4) != nodeSize - 6)
             {
                 throw new InvalidDataException("An HFS Plus B-tree map node has an invalid descriptor or record layout.");
             }
@@ -651,7 +651,7 @@ internal static class HfsPlusBTree
                 }
             }
         }
-        if (freeNodes != U32(treeReader, 14 + 26))
+        if (freeNodes != treeReader.ReadUInt32At(14 + 26))
         {
             throw new InvalidDataException("The HFS Plus B-tree free-node count differs from its node map.");
         }
@@ -672,31 +672,31 @@ internal static class HfsPlusBTree
     {
         var leftReader = new BigEndianReader(left);
         var rightReader = new BigEndianReader(right);
-        int comparison = U32(leftReader, 4).CompareTo(U32(rightReader, 4));
+        int comparison = leftReader.ReadUInt32At(4).CompareTo(rightReader.ReadUInt32At(4));
         if (comparison != 0)
         {
             return comparison;
         }
 
         comparison = left.Span[2].CompareTo(right.Span[2]);
-        return comparison != 0 ? comparison : U32(leftReader, 8).CompareTo(U32(rightReader, 8));
+        return comparison != 0 ? comparison : leftReader.ReadUInt32At(8).CompareTo(rightReader.ReadUInt32At(8));
     }
 
     internal static int CompareHfsXCatalogKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
     {
         var leftReader = new BigEndianReader(left);
         var rightReader = new BigEndianReader(right);
-        int comparison = U32(leftReader, 2).CompareTo(U32(rightReader, 2));
+        int comparison = leftReader.ReadUInt32At(2).CompareTo(rightReader.ReadUInt32At(2));
         if (comparison != 0)
         {
             return comparison;
         }
 
-        int leftLength = U16(leftReader, 6);
-        int rightLength = U16(rightReader, 6);
+        int leftLength = leftReader.ReadUInt16At(6);
+        int rightLength = rightReader.ReadUInt16At(6);
         for (int index = 0; index < Math.Min(leftLength, rightLength); index++)
         {
-            comparison = U16(leftReader, 8 + index * 2).CompareTo(U16(rightReader, 8 + index * 2));
+            comparison = leftReader.ReadUInt16At(8 + index * 2).CompareTo(rightReader.ReadUInt16At(8 + index * 2));
             if (comparison != 0)
             {
                 return comparison;
@@ -709,19 +709,19 @@ internal static class HfsPlusBTree
     {
         var leftReader = new BigEndianReader(left);
         var rightReader = new BigEndianReader(right);
-        int comparison = U32(leftReader, 2).CompareTo(U32(rightReader, 2));
+        int comparison = leftReader.ReadUInt32At(2).CompareTo(rightReader.ReadUInt32At(2));
         if (comparison != 0)
         {
             return comparison;
         }
 
-        int leftLength = U16(leftReader, 6);
-        int rightLength = U16(rightReader, 6);
+        int leftLength = leftReader.ReadUInt16At(6);
+        int rightLength = rightReader.ReadUInt16At(6);
         if (!caseFolding)
         {
             for (int index = 0; index < Math.Min(leftLength, rightLength); index++)
             {
-                comparison = U16(leftReader, 8 + index * 2).CompareTo(U16(rightReader, 8 + index * 2));
+                comparison = leftReader.ReadUInt16At(8 + index * 2).CompareTo(rightReader.ReadUInt16At(8 + index * 2));
                 if (comparison != 0)
                 {
                     return comparison;

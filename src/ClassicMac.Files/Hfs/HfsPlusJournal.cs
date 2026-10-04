@@ -23,7 +23,7 @@ internal static class HfsPlusJournal
         const uint journalOnOtherDeviceFlag = 0x00000002;
         const uint journalNeedsInitializationFlag = 0x00000004;
         const int journalInfoBlockLength = 180;
-        uint allocationBlock = U32(volumeHeader, 12);
+        uint allocationBlock = volumeHeader.ReadUInt32At(12);
         if (allocationBlock >= totalBlocks ||
             (allocationBitmap[allocationBlock / 8] & (0x80 >> (int)(allocationBlock & 7))) == 0)
         {
@@ -34,10 +34,10 @@ internal static class HfsPlusJournal
 
         long blockOffset = checked((long)allocationBlock * blockSize);
         var journalInfo = new BigEndianReader(image.Slice(blockOffset, journalInfoBlockLength).ToArray());
-        uint flags = U32(journalInfo, 0);
+        uint flags = journalInfo.ReadUInt32At(0);
         ulong volumeBytes = (ulong)blockSize * totalBlocks;
-        ulong journalOffset = U64(journalInfo, 36);
-        ulong journalSize = U64(journalInfo, 44);
+        ulong journalOffset = journalInfo.ReadUInt64At(36);
+        ulong journalSize = journalInfo.ReadUInt64At(44);
         if ((flags & journalInVolumeFlag) == 0 || (flags & journalOnOtherDeviceFlag) != 0 ||
             journalSize == 0 || journalOffset > volumeBytes || journalSize > volumeBytes - journalOffset)
         {
@@ -120,8 +120,9 @@ internal static class HfsPlusJournal
         // The header is in the byte order of the Mac that wrote it; its endian field tells which [Doc: TN1150].
         byte[] header = image.Slice((long)journalInfo.Offset, journalHeaderLength).ToArray(journalHeaderLength);
         bool little = BinaryPrimitives.ReadUInt32LittleEndian(header) == journalHeaderMagic;
-        uint Field32(int at) => little ? BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(at)) : new BigEndianReader(header).ReadUInt32At(at);
-        ulong Field64(int at) => little ? BinaryPrimitives.ReadUInt64LittleEndian(header.AsSpan(at)) : new BigEndianReader(header).ReadUInt64At(at);
+        var reader = new BigEndianReader(header);
+        uint Field32(int at) => little ? BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(at)) : reader.ReadUInt32At(at);
+        ulong Field64(int at) => little ? BinaryPrimitives.ReadUInt64LittleEndian(header.AsSpan(at)) : reader.ReadUInt64At(at);
         uint magic = Field32(0);
         uint endian = Field32(4);
         ulong start = Field64(8);
@@ -160,14 +161,14 @@ internal static class HfsPlusJournal
 
     internal static JournalCatalogFile ReadJournalCatalogFile(BigEndianReader fork)
     {
-        ulong logicalSize = U64(fork, 0);
-        uint totalBlocks = U32(fork, 12);
-        uint extentStart = U32(fork, 16);
-        uint extentBlocks = U32(fork, 20);
+        ulong logicalSize = fork.ReadUInt64At(0);
+        uint totalBlocks = fork.ReadUInt32At(12);
+        uint extentStart = fork.ReadUInt32At(16);
+        uint extentBlocks = fork.ReadUInt32At(20);
         bool singleExtent = extentBlocks != 0 && extentBlocks == totalBlocks;
         for (int index = 1; index < 8; index++)
         {
-            if (U32(fork, 16 + index * 8) != 0 || U32(fork, 20 + index * 8) != 0)
+            if (fork.ReadUInt32At(16 + index * 8) != 0 || fork.ReadUInt32At(20 + index * 8) != 0)
             {
                 singleExtent = false;
             }

@@ -5,6 +5,7 @@ using ClassicMac.Core;
 using static ClassicMac.Files.Hfs.HfsWriter;
 using static ClassicMac.Files.Hfs.HfsCatalogEditing;
 using static ClassicMac.Files.Hfs.HfsBTreeWriting;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -24,7 +25,7 @@ internal static class HfsFragmentation
             return null;
         }
 
-        if (U16(new BigEndianReader(state.Mdb), 0x7C) == 0x482B)
+        if (new BigEndianReader(state.Mdb).ReadUInt16At(0x7C) == 0x482B)
         {
             return null;                                                                // an HFS wrapper
         }
@@ -32,7 +33,7 @@ internal static class HfsFragmentation
         var overflow = new Dictionary<(byte Fork, uint File), int>();
         foreach (var record in LeafRecords(state.ExtentsTree))
         {
-            var key = (record.Key[1], U32(new BigEndianReader(record.Key), 2));
+            var key = (record.Key[1], KeyId(record.Key));
             overflow[key] = overflow.GetValueOrDefault(key) + Extents(record.Data, 0);
         }
 
@@ -45,7 +46,7 @@ internal static class HfsFragmentation
             }
 
             files++;
-            uint id = U32(new BigEndianReader(data), 0x14);
+            uint id = FileId(data);
             bool fragmented = false;
             foreach (var (fork, offset) in new[] { ((byte)0x00, 0x4A), ((byte)0xFF, 0x56) })
             {

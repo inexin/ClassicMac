@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A container whose data is shorter than its structures say is reported as unreadable (`container.unreadable`) and kept, as damaged data is, instead of ending the read.
 - Fragmentation (hfs.md §5.7): `stat` on an HFS volume shows how many files lie in more than one extent and how the
   free space lies (JSON `fragmentation`); the app's Volume card shows the block size, size, free space, files and
   folders, and the fragmentation.

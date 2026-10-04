@@ -27,7 +27,7 @@ internal sealed class BTreeEdit
     {
         Bytes = bytes;
         this.compare = compare;
-        maxKeyLength = U16(Reader, 14 + 20);
+        maxKeyLength = Reader.ReadUInt16At(14 + 20);
         if (!new BTreeFile(bytes, NodeSize, wordKeyLength: false).TryReadMap(out map, out var problem))
         {
             throw new InvalidDataException($"The HFS B-tree node map is invalid: {problem}");
@@ -44,29 +44,29 @@ internal sealed class BTreeEdit
 
     private int Depth
     {
-        get => U16(Reader, 14);
+        get => Reader.ReadUInt16At(14);
         set => Writer.WriteUInt16At(14, value);
     }
 
     private uint Root
     {
-        get => U32(Reader, 14 + 2);
+        get => Reader.ReadUInt32At(14 + 2);
         set => Writer.WriteUInt32At(14 + 2, value);
     }
 
     private uint FreeNodes
     {
-        get => U32(Reader, 14 + 26);
+        get => Reader.ReadUInt32At(14 + 26);
         set => Writer.WriteUInt32At(14 + 26, value);
     }
 
-    private void AddLeafRecords(int delta) => Writer.WriteUInt32At(14 + 6, checked((uint)(U32(Reader, 14 + 6) + delta)));
+    private void AddLeafRecords(int delta) => Writer.WriteUInt32At(14 + 6, checked((uint)(Reader.ReadUInt32At(14 + 6) + delta)));
 
     private static int Offset(uint node) => checked((int)node * NodeSize);
 
-    private uint FLink(uint node) => U32(Reader, Offset(node));
+    private uint FLink(uint node) => Reader.ReadUInt32At(Offset(node));
 
-    private uint BLink(uint node) => U32(Reader, Offset(node) + 4);
+    private uint BLink(uint node) => Reader.ReadUInt32At(Offset(node) + 4);
 
     private void SetFLink(uint node, uint value) => Writer.WriteUInt32At(Offset(node), value);
 
@@ -76,7 +76,7 @@ internal sealed class BTreeEdit
 
     private List<(byte[] Key, byte[] Data)> Records(uint node) => ReadNodeRecords(Bytes, node);
 
-    private static uint Child(byte[] data) => U32(new BigEndianReader(data), 0);
+    private static uint Child(byte[] data) => new BigEndianReader(data).ReadUInt32At(0);
 
     // A record's bytes in a node, with its offset slot: key (padded to even) and data, + 2.
     private static int Size((byte[] Key, byte[] Data) record) => ((record.Key.Length + 1) & ~1) + record.Data.Length + 2;
@@ -356,12 +356,12 @@ internal sealed class BTreeEdit
 
         if (IsLeaf(node))
         {
-            if (U32(Reader, 14 + 10) == node)
+            if (Reader.ReadUInt32At(14 + 10) == node)
             {
                 Writer.WriteUInt32At(14 + 10, right);
             }
 
-            if (U32(Reader, 14 + 14) == node)
+            if (Reader.ReadUInt32At(14 + 14) == node)
             {
                 Writer.WriteUInt32At(14 + 14, left);
             }

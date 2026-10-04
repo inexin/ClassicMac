@@ -121,10 +121,10 @@ internal static class HfsBTreeWriting
     internal static void RebuildBTree(byte[] tree, List<(byte[] Key, byte[] Data)> records, bool validateExtents)
     {
         var treeReader = new BigEndianReader(tree);
-        uint nodeCount = U32(treeReader, 14 + 22);
+        uint nodeCount = treeReader.ReadUInt32At(14 + 22);
         // Index keys are written at the tree's maximum key length, zero-padded, as Mac OS writes them: HFS B-trees do
         // not set kBTVariableIndexKeysMask [Code: Mac OS 9.0 ROM; Verified: Mac OS 9's catalog] (hfs.md §1.8).
-        int maxKeyLength = U16(treeReader, 14 + 20);
+        int maxKeyLength = treeReader.ReadUInt16At(14 + 20);
         byte[] IndexKey(byte[] key)
         {
             if (key.Length == 0 || key[0] >= maxKeyLength)
@@ -279,6 +279,21 @@ internal static class HfsBTreeWriting
         }
 
         rebuilt.CopyTo(tree, 0);
+    }
+
+    // A tree file grown to length bytes: the new nodes free, the node map extended over them (map nodes added where it
+    // cannot cover them), and the header's node counts.
+    internal static byte[] GrowBTree(byte[] tree, long length)
+    {
+        uint oldNodes = checked((uint)(tree.Length / NodeSize)), newNodes = checked((uint)(length / NodeSize));
+        var grown = new byte[length];
+        tree.CopyTo(grown, 0);
+        uint mapNodes = ExtendBTreeNodeMap(grown, oldNodes, newNodes);
+        var header = new BigEndianReader(grown);
+        var writer = new BigEndianWriter(grown);
+        writer.WriteUInt32At(14 + 22, newNodes);                                        // bthNNodes
+        writer.WriteUInt32At(14 + 26, checked(header.ReadUInt32At(14 + 26) + (newNodes - oldNodes) - mapNodes));   // bthFree
+        return grown;
     }
 
     // The node map of a tree file grown from oldNodeCount to newNodeCount nodes: map nodes added where the map cannot
@@ -444,20 +459,20 @@ internal static class HfsBTreeWriting
         int CompareKeys(byte[] left, byte[] right) => catalog
             ? CompareCatalogKeys(left, right) : CompareExtentsKeys(left, right);
         var treeReader = new BigEndianReader(tree);
-        if (tree.Length < NodeSize || tree.Length % NodeSize != 0 || tree[8] != 1 || U16(treeReader, 10) != 3)
+        if (tree.Length < NodeSize || tree.Length % NodeSize != 0 || tree[8] != 1 || treeReader.ReadUInt16At(10) != 3)
         {
             throw new InvalidDataException($"The HFS {treeKind} B-tree has an invalid header node or length.");
         }
 
-        uint nodeCount = U32(treeReader, 14 + 22);
-        if (nodeCount != (uint)(tree.Length / NodeSize) || U16(treeReader, 14 + 18) != NodeSize)
+        uint nodeCount = treeReader.ReadUInt32At(14 + 22);
+        if (nodeCount != (uint)(tree.Length / NodeSize) || treeReader.ReadUInt16At(14 + 18) != NodeSize)
         {
             throw new InvalidDataException($"The HFS {treeKind} B-tree header disagrees with its node file.");
         }
 
-        int mapStart = U16(treeReader, NodeSize - 6);
-        int mapEnd = U16(treeReader, NodeSize - 8);
-        if (U16(treeReader, NodeSize - 2) != 14 || U16(treeReader, NodeSize - 4) != 14 + 106 ||
+        int mapStart = treeReader.ReadUInt16At(NodeSize - 6);
+        int mapEnd = treeReader.ReadUInt16At(NodeSize - 8);
+        if (treeReader.ReadUInt16At(NodeSize - 2) != 14 || treeReader.ReadUInt16At(NodeSize - 4) != 14 + 106 ||
             mapStart != 14 + 106 + 128 || mapEnd < mapStart || mapEnd > NodeSize - 8)
         {
             throw new InvalidDataException($"The HFS {treeKind} B-tree header records have invalid offsets.");
@@ -478,12 +493,12 @@ internal static class HfsBTreeWriting
 
         var nodesByHeight = new Dictionary<int, List<uint>>();
         uint leafRecordCount = 0;
-        ushort depth = U16(treeReader, 14);
-        uint root = U32(treeReader, 14 + 2);
+        ushort depth = treeReader.ReadUInt16At(14);
+        uint root = treeReader.ReadUInt32At(14 + 2);
         if (depth == 0)
         {
-            if (root != 0 || U32(treeReader, 14 + 6) != 0 || U32(treeReader, 14 + 10) != 0 ||
-                U32(treeReader, 14 + 14) != 0)
+            if (root != 0 || treeReader.ReadUInt32At(14 + 6) != 0 || treeReader.ReadUInt32At(14 + 10) != 0 ||
+                treeReader.ReadUInt32At(14 + 14) != 0)
             {
                 throw new InvalidDataException($"The empty HFS {treeKind} B-tree has inconsistent header fields.");
             }
@@ -497,8 +512,8 @@ internal static class HfsBTreeWriting
 
             Visit(root, depth);
             var leaves = nodesByHeight[1];
-            if (U32(treeReader, 14 + 10) != leaves[0] || U32(treeReader, 14 + 14) != leaves[^1] ||
-                U32(treeReader, 14 + 6) != leafRecordCount)
+            if (treeReader.ReadUInt32At(14 + 10) != leaves[0] || treeReader.ReadUInt32At(14 + 14) != leaves[^1] ||
+                treeReader.ReadUInt32At(14 + 6) != leafRecordCount)
             {
                 throw new InvalidDataException($"The HFS {treeKind} B-tree leaf header disagrees with its nodes.");
             }
@@ -511,7 +526,7 @@ internal static class HfsBTreeWriting
                 int offset = checked((int)nodes[i] * NodeSize);
                 uint previous = i == 0 ? 0 : nodes[i - 1];
                 uint next = i + 1 == nodes.Count ? 0 : nodes[i + 1];
-                if (U32(treeReader, offset) != next || U32(treeReader, offset + 4) != previous)
+                if (treeReader.ReadUInt32At(offset) != next || treeReader.ReadUInt32At(offset + 4) != previous)
                 {
                     throw new InvalidDataException($"The HFS {treeKind} B-tree level {height} has inconsistent sibling links.");
                 }
@@ -532,7 +547,7 @@ internal static class HfsBTreeWriting
                 actualFreeNodes++;
             }
         }
-        if (actualFreeNodes != U32(treeReader, 14 + 26))
+        if (actualFreeNodes != treeReader.ReadUInt32At(14 + 26))
         {
             throw new InvalidDataException($"The HFS {treeKind} B-tree free-node count disagrees with its map.");
         }
@@ -607,7 +622,7 @@ internal static class HfsBTreeWriting
                         throw new InvalidDataException($"An HFS {treeKind} index record has an invalid child pointer.");
                     }
 
-                    var child = Visit(U32(new BigEndianReader(data), 0), height - 1);
+                    var child = Visit(new BigEndianReader(data).ReadUInt32At(0), height - 1);
                     if (CompareKeys(key, child.First) != 0 ||
                         (last is not null && CompareKeys(last, child.First) >= 0))
                     {
@@ -631,13 +646,13 @@ internal static class HfsBTreeWriting
 
         var leftReader = new BigEndianReader(left);
         var rightReader = new BigEndianReader(right);
-        int order = U32(leftReader, 2).CompareTo(U32(rightReader, 2));
+        int order = leftReader.ReadUInt32At(2).CompareTo(rightReader.ReadUInt32At(2));
         if (order != 0)
         {
             return order;
         }
 
         order = left[1].CompareTo(right[1]);
-        return order != 0 ? order : U16(leftReader, 6).CompareTo(U16(rightReader, 6));
+        return order != 0 ? order : leftReader.ReadUInt16At(6).CompareTo(rightReader.ReadUInt16At(6));
     }
 }

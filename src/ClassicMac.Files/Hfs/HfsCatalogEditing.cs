@@ -8,6 +8,7 @@ using static ClassicMac.Files.Hfs.HfsCatalogKeys;
 using static ClassicMac.Files.Hfs.HfsBTreeWriting;
 using static ClassicMac.Files.Hfs.HfsAllocation;
 using static ClassicMac.Files.Hfs.HfsForkWriting;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -24,7 +25,7 @@ internal static class HfsCatalogEditing
             throw new InvalidDataException("The HFS folder thread is missing.");
         }
 
-        return U32(new BigEndianReader(thread.Data), 10);
+        return new BigEndianReader(thread.Data).ReadUInt32At(10);
     }
 
     // Deletes an item and, for a folder, everything below it, in one pass over the catalog (hfs.md §3): every fork's
@@ -34,7 +35,7 @@ internal static class HfsCatalogEditing
     internal static HfsVolume DeleteTree(CatalogEditState state, uint parent, string macPath, (byte[] Key, byte[] Data) item)
     {
         var before = state.Records.Select(r => (r.Key, Data: r.Data.ToArray())).ToList();
-        var children = state.Records.Where(r => r.Data[0] is 1 or 2).ToLookup(r => U32(new BigEndianReader(r.Key), 2));
+        var children = state.Records.Where(r => r.Data[0] is 1 or 2).ToLookup(r => KeyId(r.Key));
         var files = new List<(byte[] Key, byte[] Data)>();
         var folders = new List<(byte[] Key, byte[] Data)>();
         var pending = new Queue<((byte[] Key, byte[] Data) Record, string Path)>([(item, macPath)]);
@@ -53,7 +54,7 @@ internal static class HfsCatalogEditing
             }
 
             folders.Add(record);
-            foreach (var child in children[U32(new BigEndianReader(record.Data), 6)])
+            foreach (var child in children[FolderId(record.Data)])
             {
                 pending.Enqueue((child, path + ":" + DecodeName(child.Key)));
             }
@@ -66,13 +67,13 @@ internal static class HfsCatalogEditing
         foreach (var file in files)
         {
             var data = new BigEndianReader(file.Data);
-            uint id = U32(data, 20);
+            uint id = data.ReadUInt32At(20);
             fileIds.Add(id);
             foreach (var (offset, fork) in new[] { (74, (byte)0x00), (86, (byte)0xFF) })
             {
                 var extents = ParseExtents(data, offset);
-                extents.AddRange(overflow.Where(r => r.Key[1] == fork && U32(new BigEndianReader(r.Key), 2) == id)
-                    .OrderBy(r => U16(new BigEndianReader(r.Key), 6)).SelectMany(r => ParseExtents(new BigEndianReader(r.Data))));
+                extents.AddRange(overflow.Where(r => r.Key[1] == fork && KeyId(r.Key) == id)
+                    .OrderBy(r => ExtentsStart(r.Key)).SelectMany(r => ParseExtents(new BigEndianReader(r.Data))));
                 foreach (var (start, count) in extents)
                 {
                     for (var block = start; block < start + count; block++)
@@ -109,7 +110,7 @@ internal static class HfsCatalogEditing
         foreach (var folder in folders)
         {
             removed.Add(folder.Data);
-            var thread = FindCatalogRecord(state.Records, U32(new BigEndianReader(folder.Data), 6), "");
+            var thread = FindCatalogRecord(state.Records, FolderId(folder.Data), "");
             if (thread.Data is null || thread.Data[0] != 3)
             {
                 throw new InvalidDataException("The HFS folder thread is missing.");
@@ -120,7 +121,7 @@ internal static class HfsCatalogEditing
 
         var removedKeys = state.Records.Where(r => removed.Contains(r.Data)).Select(r => Convert.ToHexString(r.Key)).ToHashSet();
         state.Records.RemoveAll(r => removed.Contains(r.Data));
-        bool Removed((byte[] Key, byte[] Data) r) => r.Key[1] is 0x00 or 0xFF && fileIds.Contains(U32(new BigEndianReader(r.Key), 2));
+        bool Removed((byte[] Key, byte[] Data) r) => r.Key[1] is 0x00 or 0xFF && fileIds.Contains(KeyId(r.Key));
         var gone = overflow.Where(r => Removed((r.Key, r.Data))).ToList();
         if (gone.Count > 0)
         {
@@ -157,7 +158,7 @@ internal static class HfsCatalogEditing
         List<(byte[] Key, byte[] Data)> overflowBefore, HashSet<uint> overflowFiles, HashSet<uint> skipBlocks)
     {
         var after = OpenCatalog(result, writable: false);
-        bool Kept(byte[] key) => !overflowFiles.Contains(U32(new BigEndianReader(key), 2)) && U32(new BigEndianReader(key), 2) is not (3 or 4);
+        bool Kept(byte[] key) => !overflowFiles.Contains(KeyId(key)) && KeyId(key) is not (3 or 4);
         var overflowAfter = LeafRecords(after.ExtentsTree).Where(r => Kept(r.Key)).ToDictionary(r => Convert.ToHexString(r.Key), r => r.Data);
         var overflowKept = overflowBefore.Where(r => Kept(r.Key)).ToList();
         if (overflowKept.Count != overflowAfter.Count ||
@@ -174,7 +175,7 @@ internal static class HfsCatalogEditing
                 continue;
             }
 
-            bool isParent = data.Length >= 70 && data[0] == 1 && U32(new BigEndianReader(data), 6) == parent;
+            bool isParent = data.Length >= 70 && data[0] == 1 && FolderId(data) == parent;
             if (!records.TryGetValue(Convert.ToHexString(key), out var now) ||
                 !(isParent ? now.AsSpan(0, 4).SequenceEqual(data.AsSpan(0, 4)) && now.AsSpan(6).SequenceEqual(data.AsSpan(6)) : now.AsSpan().SequenceEqual(data)))
             {
@@ -260,12 +261,12 @@ internal static class HfsCatalogEditing
         var sector = new byte[BlockSize];
         source.Read(MdbOffset, sector.AsSpan(0, (int)Math.Min(BlockSize, source.Length - MdbOffset)));
         var mdb = new BigEndianReader(sector);
-        if (U16(mdb, 0) != 0x4244)
+        if (mdb.ReadUInt16At(0) != 0x4244)
         {
             throw new InvalidDataException("The input is not a plain HFS volume.");
         }
 
-        if (U16(mdb, 0x7C) == 0x482B)
+        if (mdb.ReadUInt16At(0x7C) == 0x482B)
         {
             throw new InvalidDataException("The HFS volume wraps an HFS Plus volume.");
         }
@@ -280,14 +281,14 @@ internal static class HfsCatalogEditing
         ArgumentNullException.ThrowIfNull(source);
         var mdbSector = PlainVolume(source);
         var mdb = new BigEndianReader(mdbSector.AsMemory(0, MdbSize));
-        if (writable && (U16(mdb, 0x0A) & 0x8000) != 0)
+        if (writable && (mdb.ReadUInt16At(0x0A) & 0x8000) != 0)
         {
             throw new InvalidDataException("The HFS volume is software-locked.");
         }
 
-        uint blockSize = U32(mdb, 0x14);
-        uint blockCount = U16(mdb, 0x12);
-        uint firstBlock = (uint)U16(mdb, 0x1C) * BlockSize;
+        uint blockSize = mdb.ReadUInt32At(0x14);
+        uint blockCount = mdb.ReadUInt16At(0x12);
+        uint firstBlock = (uint)mdb.ReadUInt16At(0x1C) * BlockSize;
         if (blockSize < BlockSize || blockSize % BlockSize != 0 ||
             firstBlock + (ulong)blockCount * blockSize > (ulong)source.Length)
         {
@@ -297,14 +298,14 @@ internal static class HfsCatalogEditing
         var overflow = new Dictionary<(byte Fork, uint File), List<(ushort Start, byte[] Extents)>>();
         var extentsTreeExtents = ParseExtents(mdb, 0x86);
         byte[] extentsTree = ReadFork(source, firstBlock, blockSize, blockCount, extentsTreeExtents,
-            U32(mdb, 0x82), overflow, 0xFF, 3, false);
+            mdb.ReadUInt32At(0x82), overflow, 0xFF, 3, false);
         ValidateExtentsTree(extentsTree);
         foreach (var record in LeafRecords(extentsTree))
         {
             byte kind = record.Key[1];
             var key = new BigEndianReader(record.Key);
-            uint id = U32(key, 2);
-            ushort start = U16(key, 6);
+            uint id = key.ReadUInt32At(2);
+            ushort start = key.ReadUInt16At(6);
             if (!overflow.TryGetValue((kind, id), out var list))
             {
                 overflow[(kind, id)] = list = [];
@@ -314,12 +315,12 @@ internal static class HfsCatalogEditing
         }
         var catalogExtents = ParseExtents(mdb, 0x96);
         byte[] catalog = ReadFork(source, firstBlock, blockSize, blockCount, catalogExtents,
-            U32(mdb, 0x92), overflow, 0, 4, true);
+            mdb.ReadUInt32At(0x92), overflow, 0, 4, true);
         ValidateCatalogTree(catalog);
         TreeRecord[] catalogRecords = LeafRecords(catalog).ToArray();
         var records = catalogRecords.Select(record => (record.Key, record.Data)).ToList();
         ValidateCatalogAccounting(mdb, records);
-        int bitmapOffset = checked(U16(mdb, 0x0E) * BlockSize);
+        int bitmapOffset = checked(mdb.ReadUInt16At(0x0E) * BlockSize);
         int bitmapLength = checked(((int)blockCount + 7) / 8);
         if (bitmapOffset + bitmapLength > source.Length)
         {
@@ -328,7 +329,7 @@ internal static class HfsCatalogEditing
 
         byte[] workingBitmap = new byte[bitmapLength];
         source.Read(bitmapOffset, workingBitmap);
-        ValidateBitmapFreeCount(blockCount, workingBitmap, U16(mdb, 0x22));
+        ValidateBitmapFreeCount(blockCount, workingBitmap, mdb.ReadUInt16At(0x22));
         ValidateExtentOwnership(blockCount, workingBitmap, extentsTreeExtents,
             WithOverflow(catalogExtents, overflow, 0, 4), catalogRecords, overflow,
             new TreeRecord([], [], 0, 0, 0), 0, -1, []);
@@ -389,7 +390,7 @@ internal static class HfsCatalogEditing
         var volumeReader = new BigEndianReader(state.Mdb);
         if (allocatedSystemBlocks != 0)
         {
-            ushort oldFree = U16(volumeReader, 0x22);
+            ushort oldFree = volumeReader.ReadUInt16At(0x22);
             if (oldFree < allocatedSystemBlocks)
             {
                 throw new InvalidDataException("The HFS free-block count cannot cover catalog growth.");
@@ -417,7 +418,7 @@ internal static class HfsCatalogEditing
         }
         uint now = MacDate.FromDateTime(Now).Seconds;
         volume.WriteUInt32At(0x06, now);
-        volume.WriteUInt32At(0x46, unchecked(U32(volumeReader, 0x46) + 1));
+        volume.WriteUInt32At(0x46, unchecked(volumeReader.ReadUInt32At(0x46) + 1));
         for (int at = 0; at < state.Bitmap.Length; at += BlockSize)
         {
             int length = Math.Min(BlockSize, state.Bitmap.Length - at);
@@ -565,8 +566,6 @@ internal static class HfsCatalogEditing
             throw new InvalidDataException("The HFS catalog B-tree cannot grow further.");
         }
 
-        uint oldNodeCount = (uint)(state.Catalog.Length / NodeSize);
-        uint nodesPerBlock = state.BlockSize / NodeSize;
         uint maxBlocks = 8;
         var extents = state.CatalogExtents;
         var last = extents[^1];
@@ -600,15 +599,7 @@ internal static class HfsCatalogEditing
             SetBitmap(state.Bitmap, checked((ushort)block), allocated: true);
         }
 
-        uint addedNodes = checked(chosenBlocks * nodesPerBlock);
-        uint newNodeCount = checked(oldNodeCount + addedNodes);
-        byte[] grown = new byte[checked(state.Catalog.Length + (int)(chosenBlocks * state.BlockSize))];
-        state.Catalog.CopyTo(grown, 0);
-        uint newMapNodes = ExtendBTreeNodeMap(grown, oldNodeCount, newNodeCount);
-        var header = new BigEndianWriter(grown);
-        header.WriteUInt32At(14 + 22, newNodeCount);
-        header.WriteUInt32At(14 + 26, checked(U32(new BigEndianReader(grown), 14 + 26) + addedNodes - newMapNodes));
-        state.Catalog = grown;
+        state.Catalog = GrowBTree(state.Catalog, checked(state.Catalog.Length + (long)chosenBlocks * state.BlockSize));
         state.AllocatedCatalogBlocks += chosenBlocks;
         if (extents.Count > 3)
         {
@@ -622,8 +613,8 @@ internal static class HfsCatalogEditing
     {
         var lastRecord = LeafRecords(state.ExtentsTree)
             .Where(record => record.Key.Length == 8 && record.Key[1] == 0 &&
-                U32(new BigEndianReader(record.Key), 2) == 4)
-            .OrderBy(record => U16(new BigEndianReader(record.Key), 6)).LastOrDefault();
+                KeyId(record.Key) == 4)
+            .OrderBy(record => ExtentsStart(record.Key)).LastOrDefault();
         var lastData = lastRecord is null ? null : new BigEndianReader(lastRecord.Data);
         if (extendLast || (lastData is not null && LastExtentSlot(lastData) < 2))
         {
@@ -635,7 +626,7 @@ internal static class HfsCatalogEditing
             int slot = LastExtentSlot(lastData);
             if (extendLast)
             {
-                if (slot < 0 || U16(lastData, slot * 4) != state.CatalogExtents[^1].Start)
+                if (slot < 0 || lastData.ReadUInt16At(slot * 4) != state.CatalogExtents[^1].Start)
                 {
                     throw new InvalidDataException("The catalog's terminal overflow extent is inconsistent.");
                 }
@@ -700,7 +691,7 @@ internal static class HfsCatalogEditing
                 throw new InvalidDataException($"The HFS parent folder '{component}' was not found.");
             }
 
-            parent = U32(new BigEndianReader(folder.Data), 6);
+            parent = FolderId(folder.Data);
         }
         ValidateCatalogName(parts[^1]);
         return (parent, parts[^1]);
@@ -714,14 +705,14 @@ internal static class HfsCatalogEditing
         var folderIds = new HashSet<uint>();
         foreach (var folder in folders)
         {
-            uint id = U32(new BigEndianReader(folder.Data), 6);
+            uint id = FolderId(folder.Data);
             if (!folderIds.Add(id))
             {
                 throw new InvalidDataException("The HFS catalog has duplicate folder IDs.");
             }
         }
         if (!folderIds.Contains(2) || folders.Count(folder =>
-                U32(new BigEndianReader(folder.Data), 6) == 2 && U32(new BigEndianReader(folder.Key), 2) == 1) != 1)
+                FolderId(folder.Data) == 2 && KeyId(folder.Key) == 1) != 1)
         {
             throw new InvalidDataException("The HFS root folder is missing or duplicated.");
         }
@@ -732,7 +723,7 @@ internal static class HfsCatalogEditing
         {
             if (record.Data.Length > 0 && record.Data[0] is 1 or 2)
             {
-                uint parent = U32(new BigEndianReader(record.Key), 2);
+                uint parent = KeyId(record.Key);
                 children[parent] = children.GetValueOrDefault(parent) + 1;
             }
         }
@@ -740,14 +731,14 @@ internal static class HfsCatalogEditing
         foreach (var folder in folders)
         {
             var data = new BigEndianReader(folder.Data);
-            uint id = U32(data, 6);
-            uint parent = U32(new BigEndianReader(folder.Key), 2);
+            uint id = data.ReadUInt32At(6);
+            uint parent = KeyId(folder.Key);
             if (id != 2 && !folderIds.Contains(parent))
             {
                 throw new InvalidDataException("An HFS folder has no parent folder.");
             }
 
-            if (U16(data, 4) != children.GetValueOrDefault(id))
+            if (data.ReadUInt16At(4) != children.GetValueOrDefault(id))
             {
                 throw new InvalidDataException("An HFS folder valence disagrees with its catalog children.");
             }
@@ -755,20 +746,20 @@ internal static class HfsCatalogEditing
         var catalogIds = new HashSet<uint>(folderIds);
         foreach (var file in files)
         {
-            if (!catalogIds.Add(U32(new BigEndianReader(file.Data), 20)))
+            if (!catalogIds.Add(FileId(file.Data)))
             {
                 throw new InvalidDataException("The HFS catalog has duplicate file or folder IDs.");
             }
 
-            if (!folderIds.Contains(U32(new BigEndianReader(file.Key), 2)))
+            if (!folderIds.Contains(KeyId(file.Key)))
             {
                 throw new InvalidDataException("An HFS file has no parent folder.");
             }
         }
         // drNmFls is not checked: Disk First Aid passes a wrong one and the File Manager keeps it, changing it by each
         // file added or removed, as the writer does (hfs.md §2.7) [Verified: Disk First Aid 8.5, Mac OS 9.0].
-        if (U32(mdb, 0x54) != files.Length || U32(mdb, 0x58) != folders.Length - 1 ||
-            U16(mdb, 0x52) != folders.Count(folder => U32(new BigEndianReader(folder.Key), 2) == 2))
+        if (mdb.ReadUInt32At(0x54) != files.Length || mdb.ReadUInt32At(0x58) != folders.Length - 1 ||
+            mdb.ReadUInt16At(0x52) != folders.Count(folder => KeyId(folder.Key) == 2))
         {
             throw new InvalidDataException("The HFS volume counts disagree with its catalog records.");
         }
@@ -815,13 +806,13 @@ internal static class HfsCatalogEditing
     internal static void AdjustParentValence(List<(byte[] Key, byte[] Data)> records, uint parent, int adjustment)
     {
         var folder = records.FirstOrDefault(record => record.Data.Length >= 70 && record.Data[0] == 1 &&
-            U32(new BigEndianReader(record.Data), 6) == parent);
+            FolderId(record.Data) == parent);
         if (folder.Data is null)
         {
             throw new InvalidDataException("The HFS parent folder record is missing.");
         }
 
-        ushort value = U16(new BigEndianReader(folder.Data), 4);
+        ushort value = new BigEndianReader(folder.Data).ReadUInt16At(4);
         int updated = value + adjustment;
         if (updated is < 0 or > ushort.MaxValue)
         {
@@ -833,10 +824,10 @@ internal static class HfsCatalogEditing
 
     // A count in the MDB's sector (offset from its start) changed by delta.
     internal static void AddCount(byte[] mdb, int offset, int delta) =>
-        new BigEndianWriter(mdb).WriteUInt32At(offset, checked((uint)((long)U32(new BigEndianReader(mdb), offset) + delta)));
+        new BigEndianWriter(mdb).WriteUInt32At(offset, checked((uint)((long)new BigEndianReader(mdb).ReadUInt32At(offset) + delta)));
 
     internal static void AddShortCount(byte[] mdb, int offset, int delta) =>
-        new BigEndianWriter(mdb).WriteUInt16At(offset, checked((ushort)(U16(new BigEndianReader(mdb), offset) + delta)));
+        new BigEndianWriter(mdb).WriteUInt16At(offset, checked((ushort)(new BigEndianReader(mdb).ReadUInt16At(offset) + delta)));
 
     // A big-endian u16 read from a volume (a field outside the buffers an edit holds: the alternate MDB's signature).
     internal static ushort ReadUInt16(HfsVolume volume, long offset)

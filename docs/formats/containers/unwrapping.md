@@ -142,7 +142,8 @@ For each file, starting with the input at depth 0 [ClassicMac]:
    a disk image needs a limit of at least 2 for the disk's files to appear.
 4. Read the container. If the reader finds the input unusable, the file becomes a leaf, with `container.unreadable`
    (Error); the remaining readers are not tried. Each format's file says when its input is unusable. Readers report
-   damage as diagnostics and keep going; only an input they cannot read at all fails.
+   damage as diagnostics and keep going; only an input they cannot read at all fails, by finding its structures wrong
+   or its data shorter than they say (a truncated image).
 5. For each file the container yielded, in order: add its data and resource fork lengths to a running total kept for
    the whole tree. When the total passes the expanded-bytes limit (§5), that file and the rest of this container's
    files are dropped, with `container.too-large` (Error). The total is not reset, so each container still to be read
@@ -227,7 +228,7 @@ The single-file containers' own codes are in their files. Offsets, where given, 
 | --- | --- | --- | --- | --- |
 | `container.too-deep` | Warning | a container nested at or past the nesting limit | the file becomes a leaf | no Mac counterpart |
 | `container.too-large` | Error | unwrapping produced more than the expanded-bytes limit | drops the rest of that container's files | no Mac counterpart |
-| `container.unreadable` | Error | a reader accepted the file but cannot read it (each format's §2 says when) | the file becomes a leaf; other readers are not tried | no Mac counterpart |
+| `container.unreadable` | Error | a reader accepted the file but cannot read it, its structures wrong or its data short (each format's §2 says when) | the file becomes a leaf; other readers are not tried | no Mac counterpart |
 | `container.reader-fault` | Error | a reader failed on the file's data with an arithmetic or index exception (a ClassicMac bug, found by mutation testing) | the file becomes a leaf; the unwrap goes on | no Mac counterpart |
 
 ## 7. Verification

@@ -261,8 +261,9 @@ public sealed class ContainerUnwrapper
         {
             contents = reader.Read(file, context.For(file.Name, context.Siblings));
         }
-        catch (InvalidDataException e)
+        catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
         {
+            // Damaged data: structures that say what is not there, or data shorter than they say.
             context.Report(DiagnosticSeverity.Error, "container.unreadable",
                 $"\"{file.Name}\" looks like {reader.FormatName} but cannot be read: {e.Message}");
             return new ContainerNode(format, file, []);

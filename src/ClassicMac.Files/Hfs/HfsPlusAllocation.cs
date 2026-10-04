@@ -51,8 +51,8 @@ internal static class HfsPlusAllocation
         int extentCount = 0;
         for (int index = 0; index < 8; index++)
         {
-            uint start = U32(reader, index * 8);
-            uint count = U32(reader, index * 8 + 4);
+            uint start = reader.ReadUInt32At(index * 8);
+            uint count = reader.ReadUInt32At(index * 8 + 4);
             if (count == 0)
             {
                 break;
@@ -70,7 +70,7 @@ internal static class HfsPlusAllocation
     {
         for (int index = 0; index < 8; index++)
         {
-            if (U32(extents, index * 8) != 0 || U32(extents, index * 8 + 4) != 0)
+            if (extents.ReadUInt32At(index * 8) != 0 || extents.ReadUInt32At(index * 8 + 4) != 0)
             {
                 return true;
             }
@@ -84,8 +84,8 @@ internal static class HfsPlusAllocation
         bool unusedDescriptorSeen = false;
         for (int index = 0; index < 8; index++)
         {
-            uint start = U32(extents, index * 8);
-            uint count = U32(extents, index * 8 + 4);
+            uint start = extents.ReadUInt32At(index * 8);
+            uint count = extents.ReadUInt32At(index * 8 + 4);
             if (count == 0)
             {
                 if (start != 0)
@@ -200,13 +200,13 @@ internal static class HfsPlusAllocation
         List<(uint Start, uint End)>? ordinaryForkExtents = null)
     {
         var forkReader = new BigEndianReader(fork);
-        ulong logical = U64(forkReader, 0);
+        ulong logical = forkReader.ReadUInt64At(0);
         if (logical > long.MaxValue)
         {
             throw new InvalidDataException("An HFS Plus fork is too large.");
         }
 
-        uint allocatedBlocks = U32(forkReader, 12);
+        uint allocatedBlocks = forkReader.ReadUInt32At(12);
         List<(uint Start, byte[] Extents)>? overflowEntries = null;
         if (overflow is not null)
         {
@@ -240,8 +240,8 @@ internal static class HfsPlusAllocation
             ValidateExtentDescriptorSequence(extents);
             for (int index = 0; index < 8; index++)
             {
-                uint start = U32(extents, index * 8);
-                uint count = U32(extents, index * 8 + 4);
+                uint start = extents.ReadUInt32At(index * 8);
+                uint count = extents.ReadUInt32At(index * 8 + 4);
                 if (count == 0)
                 {
                     break;

@@ -123,9 +123,10 @@ public static class QuickDrawResources
     public static RgbaBitmap DecodeCicn(byte[] data)
     {
         Require(data, 82, "cicn");
+        var reader = new BigEndianReader(data);
         var pm = ReadPixMap(data, 0, out _);
-        int maskRowBytes = U16(data, 54) & 0x3FFF, maskHeight = Height(data, 56);
-        int bitmapRowBytes = U16(data, 68) & 0x3FFF, bitmapHeight = Height(data, 70);
+        int maskRowBytes = reader.ReadUInt16At(54) & 0x3FFF, maskHeight = Height(reader, 56);
+        int bitmapRowBytes = reader.ReadUInt16At(68) & 0x3FFF, bitmapHeight = Height(reader, 70);
         int p = 82;
         int maskAt = p;
         p += maskRowBytes * maskHeight + bitmapRowBytes * bitmapHeight;
@@ -134,7 +135,7 @@ public static class QuickDrawResources
             throw Truncated("cicn");
         }
 
-        var b = new ClassicMac.Core.BigEndianReader(data.AsMemory(p));
+        var b = new BigEndianReader(data.AsMemory(p));
         pm.Palette = PixMap.ReadColorTable(b, pm.PixelSize);
         p += b.Position;
         pm.Data = Slice(data, p, pm.RowBytes * pm.Height, "cicn");
@@ -145,7 +146,8 @@ public static class QuickDrawResources
     public static MacCursor DecodeCursor(byte[] data)
     {
         Require(data, 68, "CURS");
-        return CursorBits(data, 0, null, I16(data, 66), I16(data, 64));
+        var reader = new BigEndianReader(data);
+        return CursorBits(data, 0, null, reader.ReadInt16At(66), reader.ReadInt16At(64));
     }
 
     /// <summary>
@@ -157,14 +159,15 @@ public static class QuickDrawResources
     public static MacCursor DecodeColorCursor(byte[] data)
     {
         Require(data, 96, "crsr");
-        if ((U16(data, 0) & 0xFFFE) != 0x8000)
+        var reader = new BigEndianReader(data);
+        if ((reader.ReadUInt16At(0) & 0xFFFE) != 0x8000)
         {
             throw new NotSupportedException("Unknown crsr type.");
         }
 
-        int mapAt = (int)U32(data, 2), pixelsAt = (int)U32(data, 6);
+        int mapAt = (int)reader.ReadUInt32At(2), pixelsAt = (int)reader.ReadUInt32At(6);
         PixMap? color = null;
-        if (U16(data, 0) == 0x8001 && mapAt > 0)
+        if (reader.ReadUInt16At(0) == 0x8001 && mapAt > 0)
         {
             color = ReadPixMap(data, mapAt, out int tableAt);
             if (tableAt < 0 || tableAt + 8 > data.Length)
@@ -172,11 +175,11 @@ public static class QuickDrawResources
                 throw Truncated("crsr");
             }
 
-            var b = new ClassicMac.Core.BigEndianReader(data.AsMemory(tableAt));
+            var b = new BigEndianReader(data.AsMemory(tableAt));
             color.Palette = PixMap.ReadColorTable(b, color.PixelSize);
             color.Data = Slice(data, pixelsAt, color.RowBytes * color.Height, "crsr");
         }
-        return CursorBits(data, 20, color, I16(data, 86), I16(data, 84));
+        return CursorBits(data, 20, color, reader.ReadInt16At(86), reader.ReadInt16At(84));
     }
 
     /// <summary><c>PAT </c>: an 8 × 8 1-bit pattern (8 bytes).</summary>
@@ -186,8 +189,9 @@ public static class QuickDrawResources
     public static IReadOnlyList<RgbaBitmap> DecodePatternList(byte[] data)
     {
         Require(data, 2, "PAT#");
+        var reader = new BigEndianReader(data);
         var list = new List<RgbaBitmap>();
-        int count = U16(data, 0);
+        int count = reader.ReadUInt16At(0);
         for (int i = 0, o = 2; i < count && o + 8 <= data.Length; i++, o += 8)
         {
             list.Add(Mono(data, o, 8, 8, null, 0));
@@ -209,11 +213,12 @@ public static class QuickDrawResources
     public static IReadOnlyList<RgbaBitmap> DecodePixelPatternList(byte[] data)
     {
         Require(data, 2, "ppt#");
-        int count = U16(data, 0);
+        var reader = new BigEndianReader(data);
+        int count = reader.ReadUInt16At(0);
         var offsets = new List<int>();
         for (int i = 0; i < count && 2 + 4 * i + 4 <= data.Length; i++)
         {
-            offsets.Add((int)U32(data, 2 + 4 * i));
+            offsets.Add((int)reader.ReadUInt32At(2 + 4 * i));
         }
 
         var list = new List<RgbaBitmap>();
@@ -238,13 +243,14 @@ public static class QuickDrawResources
             throw Truncated("ppat");
         }
 
-        int type = U16(data, start);
+        var reader = new BigEndianReader(data);
+        int type = reader.ReadUInt16At(start);
         if (type > 3)
         {
             throw new NotSupportedException($"ppat type {type} is not 0-3.");
         }
 
-        int mapAt = start + (int)U32(data, start + 2), pixelsAt = start + (int)U32(data, start + 6);
+        int mapAt = start + (int)reader.ReadUInt32At(start + 2), pixelsAt = start + (int)reader.ReadUInt32At(start + 6);
         if (type == 0)
         {
             if (pixelsAt + 8 > data.Length)
@@ -292,11 +298,11 @@ public static class QuickDrawResources
                 throw Truncated("ppat");
             }
 
-            var b = new ClassicMac.Core.BigEndianReader(data.AsMemory(tableAt));
+            var b = new BigEndianReader(data.AsMemory(tableAt));
             pm.Palette = PixMap.ReadColorTable(b, pm.PixelSize);
             // An empty table (ctSize -1, ResEdit's ppats) draws a 1-bit pattern 0 white, 1 black, whatever the
             // port's colours [Verified].
-            if (pm.PixelSize == 1 && (short)U16(data, tableAt + 6) < 0)
+            if (pm.PixelSize == 1 && (short)reader.ReadUInt16At(tableAt + 6) < 0)
             {
                 pm.Palette = [new RgbaColor(255, 255, 255), new RgbaColor(0, 0, 0)];
             }
@@ -312,14 +318,15 @@ public static class QuickDrawResources
             throw Truncated("PixMap");
         }
 
+        var reader = new BigEndianReader(data);
         var pm = new PixMap
         {
-            RowBytes = U16(data, at + 4) & 0x3FFF,
-            Bounds = new PictRect(I16(data, at + 6), I16(data, at + 8), I16(data, at + 10), I16(data, at + 12)),
-            PackType = U16(data, at + 16),
-            PixelType = U16(data, at + 30),
-            PixelSize = U16(data, at + 32),
-            CmpCount = U16(data, at + 34),
+            RowBytes = reader.ReadUInt16At(at + 4) & 0x3FFF,
+            Bounds = new PictRect(reader.ReadInt16At(at + 6), reader.ReadInt16At(at + 8), reader.ReadInt16At(at + 10), reader.ReadInt16At(at + 12)),
+            PackType = reader.ReadUInt16At(at + 16),
+            PixelType = reader.ReadUInt16At(at + 30),
+            PixelSize = reader.ReadUInt16At(at + 32),
+            CmpCount = reader.ReadUInt16At(at + 34),
             IsPixMap = true,
         };
         if (pm.PixelSize is not (1 or 2 or 4 or 8 or 16 or 32))
@@ -327,7 +334,7 @@ public static class QuickDrawResources
             throw new NotSupportedException($"PixMap pixelSize {pm.PixelSize} is not a QuickDraw depth");
         }
 
-        tableAt = origin + (int)U32(data, at + 42);
+        tableAt = origin + (int)reader.ReadUInt32At(at + 42);
         return pm;
     }
 
@@ -489,7 +496,7 @@ public static class QuickDrawResources
         bmp.Pixels[i + 3] = 255;
     }
 
-    private static int Height(byte[] data, int boundsAt) => Math.Max(0, I16(data, boundsAt + 4) - I16(data, boundsAt));
+    private static int Height(BigEndianReader reader, int boundsAt) => Math.Max(0, reader.ReadInt16At(boundsAt + 4) - reader.ReadInt16At(boundsAt));
 
     private static byte[] Slice(byte[] data, int at, int length, string type)
     {
@@ -513,8 +520,4 @@ public static class QuickDrawResources
     }
 
     private static EndOfStreamException Truncated(string type) => new EndOfStreamException($"The '{type}' resource data is truncated.");
-
-    private static int U16(byte[] d, int o) => new ClassicMac.Core.BigEndianReader(d).ReadUInt16At(o);
-    private static short I16(byte[] d, int o) => new ClassicMac.Core.BigEndianReader(d).ReadInt16At(o);
-    private static uint U32(byte[] d, int o) => new ClassicMac.Core.BigEndianReader(d).ReadUInt32At(o);
 }
