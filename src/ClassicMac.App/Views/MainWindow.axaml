@@ -38,103 +38,8 @@
   <DockPanel>
     <!-- The custom title bar (S1) on Windows and macOS, where the window extends into its decorations; a drag area for
          the platform; the caption buttons are drawn over it (see CmWindowDecorations). Linux keeps the system's. -->
-    <Border x:Name="TitleBar" DockPanel.Dock="Top" Classes="titlebar" chrome:WindowDecorationProperties.ElementRole="TitleBar"
-            IsVisible="{Binding $parent[Window].ExtendClientAreaToDecorationsHint}">
-      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <!-- The app's icon: the hand-drawn pixel size for the scaling, drawn 1:1 (AppIconView). -->
-        <views:AppIconView x:Name="TitleIcon" Slot="16" VerticalAlignment="Center" />
-        <TextBlock Text="{Binding ShellActions.TitleFile}" IsVisible="{Binding ShellActions.TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        <TextBlock Text="•" Classes="unsaved" IsVisible="{Binding ShellActions.TitleUnsaved}" />
-        <TextBlock Text="—" IsVisible="{Binding ShellActions.TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        <TextBlock Text="ClassicMac" />
-      </StackPanel>
-    </Border>
-    <Menu DockPanel.Dock="Top" Classes="chrome">
-      <MenuItem Header="_File">
-        <MenuItem Header="_Open…" Command="{Binding OpenCommand}" InputGesture="Ctrl+O" HotKey="Ctrl+O" />
-        <MenuItem Header="_Close" Command="{Binding CloseCommand}" InputGesture="Ctrl+W" HotKey="Ctrl+W" />
-        <Separator />
-        <MenuItem Header="_Save" Command="{Binding EditActions.SaveCommand}" InputGesture="Ctrl+S" HotKey="Ctrl+S" />
-        <MenuItem Header="Save _As">
-          <MenuItem Header="_MacBinary III…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.MacBinary}" />
-          <MenuItem Header="_BinHex 4.0…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.BinHex}" />
-          <MenuItem Header="Apple_Single…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.AppleSingle}" />
-          <MenuItem Header="Apple_Double Pair…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.AppleDoublePair}" />
-          <MenuItem Header="Basilisk _II Folder Entry…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.BasiliskEntry}" />
-          <MenuItem Header="_HFS Volume Image…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.HfsImage}" />
-          <MenuItem Header="_Resource Fork Only…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.RawFork}" />
-        </MenuItem>
-        <MenuItem Header="_Revert" Command="{Binding EditActions.RevertCommand}" />
-        <Separator />
-        <MenuItem Header="Show _Original" Command="{Binding AliasActions.ShowOriginalCommand}" InputGesture="Ctrl+R" HotKey="Ctrl+R" />
-        <Separator />
-        <MenuItem Header="_Quit" Click="OnQuit" />
-      </MenuItem>
-      <MenuItem Header="_Edit">
-        <MenuItem Header="{Binding EditActions.UndoTitle}" Command="{Binding EditActions.UndoCommand}" InputGesture="Ctrl+Z" HotKey="Ctrl+Z" />
-        <MenuItem Header="{Binding EditActions.RedoTitle}" Command="{Binding EditActions.RedoCommand}" InputGesture="Ctrl+Y" HotKey="Ctrl+Y" />
-      </MenuItem>
-      <MenuItem Header="_View">
-        <MenuItem Header="Zoom _In" Command="{Binding ShellActions.ZoomInCommand}" InputGesture="Ctrl+OemPlus" HotKey="Ctrl+OemPlus" />
-        <MenuItem Header="Zoom _Out" Command="{Binding ShellActions.ZoomOutCommand}" InputGesture="Ctrl+OemMinus" HotKey="Ctrl+OemMinus" />
-        <MenuItem Header="_Actual Size" Command="{Binding ShellActions.ActualSizeCommand}" InputGesture="Ctrl+D0" HotKey="Ctrl+D0" />
-        <MenuItem Header="Screen _Depth" Classes="depths" ItemsSource="{Binding ShellActions.ScreenDepthChoices}" />
-        <Separator />
-        <MenuItem Header="Show _Diagnostics" ToggleType="CheckBox" IsChecked="{Binding DiagnosticsPanel.IsExpanded, Mode=TwoWay}" InputGesture="Ctrl+Shift+D" />
-        <Separator />
-        <MenuItem Header="_Group Files with No Name" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.GroupNoName, Mode=TwoWay}" />
-        <MenuItem Header="_Hide Invisible Files" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.HideInvisible, Mode=TwoWay}" />
-        <MenuItem Header="Show _Details Column" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.ShowDetails, Mode=TwoWay}" />
-        <Separator />
-        <MenuItem Header="Type/Creator Data_base…" Command="{Binding TypeCreatorActions.ChooseTypeCreatorDatabaseCommand}" />
-        <MenuItem Header="_Forget Type/Creator Database" Command="{Binding TypeCreatorActions.ForgetTypeCreatorDatabaseCommand}" />
-        <Separator />
-        <MenuItem Header="_Theme">
-          <MenuItem Header="_System" ToggleType="Radio" GroupName="theme" IsChecked="{Binding ShellActions.IsSystemTheme, Mode=OneWay}"
-                    Command="{Binding ShellActions.SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.System}" />
-          <MenuItem Header="_Light" ToggleType="Radio" GroupName="theme" IsChecked="{Binding ShellActions.IsLightTheme, Mode=OneWay}"
-                    Command="{Binding ShellActions.SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.Light}" />
-          <MenuItem Header="_Dark" ToggleType="Radio" GroupName="theme" IsChecked="{Binding ShellActions.IsDarkTheme, Mode=OneWay}"
-                    Command="{Binding ShellActions.SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.Dark}" />
-        </MenuItem>
-      </MenuItem>
-      <MenuItem Header="_Resource">
-        <MenuItem Header="_New Resource…" Command="{Binding EditActions.NewResourceCommand}" InputGesture="Ctrl+K" HotKey="Ctrl+K" />
-        <MenuItem Header="_Duplicate" Command="{Binding EditActions.DuplicateResourceCommand}" InputGesture="Ctrl+D" HotKey="Ctrl+D" />
-        <MenuItem Header="De_lete" Command="{Binding EditActions.DeleteResourceCommand}" InputGesture="Delete" />
-        <Separator />
-        <MenuItem Header="Get _Info…" Command="{Binding EditActions.GetInfoCommand}" InputGesture="Ctrl+I" HotKey="Ctrl+I" />
-        <MenuItem Header="Edit _Hex…" Command="{Binding EditActions.EditHexCommand}" InputGesture="Ctrl+H" HotKey="Ctrl+H" />
-        <MenuItem Header="_Replace Data from File…" Command="{Binding EditActions.ReplaceDataCommand}" />
-        <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportActions.ImportCommand}" />
-      </MenuItem>
-      <MenuItem Header="_Volume">
-        <MenuItem Header="New _File…" Command="{Binding VolumeActions.NewFileCommand}" />
-        <MenuItem Header="_Import File…" Command="{Binding VolumeActions.ImportFileCommand}" />
-        <MenuItem Header="New F_older…" Command="{Binding VolumeActions.NewFolderCommand}" />
-        <Separator />
-        <MenuItem Header="_Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" />
-      </MenuItem>
-      <MenuItem Header="E_xport">
-        <MenuItem Header="_Save Resource As…" Command="{Binding ExportActions.SaveResourceAsCommand}" InputGesture="Ctrl+E" HotKey="Ctrl+E" />
-        <MenuItem Header="_Export Resources…" Command="{Binding ExportActions.ExportResourcesCommand}" />
-        <MenuItem Header="E_xtract All Resources…" Command="{Binding ExportActions.ExtractAllCommand}" />
-        <MenuItem Header="_Convert Documents…" Command="{Binding ExportActions.ConvertDocumentsCommand}" />
-        <Separator />
-        <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding ExportActions.UnpackAppleDoubleCommand}" />
-        <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding ExportActions.UnpackBasiliskCommand}" />
-        <Separator />
-        <MenuItem Header="_Drag Files Out as MacBinary" ToggleType="CheckBox" IsChecked="{Binding DragOut.DragOutAsMacBinary, Mode=TwoWay}" />
-      </MenuItem>
-      <!-- Filled by the window: Minimize, Zoom, then one item per open input. -->
-      <MenuItem x:Name="WindowMenu" Header="_Window" />
-      <MenuItem Header="_Help">
-        <MenuItem Header="ClassicMac _Help" Command="{Binding ShellActions.OpenHelpCommand}" />
-        <MenuItem Header="_Report a Problem…" Command="{Binding ShellActions.ReportProblemCommand}" />
-        <Separator />
-        <MenuItem Header="_About ClassicMac" Command="{Binding ShellActions.AboutCommand}" />
-      </MenuItem>
-    </Menu>
+    <views:TitleBarView x:Name="TitleBarView" DockPanel.Dock="Top" />
+    <views:MenuBarView x:Name="MenuBarView" DockPanel.Dock="Top" />
 
     <!-- The toolbar (design/boards/main-window.md, S2): each button follows its command's enabled state. -->
     <views:ToolbarView x:Name="ToolbarView" DockPanel.Dock="Top" />
@@ -388,55 +293,7 @@
         </DockPanel>
 
         <!-- The empty state (boards/empty-state.md, S5): over the inspector while nothing is open. -->
-        <Border x:Name="EmptyState" Grid.Column="2" Classes="empty-state" IsVisible="{Binding EmptyState.IsEmpty}">
-          <ScrollViewer>
-            <StackPanel Width="640" HorizontalAlignment="Center" Margin="0,40" Spacing="24">
-              <Border x:Name="DropZone" Classes="drop-zone" Classes.active="{Binding EmptyState.IsDropTarget}">
-                <Panel>
-                  <Rectangle Classes="dash" />
-                  <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="460" Spacing="14">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="16">
-                      <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.HardDisk}, Converter={x:Static views:TreeIcons.IconConverter}}" />
-                      <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Floppy}, Converter={x:Static views:TreeIcons.IconConverter}}" />
-                      <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Parcel}, Converter={x:Static views:TreeIcons.IconConverter}}" />
-                      <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Application}, Converter={x:Static views:TreeIcons.IconConverter}}" />
-                    </StackPanel>
-                    <TextBlock Classes="empty-title" Text="Drop a Mac file, disk image or archive here" />
-                    <TextBlock Classes="muted" TextAlignment="Center" TextWrapping="Wrap"
-                               Text="HFS and HFS+ volume images, archives, MacBinary, BinHex, AppleSingle and AppleDouble files, or a file with its resource fork. ClassicMac shows everything inside, down to single resources." />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
-                      <Button Classes="accent" Content="Open…" Command="{Binding OpenCommand}" />
-                      <TextBlock Classes="mono muted" Text="Ctrl+O" VerticalAlignment="Center" />
-                    </StackPanel>
-                  </StackPanel>
-                </Panel>
-              </Border>
-              <StackPanel x:Name="RecentList" Spacing="8" IsVisible="{Binding EmptyState.HasRecentFiles}">
-                <DockPanel>
-                  <Button DockPanel.Dock="Right" Classes="flat link" Content="Clear list" Command="{Binding EmptyState.ClearRecentCommand}" />
-                  <TextBlock Classes="caption" Text="RECENT" VerticalAlignment="Center" />
-                </DockPanel>
-                <Border Classes="recent-list">
-                  <ItemsControl ItemsSource="{Binding EmptyState.RecentFiles}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate DataType="vm:RecentFile">
-                        <Button Classes="flat recent" Command="{Binding #EmptyState.((vm:MainViewModel)DataContext).EmptyState.OpenRecentCommand}" CommandParameter="{Binding}"
-                                ToolTip.Tip="{Binding Path}">
-                          <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Image RenderOptions.BitmapInterpolationMode="None" Width="16" Height="16" Source="{Binding IconKind, Converter={x:Static views:TreeIcons.IconConverter}}" />
-                            <TextBlock Text="{Binding Name}" Classes.muted="{Binding !Exists}" VerticalAlignment="Center" />
-                            <TextBlock Classes="muted" Text="{Binding Folder}" TextTrimming="CharacterEllipsis" MaxWidth="380" VerticalAlignment="Center" />
-                            <TextBlock Classes="muted" Text="Not found" IsVisible="{Binding !Exists}" VerticalAlignment="Center" />
-                          </StackPanel>
-                        </Button>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </Border>
-              </StackPanel>
-            </StackPanel>
-          </ScrollViewer>
-        </Border>
+        <views:EmptyStateView x:Name="EmptyStateView" Grid.Column="2" />
       </Grid>
 
       <!-- The drag handle: a 6 px strip with a 36 x 2 grip; hidden while the panel is collapsed. -->

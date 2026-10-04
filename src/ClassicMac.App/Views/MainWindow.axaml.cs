@@ -27,7 +27,7 @@ internal sealed partial class MainWindow : Window, IFilePicker
         InitializeComponent();
         playhead = new PlayheadFollower(this);
         helpWebView = new HelpWebView(this, WebPagePane.HelpHost);
-        shell = new WindowShell(this, WindowMenu);
+        shell = new WindowShell(this, MenuBarView.WindowMenu);
         // The custom title bar (S1): Windows and macOS extend the client area into the decorations; Linux keeps the
         // system title bar, whose support for this varies by desktop.
         if (!OperatingSystem.IsLinux())
@@ -36,7 +36,7 @@ internal sealed partial class MainWindow : Window, IFilePicker
             ExtendClientAreaTitleBarHeightHint = 34;
         }
 
-        TitleBar.Classes.Set("mac", OperatingSystem.IsMacOS());
+        TitleBarView.TitleBar.Classes.Set("mac", OperatingSystem.IsMacOS());
         // Avalonia's own drawn title bar keeps its caption buttons but not its title text (see the theme).
         WindowDecorationsTheme = (Avalonia.Styling.ControlTheme)Resources["CmWindowDecorations"]!;
         AddHandler(DragDrop.DropEvent, OnDrop);
@@ -388,8 +388,6 @@ internal sealed partial class MainWindow : Window, IFilePicker
             }
         }
     }
-
-    private void OnQuit(object? sender, RoutedEventArgs e) => Close();
 
     // Find's match: its line scrolls into view.
     private void OnHexLineShown(int line) => HexTab.ScrollToLine(line);

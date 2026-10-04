@@ -1,0 +1,23 @@
+<!--
+  The custom title bar (boards/main-window.md, S1) on Windows and macOS, where the window extends into its decorations:
+  the app icon and the title; the caption buttons are drawn over it. Linux keeps the system's.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:ClassicMac.App.Views"
+             xmlns:chrome="using:Avalonia.Controls.Chrome"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             x:Class="ClassicMac.App.Views.TitleBarView"
+             x:DataType="vm:MainViewModel">
+  <Border x:Name="TitleBar" Classes="titlebar" chrome:WindowDecorationProperties.ElementRole="TitleBar"
+          IsVisible="{Binding $parent[Window].ExtendClientAreaToDecorationsHint}">
+    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+      <!-- The app's icon: the hand-drawn pixel size for the scaling, drawn 1:1 (AppIconView). -->
+      <views:AppIconView x:Name="TitleIcon" Slot="16" VerticalAlignment="Center" />
+      <TextBlock Text="{Binding ShellActions.TitleFile}" IsVisible="{Binding ShellActions.TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <TextBlock Text="•" Classes="unsaved" IsVisible="{Binding ShellActions.TitleUnsaved}" />
+      <TextBlock Text="—" IsVisible="{Binding ShellActions.TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <TextBlock Text="ClassicMac" />
+    </StackPanel>
+  </Border>
+</UserControl>
