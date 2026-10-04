@@ -35,6 +35,7 @@ internal sealed class PlusCatalogRepair
         repair.MissingThreads();
         repair.Files();
         repair.Valences();
+        repair.LinkCounts();
         return repair.records;
     }
 
@@ -171,6 +172,29 @@ internal sealed class PlusCatalogRepair
             {
                 new BigEndianWriter(data).WriteUInt32At(4, valence);
                 Add(id, $"the folder's valence set from {old} to {valence}");
+            }
+        }
+    }
+
+    // Each indirect file's and folder's link count: the links naming it.
+    private void LinkCounts()
+    {
+        var (fileLinks, folderLinks, privateFiles, privateFolders) = PlusLinkCheck.Links(records);
+        foreach (var (links, parent, folder) in new[] { (fileLinks, privateFiles, false), (folderLinks, privateFolders, true) })
+        {
+            var children = PlusLinkCheck.Children(records, parent);
+            foreach (var (reference, count) in links)
+            {
+                if (children.GetValueOrDefault(PlusLinkCheck.IndirectName(reference, folder)) is { Length: >= 88 } data)
+                {
+                    var reader = new BigEndianReader(data);
+                    uint old = reader.ReadUInt32At(44);
+                    if (old != count)
+                    {
+                        new BigEndianWriter(data).WriteUInt32At(44, count);
+                        Add(Id(data), $"the link count set from {old} to {count}, its links");
+                    }
+                }
             }
         }
     }

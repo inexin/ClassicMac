@@ -14,7 +14,7 @@ namespace ClassicMac.Files.Hfs;
 internal static class PlusRepair
 {
     private const FirstAidRepairs CatalogRepairs = FirstAidRepairs.MissingFolder | FirstAidRepairs.MissingThreads | FirstAidRepairs.FileThreads
-        | FirstAidRepairs.Valences | FirstAidRepairs.ForkLengths;
+        | FirstAidRepairs.Valences | FirstAidRepairs.ForkLengths | FirstAidRepairs.LinkCounts;
 
     /// <summary>The trees a repair needs written again; true when either was.</summary>
     public static bool Trees(FirstAidRun run, HfsVolume volume, List<PlannedChange> changes)

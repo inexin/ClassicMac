@@ -64,6 +64,9 @@ public enum FirstAidRepairs
 
     /// <summary>A fork's physical length short of its blocks is set to them.</summary>
     ForkLengths = 1 << 16,
+
+    /// <summary>An HFS Plus indirect file's or folder's link count is set to its links.</summary>
+    LinkCounts = 1 << 17,
 }
 
 // The state of one First Aid verify: the volume, the MDBs it reads, the stage lines shown, the problems found, the

@@ -37,7 +37,13 @@ internal sealed class PlusCatalogScan
         }
 
         run.Stage(FirstAidMessages.CheckingHierarchy);
-        return scan.Hierarchy();
+        if (!scan.Hierarchy())
+        {
+            return false;
+        }
+
+        PlusLinkCheck.Run(run);
+        return true;
     }
 
     private bool Scan()

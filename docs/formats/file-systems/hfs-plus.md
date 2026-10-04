@@ -503,7 +503,11 @@ traced, the choices are ClassicMac's [ClassicMac]. HFSX is "not checked".
    (`firstaid.extent-start`); a block count short of the extents is `firstaid.short-peof`.
 5. **"Checking catalog hierarchy."**: each folder's valence is its folders and files (#3, repaired); an item whose
    parent folder is missing, with no thread to make it again, is `firstaid.missing-parent` (not repaired); a folder
-   that is its own ancestor is #41.
+   that is its own ancestor is #41. Hard links (§1.8): each file link's indirect file `iNode<n>` in
+   `\0\0\0\0HFS+ Private Data`, and each directory link's folder `dir_<CNID>` in `.HFS+ Private Directory Data\r`,
+   must exist (`firstaid.link-target-missing`, not repaired), and its link count (BSD `special`) is its number of links
+   (`firstaid.link-count`, repaired; traditional Mac OS can leave it wrong [Doc: TN1150]). The directory links' chains
+   and first-link attribute are left to the reader's diagnostics.
 6. **"Checking volume bit map."**: the allocation file's bytes for the volume's blocks against the blocks the extents
    use (#60, repaired; #12 for blocks used twice).
 7. **"Checking volume info."**: `fileCount`, `folderCount`, `freeBlocks` and `nextCatalogID` (above the highest CNID,
@@ -514,10 +518,11 @@ traced, the choices are ClassicMac's [ClassicMac]. HFSX is "not checked".
 passes, each verified again: the extents tree written again without orphaned records and with each fork's start blocks
 renumbered; the catalog written again with the repair list (a file thread without its file deleted, a folder made
 again from its thread, a thread naming another record deleted, a thread made for every folder and file without its
-right one, each file's thread flag set, a fork's block count raised to its extents, every valence set), both at their
+right one, each file's thread flag set, a fork's block count raised to its extents, every valence set, every
+link count set), both at their
 node size and node count and keeping their clump size, type and key comparison; the allocation file from the blocks
 the extents use; and the computed header written over the header and its alternate when either differs. Forks that
-share blocks, links and the attributes tree are not repaired yet. An edit session (`InputEditKind.HfsPlusVolume`)
+share blocks and the attributes tree are not repaired yet. An edit session (`InputEditKind.HfsPlusVolume`)
 holds an HFS Plus image for repair only: it is saved with its changed sectors compared, and every other edit is
 refused.
 
