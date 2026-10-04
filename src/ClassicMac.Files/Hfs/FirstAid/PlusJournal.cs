@@ -7,7 +7,7 @@ namespace ClassicMac.Files.Hfs;
 // An HFS Plus volume's journal replayed, as TN1150's "Replaying the Journal" describes (hfs-plus.md §1.6, §5.4): the
 // journal info block from the volume header, the journal header, then each block list from start to end in the
 // circular buffer, every block copied to its sector (bnum × jhdr_size bytes into the volume); then the journal is
-// emptied (start = end, the checksum made again). The journal's structures are in the byte order of the Mac that wrote
+// emptied (start = end, the checksum over the 44-byte header made again). The journal's structures are in the byte order of the Mac that wrote
 // them, which the endian field tells. TN1150 gives a block list's data blocks both as binfo[1] to binfo[num_blocks] and
 // as num_blocks − 1 of them; the field's description (binfo[0] counted) is followed [Doc: TN1150; Code: XNU journal.c,
 // reference only].
@@ -58,7 +58,7 @@ internal static class PlusJournal
         int listSize = (int)U32(fields, 32, little), sector = (int)U32(fields, 40, little);
         if ((long)U64(fields, 24, little) != size || sector < HeaderLength || sector > size || listSize < 32 || listSize > size - sector
             || start < sector || start >= size || end < sector || end >= size
-            || Checksum(Read(volume, offset + journal, sector), 36) != U32(fields, 36, little))
+            || Checksum(fields, 36) != U32(fields, 36, little))
         {
             return new Result(0, 0, "the journal header is inconsistent");
         }
@@ -125,11 +125,10 @@ internal static class PlusJournal
             at = Advance(at, used, size, sector);
         }
 
-        // Emptied: start = end, the checksum over the header sector made again.
-        var sectorBytes = Read(volume, offset + journal, sector);
-        Put64(sectorBytes, 8, (ulong)end, little);
-        Put32(sectorBytes, 36, Checksum(sectorBytes, 36), little);
-        volume.Write(offset + journal, sectorBytes);
+        // Emptied: start = end, the checksum over the 44-byte header made again.
+        Put64(fields, 8, (ulong)end, little);
+        Put32(fields, 36, Checksum(fields, 36), little);
+        volume.Write(offset + journal, fields);
         return new Result(transactions, blocks, null);
     }
 

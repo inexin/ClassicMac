@@ -45,17 +45,21 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
 
         string? fault = null;
         FirstAidReport? firstAid = null;
-        var volume = opened.Host.Layout == HostLayout.Plain && opened.Root.Volume?.Format is "HFS" or "HFS Plus";
+        bool writerChecked = false;
+        // A plain HFS or HFS Plus volume, also one the reader refused (First Aid may still repair it).
+        var volume = opened.Host.Layout == HostLayout.Plain
+            && (opened.Root.Volume?.Format is "HFS" or "HFS Plus" || opened.Root.Volume is null && HasVolumeSignature(opened.Root.File.DataFork));
         if (volume)
         {
             // The writer's checks are HFS's; an HFS Plus volume gets First Aid's.
-            fault = opened.Root.Volume?.Format == "HFS" ? HfsWriter.Check(opened.Root.File.DataFork) : null;
+            writerChecked = opened.Root.Volume?.Format == "HFS";
+            fault = writerChecked ? HfsWriter.Check(opened.Root.File.DataFork) : null;
             firstAid = HfsFirstAid.Verify(opened.Root.File.DataFork);
         }
         else if (InputEditSession.Open(input.FullName, containerOptions, readOptions) is { Kind: InputEditKind.HfsVolume, Partition: null } session)
         {
             // A disk image the writer edits (Disk Copy 4.2, NDIF): its disk gets the writer's checks and First Aid.
-            volume = true;
+            volume = writerChecked = true;
             fault = HfsWriter.Check(ForkData.FromBytes(session.Volume));
             firstAid = HfsFirstAid.Verify(ForkData.FromBytes(session.Volume));
         }
@@ -115,7 +119,7 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
                 }
 
                 w.WriteEndArray();
-                if (volume && firstAid?.HfsPlus != true)
+                if (writerChecked && partitions.Count == 0)
                 {
                     w.WriteStartObject("volume");
                     w.WriteBoolean("passes", fault is null);
@@ -168,7 +172,7 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
             }
 
             // The writer's checks are HFS's; an HFS Plus volume has First Aid's lines only.
-            if (volume && firstAid?.HfsPlus != true)
+            if (writerChecked && partitions.Count == 0)
             {
                 output.WriteLine($"volume: {fault ?? "passes the writer's checks"}");
             }
@@ -191,6 +195,13 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
         }
 
         return errors > 0 || fault is not null || (strict && warnings > 0) ? ExitCodes.Damaged : ExitCodes.Success;
+    }
+
+    // 'BD' or 'H+' at byte 1024: an HFS or HFS Plus volume, whether or not the reader could read it.
+    private static bool HasVolumeSignature(ForkData data)
+    {
+        var head = data.ReadPrefix(1026);
+        return head.Length == 1026 && new Core.BigEndianReader(head).ReadUInt16At(1024) is 0x4244 or 0x482B;
     }
 
     // A volume First Aid does not find OK: one that needs repair, cannot be repaired, or is not an HFS disk.

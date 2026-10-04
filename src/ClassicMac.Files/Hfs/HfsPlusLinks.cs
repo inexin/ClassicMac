@@ -167,8 +167,10 @@ internal static class HfsPlusLinks
         file.FinderInfo.Type == FourCC.FromString("alis") && file.FinderInfo.Creator == FourCC.FromString("MACS") &&
         (file.FinderInfo.Flags & FinderFlags.IsAlias) != 0;
 
+    // The type marks a hard link; creator 'hfs+' alone is Apple's mark for its own files (the journal files are
+    // 'jrnl'/'hfs+') [Fitted: a journaled Mac OS X volume].
     internal static bool HasHardLinkMarker(FinderInfo finderInfo) =>
-        finderInfo.Type == FourCC.FromString("hlnk") || finderInfo.Creator == FourCC.FromString("hfs+");
+        finderInfo.Type == FourCC.FromString("hlnk");
 
     internal static bool TryParseHardLinkReference(string name, out uint reference)
     {

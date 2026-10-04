@@ -128,8 +128,9 @@ internal sealed class HfsPlusBuilder
     {
         if (JournalBlocks > 0 && journalFile is null)
         {
-            journalInfoFile = File(Root, ".journal_info_block", new byte[180], []);
-            journalFile = File(Root, ".journal", new byte[JournalBlocks * Block], []);
+            // As Mac OS X makes them: type 'jrnl', creator 'hfs+', the info block's file a whole block.
+            journalInfoFile = File(Root, ".journal_info_block", new byte[Block], [], type: "jrnl", creator: "hfs+");
+            journalFile = File(Root, ".journal", new byte[JournalBlocks * Block], [], type: "jrnl", creator: "hfs+");
         }
 
         // Blocks: 0 the header, then the allocation file (one block holds 32,768 bits), the trees, then the forks.
@@ -211,7 +212,7 @@ internal sealed class HfsPlusBuilder
             jib.WriteUInt32At((int)(info * Block), 1u);                            // in this file system
             jib.WriteUInt64At((int)(info * Block) + 36, start * (ulong)Block);
             jib.WriteUInt64At((int)(info * Block) + 44, (ulong)(JournalBlocks * Block));
-            WriteJournalHeader(image, (int)(start * Block), JournalBlocks * (long)Block, JournalSector, JournalSector);
+            WriteJournalHeader(image, (int)(start * Block), JournalBlocks * (long)Block, JournalSector, JournalSector, LittleEndianJournal);
         }
 
         header.CopyTo(image, 1024);
@@ -219,19 +220,46 @@ internal sealed class HfsPlusBuilder
         return image;
     }
 
-    /// <summary>A big-endian journal header at <paramref name="at"/>, its checksum over its sector (as the reader checks it).</summary>
-    public static void WriteJournalHeader(byte[] image, int at, long size, long start, long end)
+    /// <summary>The journal in the byte order of an Intel Mac (TN1150: the order of the Mac that wrote it).</summary>
+    public bool LittleEndianJournal { get; init; }
+
+    /// <summary>A journal header at <paramref name="at"/>, its checksum over the 44-byte header (TN1150).</summary>
+    public static void WriteJournalHeader(byte[] image, int at, long size, long start, long end, bool little = false)
     {
         image.AsSpan(at, JournalSector).Clear();
-        var w = new BigEndianWriter(image);
-        w.WriteUInt32At(at, 0x4A4E4C78u);
-        w.WriteUInt32At(at + 4, 0x12345678u);
-        w.WriteUInt64At(at + 8, (ulong)start);
-        w.WriteUInt64At(at + 16, (ulong)end);
-        w.WriteUInt64At(at + 24, (ulong)size);
-        w.WriteUInt32At(at + 32, (uint)BlockListHeader);
-        w.WriteUInt32At(at + 40, (uint)JournalSector);
-        w.WriteUInt32At(at + 36, Checksum(image.AsSpan(at, JournalSector), 36));
+        var h = image.AsSpan(at);
+        Put32(h, 0, 0x4A4E4C78u, little);
+        Put32(h, 4, 0x12345678u, little);
+        Put64(h, 8, (ulong)start, little);
+        Put64(h, 16, (ulong)end, little);
+        Put64(h, 24, (ulong)size, little);
+        Put32(h, 32, BlockListHeader, little);
+        Put32(h, 40, JournalSector, little);
+        Put32(h, 36, Checksum(image.AsSpan(at, 44), 36), little);
+    }
+
+    public static void Put32(Span<byte> bytes, int at, uint value, bool little)
+    {
+        if (little)
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(bytes[at..], value);
+        }
+        else
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(bytes[at..], value);
+        }
+    }
+
+    public static void Put64(Span<byte> bytes, int at, ulong value, bool little)
+    {
+        if (little)
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(bytes[at..], value);
+        }
+        else
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt64BigEndian(bytes[at..], value);
+        }
     }
 
     /// <summary>TN1150's calc_checksum over bytes, the 4-byte checksum field at <paramref name="field"/> taken as zero.</summary>

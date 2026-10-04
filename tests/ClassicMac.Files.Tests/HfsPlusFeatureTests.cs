@@ -2321,15 +2321,16 @@ public sealed class HfsPlusFeatureTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void HfsPlusChecksTheEntire2048ByteJournalHeaderSector(bool corruptUnusedSectorByte)
+    public void HfsPlusJournalChecksumCoversTheHeaderNotItsWhole2048ByteSector(bool corruptChecksum)
     {
         byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100, includeJournalFiles: true);
         HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
             journalSize: HfsPlusFixture.Block);
         HfsPlusFixture.SetJournalHeader(image, start: 2048, end: 2048, headerSectorSize: 2048);
-        if (corruptUnusedSectorByte)
+        image[13 * HfsPlusFixture.Block + 1024] ^= 0x01;                          // past the 44-byte header: not checksummed
+        if (corruptChecksum)
         {
-            image[13 * HfsPlusFixture.Block + 1024] ^= 0x01;
+            image[13 * HfsPlusFixture.Block + 39] ^= 0x01;
         }
 
         var diagnostics = new List<Diagnostic>();
@@ -2338,7 +2339,7 @@ public sealed class HfsPlusFeatureTests
             new ContainerContext(diagnostics: diagnostics));
 
         Assert.Single(files, file => file.MacPath == "Documents:Read Me");
-        Assert.Equal(corruptUnusedSectorByte, diagnostics.Any(diagnostic =>
+        Assert.Equal(corruptChecksum, diagnostics.Any(diagnostic =>
             diagnostic.Code == "hfs.plus-journal-info-invalid" &&
             diagnostic.Severity == DiagnosticSeverity.Warning));
     }
@@ -4109,13 +4110,16 @@ public sealed class HfsPlusFeatureTests
     [Theory]
     [InlineData(0, 1)]
     [InlineData(1, 0)]
-    public void HfsPlusFolderValenceMustMatchItsDirectChildren(uint rootValence, uint documentsValence)
+    public void HfsPlusFolderValenceOtherThanItsDirectChildrenIsReported(uint rootValence, uint documentsValence)
     {
         byte[] image = HfsPlusFixture.Build(rootFolderValence: rootValence,
             documentsFolderValence: documentsValence);
+        var context = new ContainerContext();
 
-        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
-            ForkData.FromBytes(image), new ContainerContext()));
+        var files = HfsReader.Instance.Read(ForkData.FromBytes(image), context);
+
+        Assert.NotEmpty(files);                                                    // a repairable count (First Aid's #3)
+        Assert.Contains(context.Diagnostics, d => d.Code == "hfs.plus-valence" && d.Severity == DiagnosticSeverity.Warning);
     }
 
     [Theory]

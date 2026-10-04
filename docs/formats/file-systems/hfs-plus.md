@@ -379,10 +379,13 @@ When the journaled bit is set [Doc: TN1150 Journal Info Block, Journal Header]:
 
 1. `journalInfoBlock` points at an allocated block inside the allocation area.
 2. The JournalInfoBlock's flags say the journal is in this file system, and its range lies in the allocation area.
-3. The root's `.journal_info_block` is one extent at `journalInfoBlock`; `.journal` is one extent starting at the
-   journal's offset, with its size as logical size.
+3. The root's `.journal_info_block` is one extent at `journalInfoBlock`, its logical size from the info block's 180
+   bytes to its one block (Mac OS X gives it the whole block) [Fitted: a journaled Mac OS X volume]; `.journal` is
+   one extent starting at the journal's offset, with its size as logical size.
 4. Unless the needs-initialisation flag is set, the header's magic, endian marker, sizes and circular-buffer offsets
-   are consistent and its checksum, over the full `jhdr_size` sector, matches.
+   are consistent and its checksum, over the 44-byte `journal_header` (not the rest of its sector), matches. The
+   header is in the byte order of the Mac that wrote it, which the endian field tells: an Intel Mac writes it
+   little-endian [Doc: TN1150] [Verified: a journaled Mac OS X volume, little-endian, its checksum over 44 bytes].
 
 ### 2.8 Files and links
 
@@ -449,7 +452,7 @@ Structural damage makes the volume unreadable: the reader throws `InvalidDataExc
 `container.unreadable`. That covers a bad signature or version, an invalid allocation area, a missing allocation file
 or extents tree, an invalid wrapper extent (zero, outside the wrapper's allocation area or the image, or under 1,536
 bytes), an attributes fork with allocated blocks but no B-tree header, and any failure of §2.2, §2.3 (but the attributes
-`btreeType`), §2.4 items 1–7 (but HFSX `folderCount`) and the name rules, and §2.6 items 1–2. HFS Plus keeps accepting the Unicode 2.1 forms and the sequences `FixDecomps` corrects, since its names may
+`btreeType`), §2.4 items 1–6 (item 7's valence is reported) and the name rules, and §2.6 items 1–2. HFS Plus keeps accepting the Unicode 2.1 forms and the sequences `FixDecomps` corrects, since its names may
 come from either version; HFSX rejects them. Header fields TN1150 calls reserved are not required to be zero, and the
 attributes tree's `keyCompareType` is ignored.
 
@@ -464,7 +467,7 @@ Everything else is reported and the volume read (§6):
 - An attributes tree with `btreeType` `$FF`, seen on the reference image (§7), is read.
 - Attribute records for unknown CNIDs; has-attributes and has-security flags; the ACL attribute's magic, entry count,
   payload length and ACE kinds (principals, flags and rights are not checked); BSD modes.
-- Links: a file with only one of `hlnk`/`hfs+`, or a directory-link candidate (link-chain flag and `alis` or `MACS`)
+- Links: a file of type `hlnk` without creator `hfs+`, or a directory-link candidate (link-chain flag and `alis` or `MACS`)
   without both codes and `IsAlias`, stays an ordinary file. A reference with no indirect node, or a `dir_<CNID>`
   without the link-chain flag, keeps the link with its own forks. Indirect-node names that are not canonical decimal
   are skipped; an indirect node that is a folder is not used. An indirect node no link refers to, and one whose
@@ -477,12 +480,13 @@ Everything else is reported and the volume read (§6):
 `HfsFirstAid.Verify` checks an HFS Plus volume, bare or in its HFS wrapper, in stages like HFS's
 ([hfs.md §5.6](hfs.md#56-first-aid)), with the same report, verdicts and repair flags, and Disk First Aid's problem
 numbers and words where they mean the same. The rules are TN1150's; where Disk First Aid's own HFS Plus checks are not
-traced, the choices are ClassicMac's [ClassicMac]. HFSX is "not checked".
+traced, the choices are ClassicMac's [ClassicMac]. HFSX is "not checked". A volume the reader refuses (§5.2) is still checked and repaired: `check`, the edit session and
+`repair` know it by its signature at byte 1024.
 
 1. **"Checking disk volume."**: the volume is the image (`'H+'` at 1024) or a wrapper's `drEmbedExtent`. A journaled
    volume's journal (§1.6) is replayed first, on a copy, as TN1150's "Replaying the Journal" describes: the journal
-   info block, the journal header (its magic, the byte order its endian field gives, sizes and checksum over the
-   header sector), then each block list from `start` to `end`, wrapping from the journal's end to just after its
+   info block, the journal header (its magic, the byte order its endian field gives, sizes and checksum over its 44
+   bytes), then each block list from `start` to `end`, wrapping from the journal's end to just after its
    header, its checksum over the first 32 bytes checked and its blocks copied to `bnum × jhdr_size` in the volume
    (`bnum` all ones skipped). TN1150 gives a block list's data blocks both as `binfo[1]` to `binfo[num_blocks]` and
    as `num_blocks − 1`; the field's description, which counts `binfo[0]`, is followed [Doc: TN1150]. The stage line
@@ -569,8 +573,9 @@ has not been followed in its code; Mac OS 9.0 does not mount HFSX at all, and th
 | `hfs.plus-hardlink-indirect-not-file` | Warning | A link reference names an indirect node that is a folder | Keeps the link with its own forks | Not traced |
 | `hfs.plus-hardlink-indirect-orphan` | Info | An indirect node has no link referring to it | Reports only | Not traced |
 | `hfs.plus-hardlink-private-directory-invalid` | Warning | The directory-link private folder lacks the immutable owner flag or the sticky bit | Reads on | `dirhardlink.c` checks these flags [Code] |
-| `hfs.plus-hardlink-signature-invalid` | Warning | A file has only one of `hlnk`/`hfs+`, or a directory-link candidate lacks `alis`, `MACS` or `IsAlias` | Keeps it as an ordinary file | Not traced |
+| `hfs.plus-hardlink-signature-invalid` | Warning | A file of type `hlnk` whose creator is not `hfs+` (creator `hfs+` alone is Apple's mark for its own files, the journal files `jrnl`/`hfs+` among them [Fitted: a journaled Mac OS X volume]), or a directory-link candidate lacks `alis`, `MACS` or `IsAlias` | Keeps it as an ordinary file | Not traced |
 | `hfs.plus-hardlink-target-missing` | Warning | A link reference has no indirect node, or a directory link's `dir_<CNID>` lacks the link-chain flag | Keeps the link with its catalog forks | Not traced |
+| `hfs.plus-valence` | Warning | A folder's `valence` is not its file and folder records (§2.4 item 7) | Reads on; First Aid repairs it | TN1150 [Doc] |
 | `hfs.plus-invalid-bsd-mode` | Warning | An initialised BSD mode does not match the record (folder not a directory, file of an unknown type) | Reads on | `fsck_hfs` `CheckBSDInfo` [Code] |
 | `hfs.plus-journal-info-invalid` | Warning | The JournalInfoBlock pointer, flags, range or allocation, the root journal files or their extents, or the journal header are inconsistent | Reads the catalog without replaying the journal | TN1150 Journal Info Block [Doc] |
 | `hfs.plus-journal-not-replayed` | Info | The volume is journaled | Reads the recorded structures | Not traced |

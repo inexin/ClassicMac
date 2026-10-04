@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -74,7 +75,9 @@ internal static class HfsPlusJournal
             return;
         }
 
-        if (!infoFile.IsSingleExtent || infoFile.LogicalSize != 180 || infoFile.TotalBlocks != 1 ||
+        // The info block's 180 bytes, in a file of one block: Mac OS X gives it the whole block as its logical size
+        // [Fitted: a journaled Mac OS X volume].
+        if (!infoFile.IsSingleExtent || infoFile.LogicalSize < 180 || infoFile.LogicalSize > blockSize || infoFile.TotalBlocks != 1 ||
             infoFile.ExtentStart != journalInfoBlock)
         {
             context.Report(DiagnosticSeverity.Warning, "hfs.plus-journal-info-invalid",
@@ -114,46 +117,40 @@ internal static class HfsPlusJournal
             return;
         }
 
-        var fields = new BigEndianReader(
-            image.Slice((long)journalInfo.Offset, journalHeaderLength).ToArray(journalHeaderLength));
-        uint magic = U32(fields, 0);
-        uint endian = U32(fields, 4);
-        ulong start = U64(fields, 8);
-        ulong end = U64(fields, 16);
-        ulong declaredSize = U64(fields, 24);
-        uint blockListHeaderSize = U32(fields, 32);
-        uint expectedChecksum = U32(fields, 36);
-        uint headerSize = U32(fields, 40);
+        // The header is in the byte order of the Mac that wrote it; its endian field tells which [Doc: TN1150].
+        byte[] header = image.Slice((long)journalInfo.Offset, journalHeaderLength).ToArray(journalHeaderLength);
+        bool little = BinaryPrimitives.ReadUInt32LittleEndian(header) == journalHeaderMagic;
+        uint Field32(int at) => little ? BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(at)) : new BigEndianReader(header).ReadUInt32At(at);
+        ulong Field64(int at) => little ? BinaryPrimitives.ReadUInt64LittleEndian(header.AsSpan(at)) : new BigEndianReader(header).ReadUInt64At(at);
+        uint magic = Field32(0);
+        uint endian = Field32(4);
+        ulong start = Field64(8);
+        ulong end = Field64(16);
+        ulong declaredSize = Field64(24);
+        uint blockListHeaderSize = Field32(32);
+        uint expectedChecksum = Field32(36);
+        uint headerSize = Field32(40);
 
         if (magic != journalHeaderMagic || endian != endianMagic || declaredSize != journalInfo.Size ||
             headerSize < journalHeaderLength || headerSize > journalInfo.Size || blockListHeaderSize < 32 ||
             start < headerSize || start >= journalInfo.Size || end < headerSize || end > journalInfo.Size ||
-            CalculateJournalHeaderChecksum(image, journalInfo.Offset, headerSize) != expectedChecksum)
+            CalculateJournalHeaderChecksum(header) != expectedChecksum)
         {
             ReportInvalidJournalHeader(context);
         }
     }
 
-    internal static uint CalculateJournalHeaderChecksum(ForkData image, ulong journalOffset, uint headerSize)
+    // TN1150's calc_checksum over the 44-byte journal_header, its checksum field taken as zero [Doc: TN1150; Verified:
+    // a journaled Mac OS X volume, whose checksum covers the 44 bytes, not the header's sector].
+    internal static uint CalculateJournalHeaderChecksum(ReadOnlySpan<byte> header)
     {
         uint checksum = 0;
-        byte[] buffer = new byte[8192];
-        using Stream stream = image.Slice(checked((long)journalOffset), headerSize).Open();
-        long position = 0;
-        while (position < headerSize)
+        for (int position = 0; position < 44; position++)
         {
-            int count = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, headerSize - position));
-            if (count == 0)
-            {
-                throw new EndOfStreamException("The HFS Plus journal header is truncated.");
-            }
-
-            for (int index = 0; index < count; index++, position++)
-            {
-                byte value = position is >= 36 and < 40 ? (byte)0 : buffer[index];
-                checksum = unchecked((checksum << 8) ^ (checksum + value));
-            }
+            byte value = position is >= 36 and < 40 ? (byte)0 : header[position];
+            checksum = unchecked((checksum << 8) ^ (checksum + value));
         }
+
         return ~checksum;
     }
 

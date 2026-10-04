@@ -64,8 +64,9 @@ public sealed class InputEditSession
         Path = System.IO.Path.GetFullPath(path);
         this.options = options;
         this.host = host;
-        // A plain HFS volume image, known by its MDB (an empty volume has no files to show it), or an HFS Plus one.
-        if (DataFileIsDisk(host) && root.Volume?.Format is "HFS" or "HFS Plus" && VolumeKind(host.File.DataFork) is { } plain)
+        // A plain HFS volume image, known by its MDB (an empty volume has no files to show it), or an HFS Plus one; also
+        // one the reader refused, which First Aid may still repair.
+        if (DataFileIsDisk(host) && root.Volume?.Format is "HFS" or "HFS Plus" or null && VolumeKind(host.File.DataFork) is { } plain)
         {
             Kind = plain;
             return;

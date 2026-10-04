@@ -380,9 +380,10 @@ internal static class HfsPlusReader
         foreach (var (folderId, folder) in folders)
         {
             uint childCount = childCounts[folderId];
+            // A wrong count, which First Aid repairs (#3): reported, and the volume read on.
             if (folder.Valence != childCount)
             {
-                throw new InvalidDataException(
+                context.Report(DiagnosticSeverity.Warning, "hfs.plus-valence",
                     $"HFS Plus folder {folderId} has valence {folder.Valence}, but {childCount} catalog children.");
             }
 
