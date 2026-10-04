@@ -1,0 +1,926 @@
+<!--
+  The main window's styles: the tree, the empty state, the inspector, the hex view, the previews and the forms. Included by
+  MainWindow.axaml; the parts it is split into (UserControls under Views/) inherit them.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ClassicMac.App.ViewModels"
+        xmlns:views="using:ClassicMac.App.Views">
+  <!-- The tree's filter and type-ahead (boards/browse-tree.md S6): the filter field (28 high, search icon, "Ctrl+F"),
+       matched letters on CmMatchSoft (CmMatch on the current match), rows that do not match dimmed to CmTextMuted,
+       and the type-ahead pill at the bottom of the tree (CmPaneBackground, CmAccent border, CmShadowPopover). -->
+  <Style Selector="TextBox.filter">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="4,4,6,4" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="PathIcon.search">
+    <Setter Property="Width" Value="12" />
+    <Setter Property="Height" Value="12" />
+    <Setter Property="Margin" Value="8,0,2,0" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="TextBlock.key-hint">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeCaption}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Run.match.on">
+    <Setter Property="Background" Value="{DynamicResource CmMatchSoft}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+  </Style>
+  <Style Selector="Run.match.on.current">
+    <Setter Property="Background" Value="{DynamicResource CmMatch}" />
+  </Style>
+  <Style Selector="ListBox.browse TextBlock.name.dimmed">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="Border.type-ahead">
+    <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmAccent}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="10,4" />
+    <Setter Property="Margin" Value="8,0,8,10" />
+    <Setter Property="BoxShadow" Value="{DynamicResource CmShadowPopover}" />
+  </Style>
+  <Style Selector="Border.type-ahead Border.key">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmControlBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusSmall}" />
+    <Setter Property="Padding" Value="4,0" />
+  </Style>
+  <Style Selector="Border.type-ahead TextBlock.caret">
+    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+  </Style>
+  <!-- The empty state (boards/empty-state.md S5): a centred 640 column on CmPaneBackground, the drop zone (300 high,
+       2 px dashed CmControlBorder, radius 12, CmSidebarBackground; CmAccent on CmRowHighlight while a drag is over
+       the window) and the Recent list. -->
+  <Style Selector="Border.empty-state">
+    <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+  </Style>
+  <Style Selector="Border.drop-zone">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Height" Value="300" />
+  </Style>
+  <Style Selector="Border.drop-zone Rectangle.dash">
+    <Setter Property="Stroke" Value="{DynamicResource CmControlBorder}" />
+    <Setter Property="StrokeThickness" Value="2" />
+    <Setter Property="StrokeDashArray" Value="4,3" />
+    <Setter Property="RadiusX" Value="12" />
+    <Setter Property="RadiusY" Value="12" />
+  </Style>
+  <Style Selector="Border.drop-zone.active">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+  </Style>
+  <Style Selector="Border.drop-zone.active Rectangle.dash">
+    <Setter Property="Stroke" Value="{DynamicResource CmAccent}" />
+  </Style>
+  <Style Selector="TextBlock.empty-title">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeTitle}" />
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+    <Setter Property="TextAlignment" Value="Center" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Border.recent-list">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadius}" />
+  </Style>
+  <Style Selector="Button.recent">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="CornerRadius" Value="0" />
+  </Style>
+  <!-- The tree's rows (design/boards/tree-no-name.md): no-name titles in italics, whitespace made visible in mono
+       (.mono), the group's count as the row's meta ("4 files"). The tree's header (the Tree display button) and footer
+       ("N invisible items hidden · Show") sit on CmSidebarBackground with CmDivider rules; Show is a CmAccent link. -->
+  <!-- An alias whose original is not found: dimmed (its badge carries the mark). -->
+  <Style Selector="TextBlock.broken">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="TextBlock.italic">
+    <Setter Property="FontStyle" Value="Italic" />
+  </Style>
+  <Style Selector="Border.tree-bar">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+  </Style>
+  <Style Selector="Button.link /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+  </Style>
+  <Style Selector="FlyoutPresenter.tree-display">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+  </Style>
+  <Style Selector="ListBox.hex ListBoxItem">
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="{DynamicResource CmRowList}" />
+  </Style>
+
+  <!-- The hex grid (boards/hex.md): mono 13, 24 high lines; byte cells 24 wide with a gap after the eighth, characters
+       9 wide; zero bytes lighter; changed bytes on CmWarningTint in SemiBold; the cursor on CmHexCursor. -->
+  <Style Selector="Border.hex-bar">
+    <Setter Property="Padding" Value="12,8" />
+  </Style>
+  <Style Selector="TextBox.go-to">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    <Setter Property="Width" Value="110" />
+  </Style>
+  <Style Selector="StackPanel.hex-header">
+    <Setter Property="Margin" Value="12,0,12,2" />
+  </Style>
+  <Style Selector="StackPanel.hex-header TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="TextBlock.hex-offset">
+    <Setter Property="Width" Value="68" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.hex-text">
+    <Setter Property="Margin" Value="12,0,0,0" />
+  </Style>
+  <Style Selector="Border.hex-cell">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="20" />
+  </Style>
+  <Style Selector="Border.hex-cell.group-end">
+    <Setter Property="Margin" Value="0,0,8,0" />
+  </Style>
+  <Style Selector="Border.hex-cell > TextBlock">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.hex-char">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Width" Value="9" />
+    <Setter Property="Height" Value="20" />
+  </Style>
+  <Style Selector="Border.hex-char > TextBlock">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.hex-cell.zero > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="Border.in-field">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+  </Style>
+  <Style Selector="Border.selected">
+    <Setter Property="Background" Value="{DynamicResource CmSelectionInactive}" />
+  </Style>
+  <Style Selector="Border.hex-find">
+    <Setter Property="Padding" Value="12,0,12,8" />
+  </Style>
+  <Style Selector="TextBox.find">
+    <Setter Property="Width" Value="180" />
+  </Style>
+  <Style Selector="Border.match">
+    <Setter Property="Background" Value="{DynamicResource CmMatch}" />
+  </Style>
+  <Style Selector="Border.changed">
+    <Setter Property="Background" Value="{DynamicResource CmWarningTint}" />
+  </Style>
+  <Style Selector="Border.changed > TextBlock">
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+  </Style>
+  <Style Selector="Border.cursor">
+    <Setter Property="Background" Value="{DynamicResource CmHexCursor}" />
+  </Style>
+  <Style Selector="Border.cursor > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource CmOnAccent}" />
+  </Style>
+  <Style Selector="Border.hex-inspector">
+    <Setter Property="Width" Value="212" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
+    <Setter Property="BorderThickness" Value="1,0,0,0" />
+  </Style>
+  <Style Selector="Border.hex-inspector TextBlock.mono">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+  </Style>
+  <Style Selector="TextBlock.hex-status">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="12,0" />
+  </Style>
+
+  <!-- The diagnostics list: 26 px rows divided by CmDivider, indented 32 under their group; the selected row is
+       CmRowHighlight with a 3 px CmAccent bar on the left (design/boards/diagnostics.md), its muted code staying
+       muted on that light highlight. -->
+  <Style Selector="ListBox.diagnostics ListBoxItem">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+  <Style Selector="ListBox.diagnostics ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderThickness" Value="3,0,0,0" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.diagnostics ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmAccent}" />
+  </Style>
+  <Style Selector="ListBox.diagnostics:focus-within ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmAccent}" />
+  </Style>
+  <Style Selector="ListBox.diagnostics:focus-within ListBoxItem:selected :is(TextBlock).muted">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="Border.diagnostic-row">
+    <Setter Property="Height" Value="26" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+  </Style>
+  <Style Selector="ListBox.grouped Border.diagnostic-row">
+    <Setter Property="Padding" Value="32,0,8,0" />
+  </Style>
+  <Style Selector="Border.diagnostic-group">
+    <Setter Property="Height" Value="27" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+  </Style>
+  <Style Selector="Grid.diagnostic-columns">
+    <Setter Property="Margin" Value="11,0,8,0" />
+  </Style>
+  <Style Selector="Border.diagnostics-header">
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="Border.diagnostics-header.collapsed">
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+  </Style>
+  <Style Selector="ListBox.diagnostics Button.show-item">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="ListBox.diagnostics ListBoxItem:selected Button.show-item">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+
+  <!-- The diagnostics' drag handle: a 6 px chrome strip under a CmBorder line, a 36 x 2 grip in its middle. -->
+  <Style Selector="GridSplitter.handle">
+    <Setter Property="Background" Value="{DynamicResource CmChromeBackground}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource CmBorder}" BorderThickness="0,1,0,0">
+          <Border Width="36" Height="2" CornerRadius="1" Background="{DynamicResource CmControlBorder}"
+                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Grid.diagnostic-columns.grouped">
+    <Setter Property="Margin" Value="35,0,8,0" />
+  </Style>
+
+  <!-- Title bar (S1): CmBarTitle high on CmTitleBarBackground, the title in CmFontMeta and CmTextMuted, the unsaved
+       mark in CmAccent. The caption buttons (Avalonia's drawn ones on Windows, the system's on macOS) sit over its right or left end. -->
+  <!-- A help page's source in mono; a document's text in the body font. -->
+  <Style Selector="SelectableTextBlock#HelpSource">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+  </Style>
+  <Style Selector="SelectableTextBlock#HelpSource.document">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontSans}" />
+  </Style>
+  <Style Selector="Border.titlebar">
+    <Setter Property="Height" Value="{DynamicResource CmBarTitle}" />
+    <Setter Property="Background" Value="{DynamicResource CmTitleBarBackground}" />
+    <Setter Property="Padding" Value="12,0,146,0" />
+  </Style>
+  <Style Selector="Border.titlebar.mac">
+    <Setter Property="Padding" Value="78,0,12,0" />
+  </Style>
+  <Style Selector="Border.titlebar TextBlock">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.titlebar TextBlock.unsaved">
+    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+    <Setter Property="Margin" Value="-4,0,0,0" />
+  </Style>
+
+  <!-- Toolbar (S2): CmBarTool high, a CmBorder line below; 34-high buttons with an 18 px stroke icon over a CmFontMeta
+       label, transparent until hovered, 40% opacity when disabled; groups split by 1 x 24 CmBorder lines. -->
+  <Style Selector="Border.toolbar">
+    <Setter Property="Height" Value="{DynamicResource CmBarTool}" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
+  </Style>
+  <Style Selector="Button.tool">
+    <Setter Property="Height" Value="40" />
+    <Setter Property="MinWidth" Value="52" />
+    <Setter Property="Padding" Value="6,2" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.tool StackPanel">
+    <Setter Property="Spacing" Value="2" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.tool TextBlock">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.tool:disabled">
+    <Setter Property="Opacity" Value="0.4" />
+  </Style>
+  <Style Selector="Button.tool:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Path.tool-icon">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Stroke" Value="{DynamicResource CmText}" />
+    <Setter Property="StrokeThickness" Value="1.5" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+  </Style>
+  <Style Selector="Border.tool-divider">
+    <Setter Property="Width" Value="1" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="Margin" Value="6,0" />
+    <Setter Property="Background" Value="{DynamicResource CmBorder}" />
+  </Style>
+  <Style Selector="TextBlock.tool-label">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="StackPanel:disabled TextBlock.tool-label">
+    <Setter Property="Opacity" Value="0.4" />
+  </Style>
+  <Style Selector="StackPanel:disabled ListBox.segmented">
+    <Setter Property="Opacity" Value="0.4" />
+  </Style>
+
+  <!-- The read-then-edit host (boards/read-then-edit.md, E1): the footer on CmSidebarBackground under a CmDivider
+       line; while editing, a 3 px CmAccent line over the values; Apply greyed while the values have an error. -->
+  <Style Selector="Border.host-footer">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Padding" Value="16,10" />
+    <Setter Property="MinHeight" Value="50" />
+  </Style>
+  <Style Selector="Border.host-footer TextBlock">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.applied">
+    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+  </Style>
+  <Style Selector="TextBlock.form-error">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="PathIcon.lock">
+    <Setter Property="Width" Value="12" />
+    <Setter Property="Height" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.host-values">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmAccent}" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="DockPanel.form-host.editing Border.host-values">
+    <Setter Property="BorderThickness" Value="0,3,0,0" />
+  </Style>
+  <Style Selector="ContentControl.form-content">
+    <Setter Property="Margin" Value="16,12" />
+  </Style>
+  <Style Selector="Grid.menu-form">
+    <Setter Property="Margin" Value="-16,-12" />
+  </Style>
+
+  <!-- Property cards (boards/window-alert.md, E4): CmCardBorder, radius 8; rows 34 high with CmDivider between and
+       a 150 label column in CmTextMuted; dots for yes/no (filled CmAccent for yes); the screen panel 320 wide. -->
+  <Style Selector="StackPanel.cards">
+    <Setter Property="Spacing" Value="12" />
+  </Style>
+  <Style Selector="Border.card">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusLarge}" />
+    <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="TextBlock.card-title">
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+    <Setter Property="Margin" Value="14,10,14,4" />
+  </Style>
+  <Style Selector="TextBlock.card-note">
+    <Setter Property="Margin" Value="14,4,14,8" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+  </Style>
+  <Style Selector="Grid.card-row">
+    <Setter Property="MinHeight" Value="{DynamicResource CmRowForm}" />
+    <Setter Property="Margin" Value="14,0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Grid.card-row > :is(Control)">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Grid.card-row > TextBlock.label">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="Border.card-line">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+  </Style>
+  <Style Selector="Border.card-line.last">
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="Border.card TextBlock.mono">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+  </Style>
+  <!-- The property view (boards/property-view.md, P2) on these cards: values selectable, raw values in mono
+       CmTextMuted beside them, no line under the last row. -->
+  <Style Selector="SelectableTextBlock.property-value">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="SelectableTextBlock.property-value.mono">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+  </Style>
+  <Style Selector="SelectableTextBlock.property-raw">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="ItemsControl.property-rows ContentPresenter:nth-last-child(1) > Border.card-line">
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="Ellipse.dot">
+    <Setter Property="Width" Value="9" />
+    <Setter Property="Height" Value="9" />
+    <Setter Property="Stroke" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="StrokeThickness" Value="1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Ellipse.dot.on">
+    <Setter Property="Fill" Value="{DynamicResource CmAccent}" />
+    <Setter Property="Stroke" Value="{DynamicResource CmAccent}" />
+  </Style>
+  <Style Selector="Grid.card-columns">
+    <Setter Property="Margin" Value="14,0,14,4" />
+  </Style>
+  <Style Selector="Grid.stage-row > :is(Control)">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Border.screen-panel">
+    <Setter Property="Width" Value="320" />
+    <Setter Property="Margin" Value="16,0,0,0" />
+    <Setter Property="Padding" Value="16,12" />
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusLarge}" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+  </Style>
+
+  <!-- The template form (boards/template-form.md, E6): the note on CmWarningTint, fields in a card with their type
+       codes, list headings, item cards with a header strip, nested lists as compact tables, the template panel 300 wide. -->
+  <Style Selector="Border.note-banner">
+    <Setter Property="Background" Value="{DynamicResource CmWarningTint}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadius}" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="Margin" Value="0,0,0,12" />
+  </Style>
+  <Style Selector="Border.note-banner TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource CmWarning}" />
+  </Style>
+  <Style Selector="Grid.template-field TextBlock.type-code">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="Margin" Value="8,0,0,0" />
+  </Style>
+  <Style Selector="Grid.template-field > TextBlock.label">
+    <Setter Property="Margin" Value="0,0,12,0" />
+  </Style>
+  <Style Selector="Grid.template-field TextBlock.value.code">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+  </Style>
+  <Style Selector="TextBlock.count-note">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="StackPanel.template-list">
+    <Setter Property="Margin" Value="14,10" />
+  </Style>
+  <Style Selector="TextBlock.list-heading">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeBody}" />
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.item-card">
+    <Setter Property="Margin" Value="0,0,0,8" />
+  </Style>
+  <Style Selector="Border.item-header">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="Padding" Value="12,6" />
+  </Style>
+  <Style Selector="TextBlock.item-key">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="StackPanel.compact-table :is(Control).table-cell">
+    <Setter Property="Width" Value="112" />
+    <Setter Property="Margin" Value="0,2" />
+  </Style>
+  <Style Selector="StackPanel.compact-table Panel.table-cell TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.link.danger">
+    <Setter Property="Foreground" Value="{DynamicResource CmError}" />
+  </Style>
+  <Style Selector="Border.template-panel">
+    <Setter Property="Width" Value="300" />
+    <Setter Property="Margin" Value="16,0,0,0" />
+    <Setter Property="Padding" Value="16,12" />
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusLarge}" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+  </Style>
+  <Style Selector="Border.template-panel TextBlock.outline">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+  </Style>
+  <Style Selector="Border.template-panel TextBlock.note">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+  </Style>
+
+  <!-- The menu form (E2): summary, table rows 32 high with CmDivider between, the selected row CmRowHighlight with a
+       3 px CmAccent bar, disabled items muted, dividers as a short rule; key fields that clash in CmError on
+       CmErrorTint; the preview panel 420 wide. -->
+  <Style Selector="StackPanel.menu-table :is(Control).editing">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="StackPanel.menu-table.editing :is(Control).editing">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <Style Selector="StackPanel.menu-table.editing :is(Control).read-only">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="WrapPanel.menu-summary > TextBlock, WrapPanel.menu-fields > :is(Control)">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,0,8,4" />
+  </Style>
+  <Style Selector="WrapPanel.menu-summary > TextBlock.value">
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+    <Setter Property="Margin" Value="0,0,20,4" />
+  </Style>
+  <Style Selector="Grid.menu-columns">
+    <Setter Property="Margin" Value="11,0,8,4" />
+  </Style>
+  <Style Selector="Border.table-row">
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Padding" Value="11,2,8,2" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Border.table-row.selected">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+  </Style>
+  <Style Selector="Border.table-row Border.bar">
+    <Setter Property="Width" Value="3" />
+    <Setter Property="Margin" Value="-11,-2,0,-2" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Background" Value="{DynamicResource CmAccent}" />
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Border.table-row.selected Border.bar">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <Style Selector="Border.table-row Grid.read-only > TextBlock">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.table-row.dimmed Grid.read-only TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="Border.table-row StackPanel.divider-mark">
+    <Setter Property="IsVisible" Value="False" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.table-row.divider StackPanel.divider-mark">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <Style Selector="Border.table-row.divider TextBlock.item-text">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Border.rule">
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource CmBorder}" />
+  </Style>
+  <Style Selector="Border.table-row Grid.editing > :is(Control)">
+    <Setter Property="Margin" Value="0,0,6,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBox.conflict">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmError}" />
+    <Setter Property="Background" Value="{DynamicResource CmErrorTint}" />
+  </Style>
+  <Style Selector="Button.row-tool">
+    <Setter Property="Padding" Value="4,0" />
+    <Setter Property="FontSize" Value="9" />
+  </Style>
+  <Style Selector="Button.row-tool.remove">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeBody}" />
+  </Style>
+  <!-- The menu rows' Mark select: a little less inner padding, so "Check mark" fits, and "Other" beside its code field. -->
+  <Style Selector="ComboBox.mark">
+    <Setter Property="Padding" Value="8,5,0,7" />
+    <Setter Property="MinWidth" Value="0" />
+  </Style>
+  <Style Selector="Button.row-tool PathIcon.row-chevron">
+    <Setter Property="Width" Value="10" />
+    <Setter Property="Height" Value="10" />
+  </Style>
+  <Style Selector="WrapPanel.menu-fields > StackPanel">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Spacing" Value="6" />
+  </Style>
+  <Style Selector="WrapPanel.menu-fields > StackPanel > TextBlock">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- Table inputs (28 high, as boards/read-then-edit.md has them inside tables) fit their columns. -->
+  <Style Selector="Border.table-row Grid.editing TextBox, Border.table-row Grid.editing ComboBox">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="Border.table-row Grid.editing NumericUpDown, WrapPanel.menu-fields NumericUpDown">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+  </Style>
+  <!-- The cards' coordinates, IDs and values: typed (or arrowed) in mono without the spinner buttons, which left too
+       little room for "-32768" (four bounds fit one row). -->
+  <Style Selector="NumericUpDown.coord">
+    <Setter Property="ShowButtonSpinner" Value="False" />
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="Width" Value="84" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="NumericUpDown.coord.wide">
+    <Setter Property="Width" Value="132" />
+  </Style>
+  <Style Selector="Border.table-row Grid.editing TextBox, Border.table-row Grid.editing ComboBox">
+    <Setter Property="Padding" Value="6,2" />
+  </Style>
+  <Style Selector="Border.table-row Grid.editing CheckBox">
+    <Setter Property="MinWidth" Value="0" />
+  </Style>
+  <Style Selector="WrapPanel.menu-fields TextBox">
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Padding" Value="6,2" />
+  </Style>
+  <Style Selector="StackPanel.menu-table.editing Border.table-row">
+    <Setter Property="Padding" Value="11,1,8,1" />
+    <Setter Property="MinHeight" Value="30" />
+  </Style>
+
+  <!-- E5's read-only views: a double-click anywhere on them edits; labelled rows 8 apart. -->
+  <Style Selector="Border.read-view">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Grid.labelled > TextBlock">
+    <Setter Property="Margin" Value="0,0,0,8" />
+  </Style>
+  <Style Selector="TextBlock.strong-value">
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+  </Style>
+  <Style Selector="Button.row-tool.remove /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource CmError}" />
+  </Style>
+  <Style Selector=":is(Button).style-bit">
+    <Setter Property="MinWidth" Value="26" />
+    <Setter Property="Height" Value="26" />
+    <Setter Property="Padding" Value="6,0" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.style-bit.more.on /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+  </Style>
+  <Style Selector="Border.preview-panel">
+    <Setter Property="MaxWidth" Value="420" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
+    <Setter Property="BorderThickness" Value="1,0,0,0" />
+  </Style>
+  <!-- The item list's preview panel is 400 wide (boards/dialog-item-list.md); its bounds inputs are mono, 38 wide. -->
+  <Style Selector="Border.ditl-preview">
+    <Setter Property="MaxWidth" Value="400" />
+  </Style>
+  <Style Selector="TextBlock.preview-note">
+    <Setter Property="Margin" Value="12,6" />
+  </Style>
+  <Style Selector="Border.ditl-row">
+    <Setter Property="MinHeight" Value="34" />
+  </Style>
+  <!-- While editing, the table takes the room and the live preview narrows to 216 (it scrolls), so the text column
+       is at least 160 wide in a 1200-pixel window. -->
+  <Style Selector="Border.ditl-preview">
+    <Setter Property="Width" Value="320" />
+  </Style>
+  <Style Selector="Grid.ditl-form.editing > Border.ditl-preview">
+    <Setter Property="Width" Value="216" />
+  </Style>
+  <!-- The menu form likewise: its preview a third of a 1200-pixel window read only, 166 while editing (it scrolls, 2×),
+       so the Text column is at least 160 wide. -->
+  <Style Selector="Border.menu-preview">
+    <Setter Property="Width" Value="272" />
+  </Style>
+  <Style Selector="Grid.menu-edit-form.editing > Border.menu-preview">
+    <Setter Property="Width" Value="166" />
+  </Style>
+  <Style Selector="TextBox.bound">
+    <Setter Property="Width" Value="38" />
+    <Setter Property="MinWidth" Value="38" />
+    <Setter Property="Padding" Value="4,4" />
+  </Style>
+  <!-- The sound preview (boards/sound.md): a 40 px round play button, chips with a 1 px CmCardBorder and radius 6, the
+       waveform card with its header strip, and the error card on CmSidebarBackground. -->
+  <Style Selector="Button.transport">
+    <Setter Property="Width" Value="40" />
+    <Setter Property="Height" Value="40" />
+    <Setter Property="CornerRadius" Value="20" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.transport PathIcon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+  </Style>
+  <Style Selector="TextBlock.sound-time">
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+  <!-- The font family preview (boards/font-family.md). -->
+  <Style Selector="TextBlock.font-size">
+    <Setter Property="Width" Value="72" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.font-cell, StackPanel.font-cell">
+    <Setter Property="Width" Value="128" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="StackPanel.font-matrix">
+    <Setter Property="Margin" Value="16,4,16,8" />
+  </Style>
+  <Style Selector="Button.mono">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+  </Style>
+  <Style Selector="TextBlock.missing">
+    <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="PathIcon.warning">
+    <Setter Property="Width" Value="12" />
+    <Setter Property="Height" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource CmWarning}" />
+  </Style>
+  <Style Selector="Border.depth">
+    <Setter Property="Background" Value="{DynamicResource CmSegmentTrack}" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="4,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.depth">
+    <Setter Property="FontSize" Value="10" />
+  </Style>
+  <Style Selector="Border.font-flag">
+    <Setter Property="Background" Value="{DynamicResource CmSegmentTrack}" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="6,1" />
+    <Setter Property="Margin" Value="0,0,6,4" />
+  </Style>
+  <Style Selector="StackPanel.font-extra">
+    <Setter Property="Margin" Value="0,0,8,4" />
+    <Setter Property="MinWidth" Value="56" />
+  </Style>
+  <Style Selector="ListBox.font-kerns ListBoxItem">
+    <Setter Property="Padding" Value="12,3" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+  <Style Selector="Grid.font-kern-header">
+    <Setter Property="Margin" Value="16,8,16,0" />
+  </Style>
+  <Style Selector="ListBox.font-kerns">
+    <Setter Property="Margin" Value="4,0,4,4" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Border.chip">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="Margin" Value="0,0,8,8" />
+  </Style>
+  <Style Selector="Border.wave-card">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="Border.wave-header">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="12,6" />
+  </Style>
+  <Style Selector="Border.loop-swatch">
+    <Setter Property="Width" Value="12" />
+    <Setter Property="Height" Value="12" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource CmLoopRegion}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Border.sound-error">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="16" />
+    <Setter Property="Margin" Value="16" />
+    <Setter Property="MaxWidth" Value="520" />
+  </Style>
+  <!-- The image grid (boards/main-window.md, P1): cards with a 1 px CmCardBorder, a checkerboard area with 12 padding and
+       a caption strip under a CmCardBorder rule; the Finder states strip on checkerboard with captions on a plate. -->
+  <Style Selector="Border.image-card">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="ClipToBounds" Value="True" />
+    <Setter Property="VerticalAlignment" Value="Bottom" />
+    <Setter Property="Margin" Value="0,0,12,0" />
+  </Style>
+  <Style Selector="Border.image-caption">
+    <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Padding" Value="8,4" />
+  </Style>
+  <Style Selector="Border.state-plate">
+    <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Padding" Value="4,1" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.preview-header">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="12,8" />
+  </Style>
+  <Style Selector="TextBlock.strong">
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+  </Style>
+
+  <!-- View ▸ Screen Depth: one radio item per depth. -->
+  <Style Selector="MenuItem.depths > MenuItem" x:DataType="vm:ScreenDepthChoice">
+    <Setter Property="Header" Value="{Binding Label}" />
+    <Setter Property="ToggleType" Value="Radio" />
+    <Setter Property="GroupName" Value="depth" />
+    <Setter Property="Command" Value="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShellActions.SetScreenDepthCommand, FallbackValue={x:Null}}" />
+    <Setter Property="CommandParameter" Value="{Binding Depth}" />
+    <Setter Property="IsChecked">
+      <MultiBinding Converter="{x:Static views:ShellConverters.AreEqual}">
+        <Binding Path="Depth" />
+        <Binding Path="$parent[Window].((vm:MainViewModel)DataContext).ScreenDepth" FallbackValue="0" />
+      </MultiBinding>
+    </Setter>
+  </Style>
+</Styles>
