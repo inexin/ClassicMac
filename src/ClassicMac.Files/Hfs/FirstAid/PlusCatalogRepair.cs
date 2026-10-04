@@ -40,6 +40,7 @@ internal sealed class PlusCatalogRepair
         repair.Files();
         repair.Valences();
         repair.LinkCounts();
+        repair.AttributeFlags();
         return repair.records;
     }
 
@@ -182,6 +183,21 @@ internal sealed class PlusCatalogRepair
             {
                 new BigEndianWriter(data).WriteUInt32At(4, valence);
                 Add(id, $"the folder's valence set from {old} to {valence}");
+            }
+        }
+    }
+
+    // Each file's and folder's has-attributes flag: set when it keeps attributes.
+    private void AttributeFlags()
+    {
+        foreach (var (_, data) in records.Where(r => Type(r.Data) is Folder or File && r.Data.Length >= 12))
+        {
+            uint id = Id(data);
+            bool has = run.AttributeOwners.Contains(id), flagged = (data[3] & 0x04) != 0;
+            if (has != flagged)
+            {
+                data[3] ^= 0x04;
+                Add(id, has ? "the has-attributes flag set" : "the has-attributes flag cleared");
             }
         }
     }

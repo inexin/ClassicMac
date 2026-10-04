@@ -102,6 +102,27 @@ internal sealed class HfsPlusBuilder
     public const int JournalSector = 512, BlockListHeader = 4096;
 
     private uint? journalInfoFile, journalFile;
+    private const int AttributeNodes = 8;
+    private readonly List<(uint FileId, string Name, byte[] Data, bool Fork)> attributes = [];
+
+    /// <summary>An extended attribute of a file or folder: inline data, or (fork) data in its own blocks.</summary>
+    public void Attribute(uint fileId, string name, byte[] data, bool fork = false) => attributes.Add((fileId, name, data, fork));
+
+    internal static byte[] AttributeKey(uint fileId, string name, uint startBlock = 0)
+    {
+        var writer = new BigEndianWriter();
+        writer.WriteUInt16(12 + 2 * name.Length);
+        writer.WriteUInt16((ushort)0);
+        writer.WriteUInt32(fileId);
+        writer.WriteUInt32(startBlock);
+        writer.WriteUInt16(name.Length);
+        foreach (char c in name)
+        {
+            writer.WriteUInt16(c);
+        }
+
+        return writer.ToArray();
+    }
 
     public byte[] Build(string volumeName)
     {
@@ -117,7 +138,10 @@ internal sealed class HfsPlusBuilder
         block += ExtentsNodes;
         var catalogStart = block;
         block += CatalogNodes;
+        uint attributesStart = block;
+        block += attributes.Count > 0 ? (uint)AttributeNodes : 0;
         var forks = new Dictionary<(uint Id, byte Fork), List<(uint Start, uint Count)>>();
+        var attributeForks = attributes.Where(a => a.Fork).ToDictionary(a => (a.FileId, a.Name), a => Place(ref block, Blocks(a.Data), 1));
         foreach (var file in files)
         {
             forks[(file.Id, 0)] = Place(ref block, Blocks(file.Data), file.Fragments);
@@ -130,6 +154,11 @@ internal sealed class HfsPlusBuilder
         {
             Copy(image, file.Data, forks[(file.Id, 0)]);
             Copy(image, file.Resource, forks[(file.Id, 0xFF)]);
+        }
+
+        foreach (var (fileId, name, data, _) in attributes.Where(a => a.Fork))
+        {
+            Copy(image, data, attributeForks[(fileId, name)]);
         }
 
         // The extents tree: each fork's extents after its first eight, eight to a record.
@@ -148,6 +177,12 @@ internal sealed class HfsPlusBuilder
         extentsTree.CopyTo(image, extentsStart * Block);
         var catalog = HfsPlusBTreeWriter.Build(HfsPlusBTreeWriter.Catalog, CatalogRecords(volumeName, forks), Block, CatalogNodes, CatalogNodes * Block);
         catalog.CopyTo(image, catalogStart * Block);
+        if (attributes.Count > 0)
+        {
+            var records = attributes.Select(a => (AttributeKey(a.FileId, a.Name), a.Fork ? ForkAttribute(a.Data.Length, attributeForks[(a.FileId, a.Name)]) : InlineAttribute(a.Data)))
+                .OrderBy(r => r.Item1, Comparer<byte[]>.Create((x, y) => HfsPlusAttributes.CompareAttributeKeys(x, y))).ToList();
+            HfsPlusBTreeWriter.Build(HfsPlusBTreeWriter.Attributes, records, Block, AttributeNodes, AttributeNodes * Block).CopyTo(image, attributesStart * Block);
+        }
 
         // The allocation file: every block before the free space, and the last.
         var used = new HashSet<uint>(Enumerable.Range(0, (int)block).Select(b => (uint)b)) { totalBlocks - 1 };
@@ -162,6 +197,10 @@ internal sealed class HfsPlusBuilder
         }
 
         var header = Header(totalBlocks, totalBlocks - (uint)used.Count, extentsStart, catalogStart);
+        if (attributes.Count > 0)
+        {
+            ForkData(new BigEndianWriter(header), 352, AttributeNodes * Block, [(attributesStart, AttributeNodes)]);
+        }
         if (journalFile is { } journal)
         {
             uint info = forks[(journalInfoFile!.Value, 0)][0].Start, start = forks[(journal, 0)][0].Start;
@@ -277,6 +316,11 @@ internal sealed class HfsPlusBuilder
                 fw.WriteUInt32At(44, link.Special);
             }
 
+            if (HasAttributes(id))
+            {
+                folder[3] |= 0x04;
+            }
+
             records.Add((CatalogKey(parent, name), folder));
             records.Add((CatalogKey(id, ""), Thread(3, parent, name)));
         }
@@ -297,6 +341,11 @@ internal sealed class HfsPlusBuilder
                 w.WriteUInt16At(56, link.FinderFlags);
             }
 
+            if (HasAttributes(file.Id))
+            {
+                data[3] |= 0x04;
+            }
+
             ForkData(w, 88, file.Data.Length, forks[(file.Id, 0)]);
             ForkData(w, 168, file.Resource.Length, forks[(file.Id, 0xFF)]);
             records.Add((CatalogKey(file.Parent, file.Name), data));
@@ -306,6 +355,29 @@ internal sealed class HfsPlusBuilder
         records.Sort((a, b) => HfsPlusBTree.CompareCatalogKeys(a.Key, b.Key, caseFolding: true));
         return records;
     }
+
+    // An inline attribute record: type $10, 8 reserved bytes, the size, the data, padded to even.
+    private static byte[] InlineAttribute(byte[] data)
+    {
+        var record = new byte[(16 + data.Length + 1) & ~1];
+        var w = new BigEndianWriter(record);
+        w.WriteUInt32At(0, 0x10u);
+        w.WriteUInt32At(12, data.Length);
+        data.CopyTo(record, 16);
+        return record;
+    }
+
+    // A fork-data attribute record: type $20, a reserved word, the fork data.
+    private static byte[] ForkAttribute(long length, List<(uint Start, uint Count)> extents)
+    {
+        var record = new byte[88];
+        var w = new BigEndianWriter(record);
+        w.WriteUInt32At(0, 0x20u);
+        ForkData(w, 8, length, extents);
+        return record;
+    }
+
+    private bool HasAttributes(uint id) => attributes.Exists(a => a.FileId == id);
 
     private static byte[] FolderRecord(uint id, int valence)
     {

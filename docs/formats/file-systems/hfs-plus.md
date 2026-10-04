@@ -516,7 +516,13 @@ traced, the choices are ClassicMac's [ClassicMac]. HFSX is "not checked".
    `\0\0\0\0HFS+ Private Data`, and each directory link's folder `dir_<CNID>` in `.HFS+ Private Directory Data\r`,
    must exist (`firstaid.link-target-missing`, not repaired), and its link count (BSD `special`) is its number of links
    (`firstaid.link-count`, repaired; traditional Mac OS can leave it wrong [Doc: TN1150]). The directory links' chains
-   and first-link attribute are left to the reader's diagnostics.
+   and first-link attribute are left to the reader's diagnostics. The attributes tree's records (§1.7, §2.6): each
+   belongs to a catalog file or folder or a special file (CNIDs 3 to 8) (`firstaid.attribute-owner`); inline data fits
+   its record, and fork-data and extents records have their lengths (`firstaid.attribute-record`); an extents record
+   continues its fork record at its start block (else `firstaid.attribute-record`); a fork attribute's extents add up
+   to its block count and its size fits them (`firstaid.attribute-extents`, not repaired), and its blocks count as in
+   use. Other record types are ignored. Each file's and folder's has-attributes flag ($0004) matches whether it keeps
+   attributes (`firstaid.attribute-flag`). The records that fail are deleted by repair, and the flags set.
 6. **"Checking volume bit map."**: the allocation file's bytes for the volume's blocks against the blocks the extents
    use (#60, repaired; #12 for blocks used twice).
 7. **"Checking volume info."**: `fileCount`, `folderCount`, `freeBlocks` and `nextCatalogID` (above the highest CNID,
@@ -531,7 +537,8 @@ right one, each file's thread flag set, a fork's block count raised to its exten
 link count set), both at their
 node size and node count and keeping their clump size, type and key comparison; the allocation file from the blocks
 the extents use; and the computed header written over the header and its alternate when either differs. Forks that
-share blocks and the attributes tree are not repaired yet. An edit session (`InputEditKind.HfsPlusVolume`)
+share blocks (#12) are copied whole into free blocks, as on HFS (hfs.md §5.6), their fork data and overflow records
+made again; an attribute's fork is not moved. The attributes tree is written again without the records that fail. An edit session (`InputEditKind.HfsPlusVolume`)
 holds an HFS Plus image for repair only: it is saved with its changed sectors compared, and every other edit is
 refused.
 

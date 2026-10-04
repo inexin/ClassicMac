@@ -28,7 +28,8 @@ internal static class OverlapRepair
                 used[block] = true;
             }
 
-            if (fork.Key.FileId >= 16 && blocks.Exists(b => claimed[b]))
+            // Only files' data and resource forks move: an attribute's fork stays where it is.
+            if (fork.Key.FileId >= 16 && fork.Key.Fork is 0x00 or 0xFF && blocks.Exists(b => claimed[b]))
             {
                 sharing.Add((fork.Key, extents));
                 continue;

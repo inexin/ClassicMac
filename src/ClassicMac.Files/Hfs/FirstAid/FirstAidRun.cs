@@ -70,6 +70,9 @@ public enum FirstAidRepairs
 
     /// <summary>An HFS Plus journal's transactions are written to the volume and the journal emptied.</summary>
     Journal = 1 << 18,
+
+    /// <summary>HFS Plus attribute records that fail are deleted, and has-attributes flags set to match.</summary>
+    AttributeRecords = 1 << 19,
 }
 
 // The state of one First Aid verify: the volume, the MDBs it reads, the stage lines shown, the problems found, the
@@ -150,6 +153,12 @@ internal sealed class FirstAidRun(HfsVolume volume)
 
     /// <summary>The HFS Plus attributes tree, when the volume has one.</summary>
     public FirstAidTree? AttributesTree { get; set; }
+
+    /// <summary>The HFS Plus attribute records repair deletes, by key.</summary>
+    public List<byte[]> BadAttributes { get; } = [];
+
+    /// <summary>The CNIDs with attributes that are kept, for the has-attributes flags.</summary>
+    public HashSet<uint> AttributeOwners { get; set; } = [];
 
     /// <summary>An HFS Plus volume's name, from its root folder's key.</summary>
     public string? PlusVolumeName { get; set; }

@@ -43,7 +43,8 @@ internal sealed class PlusCatalogScan
         }
 
         PlusLinkCheck.Run(run);
-        return true;
+        PlusAttributesCheck.Run(run);
+        return run.Ended is null;
     }
 
     private bool Scan()

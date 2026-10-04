@@ -14,7 +14,7 @@ namespace ClassicMac.Files.Hfs;
 internal static class PlusRepair
 {
     private const FirstAidRepairs CatalogRepairs = FirstAidRepairs.MissingFolder | FirstAidRepairs.MissingThreads | FirstAidRepairs.FileThreads
-        | FirstAidRepairs.Valences | FirstAidRepairs.ForkLengths | FirstAidRepairs.LinkCounts;
+        | FirstAidRepairs.Valences | FirstAidRepairs.ForkLengths | FirstAidRepairs.LinkCounts | FirstAidRepairs.AttributeRecords;
     private const FirstAidRepairs ExtentsRepairs = FirstAidRepairs.OrphanedExtents | FirstAidRepairs.ExtentStarts;
 
     /// <summary>The trees a repair needs written again; true when either was.</summary>
@@ -70,6 +70,22 @@ internal static class PlusRepair
             if ((made.Count > 0 || relocated.Count > 0 || run.TreesToRebuild.Contains(4)) && Write(run, volume, catalog, HfsPlusBTreeWriter.Catalog, records, changes))
             {
                 changes.AddRange(made);
+                written = true;
+            }
+        }
+
+        if (run.AttributesTree is { } attributes
+            && (run.TreesToRebuild.Contains(8) || (run.Repairs & FirstAidRepairs.AttributeRecords) != 0))
+        {
+            var bad = new HashSet<byte[]>(run.BadAttributes, HfsPlusBTree.ByteArrayEqualityComparer.Instance);
+            var records = attributes.Records.Where(r => !bad.Contains(r.Key)).Select(r => (r.Key, r.Data)).ToList();
+            if ((bad.Count > 0 || run.TreesToRebuild.Contains(8)) && Write(run, volume, attributes, HfsPlusBTreeWriter.Attributes, records, changes))
+            {
+                foreach (var key in bad)
+                {
+                    changes.Add(new PlannedChange("repair", "", $"attributes, CNID {new BigEndianReader(key).ReadUInt32At(4)}: a bad attribute record deleted"));
+                }
+
                 written = true;
             }
         }
@@ -131,7 +147,7 @@ internal static class PlusRepair
         }
 
         WriteThrough(run, volume, tree.Extents, bytes);
-        changes.Add(new PlannedChange("repair", "", $"{(tree.IsCatalog ? "catalog" : "extents")} B-tree written again ({records.Count} records)"));
+        changes.Add(new PlannedChange("repair", "", $"{(tree.IsCatalog ? "catalog" : tree.IsAttributes ? "attributes" : "extents")} B-tree written again ({records.Count} records)"));
         return true;
     }
 
