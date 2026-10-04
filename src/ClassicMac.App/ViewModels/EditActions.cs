@@ -79,6 +79,9 @@ public interface IEditDialogs
 
     /// <summary>Resize: the new size as typed (bytes, or with K, M or G), or null when cancelled.</summary>
     Task<string?> ResizeAsync(ResizeView view);
+
+    /// <summary>Defragment's dialog, which runs the model and shows what it did; done when it closes.</summary>
+    Task DefragmentAsync(DefragmentViewModel model);
 }
 
 /// <summary>Resize's window (Volume ▸ Resize…): the volume, its size, the smallest it shrinks to and the largest it grows to, in bytes.</summary>

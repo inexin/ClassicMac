@@ -317,39 +317,46 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
     private bool CanDefragment() => !appParts.ExportActions.IsExporting && appSelection.Selected is { } selected
         && selected.Input.VolumeOf(selected) is { } volume && selected.Input.VolumeSession.KindOf(volume.Name) == InputEditKind.HfsVolume;
 
-    // Volume ▸ Defragment (hfs.md §3.4): the selected item's volume laid out again in the session, every fork in one
-    // extent and the free space in one run, written by Save As. The tree shows the same items, so it is not read again.
+    // Volume ▸ Defragment… (hfs.md §3.4, volume-tools.md §3): its dialog explains it with the layout now and after, runs
+    // it in the session off the UI thread (progress, Cancel), and shows the layout it made; Save As writes it.
     [RelayCommand(CanExecute = nameof(CanDefragment))]
     private async Task Defragment()
     {
-        if (appSelection.Selected is not { } selected || selected.Input.VolumeOf(selected) is not { } volume)
+        if (appSelection.Selected is not { } selected || selected.Input.VolumeOf(selected) is not { } volume || appServices.EditDialogs is not { } dialogs)
         {
             return;
         }
 
         var input = selected.Input;
-        Exception? failed = null;
-        await Task.Run(() =>
+        var session = input.VolumeSession;
+        VolumeLayout? Measure() => HfsReader.Instance.ReadLayout(ForkData.FromBytes(session.VolumeOf(volume.Name)));
+        if (await Task.Run(Measure) is not { } before)
         {
-            try
-            {
-                input.VolumeSession.Defragment(volume.Name);
-            }
-            catch (Exception e) when (e is InvalidDataException or InvalidOperationException)
-            {
-                failed = e;
-            }
-        });
-        if (failed is not null)
-        {
-            appServices.Status = $"Could not defragment the volume: {failed.Message}";
+            appServices.Status = "Could not defragment the volume: the writer can't read its layout.";
             return;
         }
 
-        input.Title = input.BaseTitle + " •";
-        appParts.EditActions.NotifyEditCommands();
-        appServices.Status = "Defragmented the volume; Save As ▸ HFS Volume Image writes it.";
+        var model = new DefragmentViewModel(VolumeName(volume.Root), before, async (progress, token) =>
+        {
+            await Task.Run(() => session.Defragment(volume.Name, progress, token), token);
+            input.Title = input.BaseTitle + " •";
+            appParts.EditActions.NotifyEditCommands();
+            return await Task.Run(Measure);
+        });
+        await dialogs.DefragmentAsync(model);
+        if (model.IsDone)
+        {
+            appServices.Status = "Defragmented the volume; Save As ▸ HFS Volume Image writes it.";
+        }
     }
+
+    // A volume node's own name (drVN): the input's, or the disk image's or partition's volume.
+    private static string VolumeName(NodeViewModel root) => root switch
+    {
+        InputNode input => input.Root.Volume?.Name ?? input.BaseTitle,
+        ContainerFileNode container => container.Node.Volume?.Name ?? container.File.Name.ToMacRoman(),
+        _ => root.BaseTitle,
+    };
 
     private bool CanResize() => !appParts.ExportActions.IsExporting && appSelection.Selected?.Input is { VolumeSession.CanResize: true };
 

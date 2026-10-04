@@ -619,6 +619,148 @@ internal static class DialogViews
         return dialog;
     }
 
+    // ---- Volume operations (design/boards/volume-tools.md §2) ----
+
+    private static TextBlock Line(params string[] classes)
+    {
+        var text = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        foreach (var c in classes)
+        {
+            text.Classes.Add(c);
+        }
+
+        return text;
+    }
+
+    // The progress state: the bold step line, a 6 px bar, the detail and what Cancel does; the returned action
+    // brings it up to date with the model.
+    private static (StackPanel Panel, Action Update) Running(VolumeOperation model)
+    {
+        var step = Line("strong");
+        var bar = new ShareBar { Name = "OperationProgress", Classes = { "fork-bar" } };
+        Avalonia.Automation.AutomationProperties.SetName(bar, "Progress");
+        var detail = Line("muted");
+        var panel = new StackPanel { Spacing = 8, Children = { step, bar, detail, new TextBlock { Text = model.CancelNote, Classes = { "muted" }, TextWrapping = TextWrapping.Wrap } } };
+        return (panel, () =>
+        {
+            panel.IsVisible = model.IsRunning;
+            step.Text = model.StepText;
+            bar.Value = model.Progress;
+            detail.Text = model.DetailText;
+        });
+    }
+
+    /// <summary>
+    /// Defragment (volume-tools.md §3): a sentence, the allocation map ("Now", then "After") and the Now and After
+    /// figures; the progress state while it runs; Cancel and Defragment before, Cancel while running, Done after (and
+    /// only Done for a volume already in order).
+    /// </summary>
+    public static Dialog<bool> Defragment(DefragmentViewModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        var window = NewWindow(model.Title);
+        var dialog = new Dialog<bool>(window, false);
+        var figures = new Grid { ColumnDefinitions = new ColumnDefinitions("120,*,*"), ColumnSpacing = 12, RowSpacing = 6, Name = "DefragmentFigures" };
+        void Cell(string text, int row, int column, params string[] classes)
+        {
+            var cell = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap };
+            foreach (var c in classes)
+            {
+                cell.Classes.Add(c);
+            }
+
+            Grid.SetRow(cell, row);
+            Grid.SetColumn(cell, column);
+            figures.Children.Add(cell);
+        }
+
+        IReadOnlyList<DefragmentFigure>? shown = null;
+        void Fill()
+        {
+            figures.Children.Clear();
+            figures.RowDefinitions.Clear();
+            for (var row = 0; row <= model.Figures.Count; row++)
+            {
+                figures.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            }
+
+            Cell("Now", 0, 1, "muted");
+            Cell("After", 0, 2, "muted");
+            for (var i = 0; i < model.Figures.Count; i++)
+            {
+                var figure = model.Figures[i];
+                string kind = figure.Label == "Can shrink to" ? "mono" : "plain";
+                Cell(figure.Label, i + 1, 0, "muted");
+                Cell(figure.Now, i + 1, 1, kind);
+                Cell(figure.After, i + 1, 2, kind, "strong");
+            }
+        }
+
+        var lead = Line();
+        var mapTitle = Line("muted");
+        var map = new AllocationMap { Name = "DefragmentMap", Classes = { "volume-map" } };
+        var sessionNote = new TextBlock { Text = "Changes stay in this session until you Save As.", Classes = { "muted" }, TextWrapping = TextWrapping.Wrap };
+        var doneNote = Line("muted");
+        var error = Line("error");
+        var explained = new StackPanel { Spacing = 10, Children = { lead, mapTitle, map, figures, sessionNote, doneNote, error } };
+        var (running, updateRunning) = Running(model);
+        var body = new StackPanel { Width = 420, Spacing = 10, Children = { explained, running } };
+
+        var cancel = Button("Cancel", () =>
+        {
+            if (model.IsRunning)
+            {
+                model.CancelCommand.Execute(null);
+            }
+            else
+            {
+                window.Close();
+            }
+        });
+        cancel.IsCancel = true;
+        cancel.Classes.Add("dialog-cancel");
+        var start = new Button { Content = "Defragment", MinWidth = 76, HorizontalContentAlignment = HorizontalAlignment.Center, Classes = { "accent" }, IsDefault = true, Command = model.StartCommand };
+        var done = Button("Done", () =>
+        {
+            dialog.Result = model.IsDone;
+            window.Close();
+        }, "accent");
+        var right = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { cancel, start, done } };
+        DockPanel.SetDock(right, Dock.Right);
+        var footer = new Border { Name = "DialogFooter", Classes = { "dialog-footer" }, Child = new DockPanel { LastChildFill = false, Children = { right } } };
+
+        void Update()
+        {
+            explained.IsVisible = !model.IsRunning;
+            lead.Text = model.Lead;
+            mapTitle.Text = model.MapTitle;
+            map.Layout = model.MapLayout;
+            if (!ReferenceEquals(shown, model.Figures) && (shown is null || !shown.SequenceEqual(model.Figures)))
+            {
+                shown = model.Figures;
+                Fill();
+            }
+
+            sessionNote.IsVisible = model.IsReady && !model.IsInOrder;
+            doneNote.IsVisible = model.IsDone;
+            doneNote.Text = model.DoneNote;
+            error.IsVisible = model.HasError;
+            error.Text = model.Error;
+            cancel.IsVisible = !model.IsDone && !model.IsInOrder;
+            start.IsVisible = model.IsReady && !model.IsInOrder;
+            done.IsVisible = model.IsDone || model.IsInOrder;
+            start.IsDefault = start.IsVisible;
+            done.IsDefault = done.IsVisible;
+            updateRunning();
+        }
+
+        Update();
+        model.PropertyChanged += (_, _) => Update();
+        window.Closing += (_, _) => model.CancelCommand.Execute(null);
+        Compose(window, Header(window, model.Title, () => model.CancelCommand.Execute(null)), body, footer);
+        return dialog;
+    }
+
     /// <summary>A yes/no question: No and Yes.</summary>
     public static Dialog<bool> Confirm(string title, string message)
     {

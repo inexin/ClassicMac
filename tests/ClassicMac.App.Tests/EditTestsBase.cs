@@ -92,6 +92,18 @@ public abstract class EditTestsBase : IDisposable
         public Func<FirstAidView, bool> FirstAid { get; set; } = _ => false;
         public List<FirstAidView> FirstAidShown { get; } = [];
 
+        public List<DefragmentViewModel> DefragmentShown { get; } = [];
+
+        // Clicks Defragment, when it is offered, and then Done.
+        public Func<DefragmentViewModel, Task> Defragment { get; set; } = model =>
+            model.StartCommand.CanExecute(null) ? model.StartCommand.ExecuteAsync(null) : Task.CompletedTask;
+
+        public Task DefragmentAsync(DefragmentViewModel model)
+        {
+            DefragmentShown.Add(model);
+            return Defragment(model);
+        }
+
         public Func<ResizeView, string?> Resize { get; set; } = _ => null;
         public List<ResizeView> ResizeShown { get; } = [];
 

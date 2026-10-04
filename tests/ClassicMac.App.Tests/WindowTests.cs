@@ -472,6 +472,7 @@ public class WindowTests
         public Task<string?> NewFolderAsync(string initial) => throw new NotSupportedException();
         public Task<bool> FirstAidAsync(FirstAidView view) => throw new NotSupportedException();
         public Task<string?> ResizeAsync(ResizeView view) => throw new NotSupportedException();
+        public Task DefragmentAsync(DefragmentViewModel model) => throw new NotSupportedException();
     }
 
     // Clicking or arrowing to another tree node with an unapplied form: the tree keeps the old node selected and nothing

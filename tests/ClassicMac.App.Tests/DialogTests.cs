@@ -6,6 +6,7 @@ using ClassicMac.App.Controls;
 using ClassicMac.App.Dialogs;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
+using ClassicMac.Files;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders.Images;
 
@@ -314,6 +315,117 @@ public class DialogTests
         var cancelled = Show(DialogViews.Resize(new ResizeView("Macintosh HD", 819_200, 412_160, 2_147_483_136)));
         Footer(cancelled.Window, "Cancel").Command!.Execute(null);
         Assert.Null(cancelled.Result);
+    });
+
+    private static VolumeLayout Fragmented() => new(4090, 512, 21, 1, 1, 17,
+        [new(10, 2), new(20, 1), new(40, 2), new(90, 3), new(4000, 90)], [new(100, 50), new(300, 40)], 640 * 1024, 403 * 1024);
+
+    private static VolumeLayout InOrder() => new(4090, 512, 21, 0, 0, 1, [new(3990, 100)], [], 403 * 1024, 403 * 1024);
+
+    private static List<string> Visible(Window window) => FooterButtons(window)
+        .Where(b => b.IsEffectivelyVisible).Select(b => (string)b.Content!).ToList();
+
+    private static List<string?> Texts(Window window) =>
+        window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+
+    [Fact]
+    public void Defragment_explains_runs_and_shows_the_result_in_one_dialog() => OnUiThread(() =>
+    {
+        var finish = new TaskCompletionSource<VolumeLayout?>();
+        IProgress<VolumeProgress>? reports = null;
+        var model = new DefragmentViewModel("Macintosh HD", Fragmented(), (progress, _) =>
+        {
+            reports = progress;
+            return finish.Task;
+        }) { Time = new SteppingClock() };
+        var dialog = Show(DialogViews.Defragment(model));
+        Assert.Contains(dialog.Window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Defragment “Macintosh HD”");
+        Assert.Equal(["Cancel", "Defragment"], Visible(dialog.Window));
+        Assert.True(Footer(dialog.Window, "Defragment").IsDefault);
+        Assert.True(Footer(dialog.Window, "Cancel").IsCancel);
+        var texts = Texts(dialog.Window);
+        Assert.Contains("Now", texts);
+        Assert.Contains("1 of 21", texts);
+        Assert.Contains("Changes stay in this session until you Save As.", texts);
+        Assert.Same(model.Before, dialog.Window.GetVisualDescendants().OfType<AllocationMap>().Single().Layout);
+
+        Footer(dialog.Window, "Defragment").Command!.Execute(null);
+        reports!.Report(new VolumeProgress(12, 21, "File 12 of 21"));
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(["Cancel"], Visible(dialog.Window));
+        texts = Texts(dialog.Window);
+        Assert.Contains("Defragmenting…", texts);
+        Assert.Contains("File 12 of 21", texts);
+        Assert.DoesNotContain("Now", texts);
+        Assert.Equal(12 / 21.0, dialog.Window.GetVisualDescendants().OfType<ShareBar>().Single(b => b.Name == "OperationProgress").Value, 3);
+
+        finish.SetResult(InOrder());
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(["Done"], Visible(dialog.Window));
+        Assert.True(Footer(dialog.Window, "Done").IsDefault);
+        texts = Texts(dialog.Window);
+        Assert.Contains("After", texts);
+        Assert.Contains("Took 1.2 s. Save As ▸ HFS Volume Image writes the result.", texts);
+        Footer(dialog.Window, "Done").Command!.Execute(null);
+        Assert.True(dialog.Result);
+    });
+
+    [Fact]
+    public void Defragment_on_a_volume_in_order_offers_only_Done_and_Cancel_while_running_stops_it() => OnUiThread(() =>
+    {
+        var tidy = Show(DialogViews.Defragment(new DefragmentViewModel("Macintosh HD", InOrder(), (_, _) => Task.FromResult<VolumeLayout?>(null))));
+        Assert.Equal(["Done"], Visible(tidy.Window));
+        Assert.Contains("This volume is already in order.", Texts(tidy.Window));
+        Footer(tidy.Window, "Done").Command!.Execute(null);
+        Assert.False(tidy.Result);
+
+        var model = new DefragmentViewModel("Macintosh HD", Fragmented(), async (_, token) =>
+        {
+            await Task.Delay(Timeout.Infinite, token);
+            return null;
+        });
+        var dialog = Show(DialogViews.Defragment(model));
+        Footer(dialog.Window, "Defragment").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(model.IsRunning);
+        Footer(dialog.Window, "Cancel").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(model.IsReady);
+        Assert.True(dialog.Window.IsVisible);
+        Assert.Equal(["Cancel", "Defragment"], Visible(dialog.Window));
+        dialog.Window.Close();
+    });
+
+    // A clock where each reading is 1.2 s after the last.
+    private sealed class SteppingClock : TimeProvider
+    {
+        private long now;
+
+        public override long GetTimestamp() => now += TimestampFrequency * 6 / 5;
+    }
+
+    [Fact]
+    public void Defragment_draws_before_running_and_done() => OnUiThread(() =>
+    {
+        var baselines = new List<string>();
+        var finish = new TaskCompletionSource<VolumeLayout?>();
+        IProgress<VolumeProgress>? reports = null;
+        var model = new DefragmentViewModel("Macintosh HD", Fragmented(), (progress, _) =>
+        {
+            reports = progress;
+            return finish.Task;
+        }) { Time = new SteppingClock() };
+        var dialog = Show(DialogViews.Defragment(model));
+        Baselines.Check(dialog.Window, "dialog-defragment", baselines, Baselines.All);
+        Footer(dialog.Window, "Defragment").Command!.Execute(null);
+        reports!.Report(new VolumeProgress(12, 21, "File 12 of 21"));
+        Dispatcher.UIThread.RunJobs();
+        Baselines.Check(dialog.Window, "dialog-defragment-running", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+        finish.SetResult(InOrder());
+        Dispatcher.UIThread.RunJobs();
+        Baselines.Check(dialog.Window, "dialog-defragment-done", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+        dialog.Window.Close();
+        Baselines.Verify(baselines);
     });
 
     [Fact]
