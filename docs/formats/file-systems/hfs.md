@@ -700,8 +700,9 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   rebuilds the tree's leaf and index nodes from the sorted records, each node filled in turn, using the nodes already
   in the tree file first. The extents tree is always rebuilt so. Volumes edited so (a Mac OS-initialized 20 MB volume
   with 100 new folders, catalog depth 1 to 3; a new 20 MB volume with 600, depth 4) mount in Mac OS 9.0, pass Disk
-  First Aid 8.5, take the Finder's own copies and deletions, and pass it again [Verified: with right splits, before
-  the BTree manager's rules were followed]. It
+  First Aid 8.5, take the Finder's own copies and deletions, and pass it again; so does the 600-folder volume with 300
+  folders deleted (emptied leaves freed, depth kept: no merging) and with all 600 deleted (the root collapsed to one
+  leaf, which Mac OS then grew again) [Verified: Mac OS 9.0, Disk First Aid 8.5, `fsck_hfs`]. It
   extends a tree file with free blocks when needed, through the MDB's extents and, for the catalog, overflow records;
   it adds linked map nodes when the header node's map is full. The bytes past a fork's end in its last block are
   zeroed. New catalog keys count the alignment byte in `ckrKeyLen`, as hfsutils does (§1.9). `CreateFile` and
