@@ -111,10 +111,11 @@ public static class QuickTimeImageFile
     // its header ends the search.
     private static bool TryFindAtom(ReadOnlyMemory<byte> data, string requestedType, out ReadOnlyMemory<byte> content)
     {
+        var file = new BigEndianReader(data);
         long p = 0;
         while (p + 8 <= data.Length)
         {
-            var atom = new BigEndianReader(data.Slice((int)p, 8));
+            var atom = file.ReadSubReaderAt((int)p);
             long size = atom.ReadUInt32();
             string type = Encoding.Latin1.GetString(atom.ReadBytes(4));
             int header = 8;
@@ -125,7 +126,7 @@ public static class QuickTimeImageFile
                     break;
                 }
 
-                size = (long)new BigEndianReader(data.Slice((int)p + 8, 8)).ReadUInt64();
+                size = (long)atom.ReadUInt64();                                             // the 64-bit size
                 header = 16;
             }
             else if (size == 0)

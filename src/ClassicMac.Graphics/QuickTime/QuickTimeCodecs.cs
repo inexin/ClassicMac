@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using ClassicMac.Core;
 using ClassicMac.Graphics;
 
@@ -34,7 +35,7 @@ internal static class QuickTimeCodecs
                 _ => null,
             };
         }
-        catch (Exception e) when (e is IndexOutOfRangeException or ArgumentException or InvalidOperationException)
+        catch (Exception e) when (e is IndexOutOfRangeException or ArgumentException or InvalidOperationException or EndOfStreamException)
         {
             return null;                                            // corrupt data: treat as undecodable
         }
@@ -135,10 +136,11 @@ internal static class QuickTimeCodecs
         }
 
         var planes = new byte[channels * d.Width * d.Height];
+        var counts = new BigEndianReader(data);                                         // a u16 byte count per line
         int p = 2 * lines;
         for (int l = 0; l < lines; l++)
         {
-            int count = (data[2 * l] << 8) | data[2 * l + 1];
+            int count = counts.ReadUInt16();
             if (p + count > data.Length)
             {
                 return null;

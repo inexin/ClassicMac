@@ -362,21 +362,20 @@ public static class PictReader
                 { int dh = b.ReadByte(), dv = b.ReadByte(); port.OffsetText(dh, dv, ReadText(b)); return true; }   // DHDVText
             case 0x002C:                                                              // fontName
                 {
-                    int length = b.ReadUInt16();
-                    var data = b.ReadBytes(length).ToArray();
-                    if (length >= 3 && data[2] <= length - 3)
+                    var data = b.ReadSubReader(b.ReadUInt16());                          // the old font ID, then a name
+                    if (data.Length >= 3 && data.ReadByteAt(2) <= data.Length - 3)
                     {
-                        port.FontName((data[0] << 8) | data[1], MacRoman.GetString(data, 3, data[2]));
+                        port.FontName(data.ReadUInt16At(0), MacRomanString(data.ReadBytesAt(3, data.ReadByteAt(2))));
                     }
 
                     return true;
                 }
             case 0x002D:                                                              // LineJustify
                 {
-                    var data = b.ReadBytes(b.ReadUInt16()).ToArray();                      // interCharSpacing, textExtra
+                    var data = b.ReadSubReader(b.ReadUInt16());                            // interCharSpacing, textExtra
                     if (data.Length >= 4)
                     {
-                        port.LineJustify((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]);
+                        port.LineJustify(data.ReadInt32At(0));
                     }
 
                     return true;

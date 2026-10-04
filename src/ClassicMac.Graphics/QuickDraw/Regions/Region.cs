@@ -38,14 +38,14 @@ public sealed class Region
             throw new InvalidDataException($"A region needs a 10-byte header; this is {data.Length} bytes.");
         }
 
-        var size = new ClassicMac.Core.BigEndianReader(data).ReadUInt16At(0) & 0x7FFF;
+        var reader = new ClassicMac.Core.BigEndianReader(data);
+        var size = reader.ReadUInt16At(0) & 0x7FFF;                                     // rgnSize
         if (size > data.Length)
         {
             throw new InvalidDataException($"The region says it is {size} bytes; there are {data.Length}.");
         }
 
-        var reader = new ClassicMac.Core.BigEndianReader(data[..Math.Max(10, size)]);
-        return Read(reader);
+        return Read(reader.ReadSubReaderAt(0, Math.Max(10, size)));
     }
 
     /// <summary>The region in QuickDraw's stored form: <c>rgnSize</c>, <c>rgnBBox</c> and, unless it is a rectangle, its rows.</summary>

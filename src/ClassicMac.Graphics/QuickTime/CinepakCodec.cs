@@ -1,4 +1,5 @@
 using System;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
 
 namespace ClassicMac.Graphics.QuickTime;
@@ -24,7 +25,8 @@ internal static class CinepakCodec
             return null;
         }
 
-        int strips = (data[8] << 8) | data[9];
+        var frame = new BigEndianReader(data);
+        int strips = frame.ReadUInt16At(8);
         var v4 = new Entry[256];
         var v1 = new Entry[256];
         bool palette = d.Depth <= 8, gray = d.Depth > 32;
@@ -33,9 +35,9 @@ internal static class CinepakCodec
         int p = 10, top = 0;
         for (int s = 0; s < strips && p + 12 <= data.Length; s++)
         {
-            int size = (data[p + 2] << 8) | data[p + 3];
-            int y1 = (data[p + 4] << 8) | data[p + 5], y2 = (data[p + 8] << 8) | data[p + 9];
-            int x2 = (data[p + 10] << 8) | data[p + 11];
+            int size = frame.ReadUInt16At(p + 2);
+            int y1 = frame.ReadUInt16At(p + 4), y2 = frame.ReadUInt16At(p + 8);
+            int x2 = frame.ReadUInt16At(p + 10);
             int stripHeight = y2 - y1;
             if (stripHeight <= 0)
             {
@@ -46,22 +48,22 @@ internal static class CinepakCodec
             int c = p + 12;
             while (c + 4 <= end)
             {
-                int id = (data[c] << 8) | data[c + 1];
-                int chunkSize = (data[c + 2] << 8) | data[c + 3];
+                int id = frame.ReadUInt16At(c);
+                int chunkSize = frame.ReadUInt16At(c + 2);
                 if (chunkSize < 4)
                 {
                     break;
                 }
 
                 int chunkEnd = Math.Min(end, c + chunkSize);
-                var chunk = data.AsSpan(c + 4, chunkEnd - c - 4);
+                var chunk = data.AsMemory(c + 4, chunkEnd - c - 4);
                 if ((id & 0xF000) == 0x2000)
                 {
                     ReadCodebook((id & 0x0200) != 0 ? v1 : v4, chunk.ToArray(), (id & 0x0400) != 0, (id & 0x0100) != 0);
                 }
                 else if ((id & 0xF000) == 0x3000)
                 {
-                    Vectors(img, chunk, id, v4, v1, top, stripHeight, Math.Min(x2 > 0 ? x2 : d.Width, d.Width), colors, gray);
+                    Vectors(img, new BigEndianReader(chunk), id, v4, v1, top, stripHeight, Math.Min(x2 > 0 ? x2 : d.Width, d.Width), colors, gray);
                 }
 
                 c = chunkEnd;
@@ -75,6 +77,7 @@ internal static class CinepakCodec
     private static void ReadCodebook(Entry[] book, byte[] chunk, bool fourBytes, bool partial)
     {
         int entrySize = fourBytes ? 4 : 6, p = 0, index = 0;
+        var reader = new BigEndianReader(chunk);
         Entry Read()
         {
             var e = new Entry { Y0 = chunk[p], Y1 = chunk[p + 1], Y2 = chunk[p + 2], Y3 = chunk[p + 3] };
@@ -97,7 +100,7 @@ internal static class CinepakCodec
         }
         while (p + 4 <= chunk.Length && index < 256)
         {
-            uint mask = (uint)((chunk[p] << 24) | (chunk[p + 1] << 16) | (chunk[p + 2] << 8) | chunk[p + 3]);
+            uint mask = reader.ReadUInt32At(p);
             p += 4;
             for (int bit = 31; bit >= 0 && index < 256; bit--, index++)
             {
@@ -114,31 +117,31 @@ internal static class CinepakCodec
         }
     }
 
-    private static void Vectors(RgbaBitmap img, ReadOnlySpan<byte> chunk, int id, Entry[] v4, Entry[] v1, int top,
+    // A vector chunk, read in order: a 32-bit mask before each 32 flags, then the codebook indices.
+    private static void Vectors(RgbaBitmap img, BigEndianReader chunk, int id, Entry[] v4, Entry[] v1, int top,
         int height, int width, RgbaColor[]? palette, bool gray)
     {
         int blocksWide = (width + 3) / 4, blocks = blocksWide * ((height + 3) / 4);
-        int p = 0, block = 0;
+        int block = 0;
         uint mask = 0;
         int bits = 0;
-        bool NextBit(ReadOnlySpan<byte> c)
+        bool NextBit()
         {
             if (bits == 0)
             {
-                if (p + 4 > c.Length)
+                if (chunk.Remaining < 4)
                 {
                     bits = -1;
                     return false;
                 }
-                mask = (uint)((c[p] << 24) | (c[p + 1] << 16) | (c[p + 2] << 8) | c[p + 3]);
-                p += 4;
+                mask = chunk.ReadUInt32();
                 bits = 32;
             }
             bits--;
             return (mask >> bits & 1) != 0;
         }
 
-        for (; block < blocks && p < chunk.Length; block++)
+        for (; block < blocks && chunk.Remaining > 0; block++)
         {
             int bx = block % blocksWide * 4, by = top + block / blocksWide * 4;
             bool useV4;
@@ -148,7 +151,7 @@ internal static class CinepakCodec
             }
             else if (id == 0x3100)
             {
-                bool changed = NextBit(chunk);
+                bool changed = NextBit();
                 if (bits < 0)
                 {
                     return;
@@ -159,11 +162,11 @@ internal static class CinepakCodec
                     continue;
                 }
 
-                useV4 = NextBit(chunk);
+                useV4 = NextBit();
             }
             else
             {
-                useV4 = NextBit(chunk);
+                useV4 = NextBit();
             }
 
             if (bits < 0)
@@ -173,26 +176,25 @@ internal static class CinepakCodec
 
             if (useV4)
             {
-                if (p + 4 > chunk.Length)
+                if (chunk.Remaining < 4)
                 {
                     return;
                 }
 
+                var four = chunk.ReadBytes(4);
                 for (int q = 0; q < 4; q++)
                 {
-                    Put2x2(img, bx + (q & 1) * 2, by + (q >> 1) * 2, v4[chunk[p + q]], palette, gray);
+                    Put2x2(img, bx + (q & 1) * 2, by + (q >> 1) * 2, v4[four[q]], palette, gray);
                 }
-
-                p += 4;
             }
             else
             {
-                if (p + 1 > chunk.Length)
+                if (chunk.Remaining < 1)
                 {
                     return;
                 }
 
-                var e = v1[chunk[p++]];
+                var e = v1[chunk.ReadByte()];
                 for (int q = 0; q < 4; q++)
                 {
                     byte y = q switch { 0 => e.Y0, 1 => e.Y1, 2 => e.Y2, _ => e.Y3 };

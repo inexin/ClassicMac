@@ -1,4 +1,5 @@
 using System;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
 
 namespace ClassicMac.Graphics.QuickTime;
@@ -52,15 +53,15 @@ internal static class AnimationCodec
             return img;
         }
 
-        int p = 4;
-        int header = (data[p] << 8) | data[p + 1];
-        p += 2;
+        var reader = new BigEndianReader(data) { Position = 4 };                        // past the chunk size
+        int header = reader.ReadUInt16();
         int y = 0, lines = d.Height;
         if ((header & 0x0008) != 0)
         {
-            y = (data[p] << 8) | data[p + 1];
-            lines = (data[p + 4] << 8) | data[p + 5];
-            p += 8;
+            y = reader.ReadUInt16();
+            reader.Skip(2);
+            lines = reader.ReadUInt16();
+            reader.Skip(2);
         }
         var palette = QuickTimeCodecs.Palette(d);
         int rowPixels = (d.Width + unitPixels - 1) / unitPixels * unitPixels;
@@ -82,18 +83,18 @@ internal static class AnimationCodec
             }
         }
 
-        for (; lines > 0 && p < data.Length; lines--, y++)
+        for (; lines > 0 && reader.Remaining > 0; lines--, y++)
         {
-            int skip = data[p++];
+            int skip = reader.ReadByte();
             if (skip == 0)
             {
                 break;
             }
 
             int x = (skip - 1) * unitPixels;
-            while (p < data.Length)
+            while (reader.Remaining > 0)
             {
-                int code = (sbyte)data[p++];
+                int code = (sbyte)reader.ReadByte();
                 if (code == -1)
                 {
                     break;
@@ -101,35 +102,33 @@ internal static class AnimationCodec
 
                 if (code == 0)
                 {
-                    if (p >= data.Length)
+                    if (reader.Remaining == 0)
                     {
                         return img;
                     }
 
-                    x += (data[p++] - 1) * unitPixels;
+                    x += (reader.ReadByte() - 1) * unitPixels;
                 }
                 else if (code > 0)
                 {
                     for (int i = 0; i < code; i++, x += unitPixels)
                     {
-                        if (p + unitBytes > data.Length)
+                        if (reader.Remaining < unitBytes)
                         {
                             return img;
                         }
 
-                        PutUnit(x, data.AsSpan(p, unitBytes));
-                        p += unitBytes;
+                        PutUnit(x, reader.ReadBytes(unitBytes));
                     }
                 }
                 else
                 {
-                    if (p + unitBytes > data.Length)
+                    if (reader.Remaining < unitBytes)
                     {
                         return img;
                     }
 
-                    var unit = data.AsSpan(p, unitBytes);
-                    p += unitBytes;
+                    var unit = reader.ReadBytes(unitBytes);
                     for (int i = 0; i < -code; i++, x += unitPixels)
                     {
                         PutUnit(x, unit);
@@ -155,13 +154,9 @@ internal static class RoadPizzaCodec
 
         var img = new RgbaBitmap(d.Width, d.Height);
         int blocksWide = (d.Width + 3) / 4, total = blocksWide * ((d.Height + 3) / 4);
-        int p = 4, block = 0;
-        int Word()
-        {
-            int v = (data[p] << 8) | data[p + 1];
-            p += 2;
-            return v & 0x7FFF;
-        }
+        var reader = new BigEndianReader(data) { Position = 4 };                        // past 0xE1 and the length
+        int block = 0;
+        int Word() => reader.ReadUInt16() & 0x7FFF;
 
         void Fill(int b, Func<int, int, int> color)
         {
@@ -178,18 +173,17 @@ internal static class RoadPizzaCodec
         void FourColor(int b, int a, int bc)
         {
             var colors = new[] { bc, Mix(a, bc, 11, 21), Mix(a, bc, 21, 11), a };
-            var rows = data.AsSpan(p, 4).ToArray();
-            p += 4;
+            var rows = reader.ReadBytes(4).ToArray();
             Fill(b, (x, y) => colors[(rows[y] >> (6 - 2 * x)) & 3]);
         }
 
-        while (p < data.Length && block < total)
+        while (reader.Remaining > 0 && block < total)
         {
-            int op = data[p++];
+            int op = reader.ReadByte();
             if ((op & 0x80) == 0)
             {
-                int a = ((op << 8) | data[p++]) & 0x7FFF;
-                if ((data[p] & 0x80) != 0)
+                int a = ((op << 8) | reader.ReadByte()) & 0x7FFF;                         // the opcode byte starts color A
+                if ((reader.ReadByteAt(reader.Position) & 0x80) != 0)
                 {
                     FourColor(block, a, Word());
                 }
@@ -259,7 +253,8 @@ internal static class GraphicsCodec
         var quads = new byte[256 * 4];
         var octets = new byte[256 * 8];
         int pairPos = 0, quadPos = 0, octetPos = 0;
-        int p = 4, block = 0;
+        var reader = new BigEndianReader(data) { Position = 4 };                        // past the flags and length
+        int block = 0;
 
         void Copy(int from, int to)
         {
@@ -284,9 +279,9 @@ internal static class GraphicsCodec
             }
         }
 
-        while (p < data.Length && block < total)
+        while (reader.Remaining > 0 && block < total)
         {
-            int op = data[p++];
+            int op = reader.ReadByte();
             int n = (op & 0x0F) + 1;
             switch (op & 0xF0)
             {
@@ -294,14 +289,14 @@ internal static class GraphicsCodec
                     block += n;
                     break;
                 case 0x10:
-                    block += data[p++] + 1;
+                    block += reader.ReadByte() + 1;
                     break;
                 case 0x20:
                 case 0x30:
                     {
                         if ((op & 0xF0) == 0x30)
                         {
-                            n = data[p++] + 1;
+                            n = reader.ReadByte() + 1;
                         }
 
                         for (int i = 0; i < n; i++, block++)
@@ -316,7 +311,7 @@ internal static class GraphicsCodec
                     {
                         if ((op & 0xF0) == 0x50)
                         {
-                            n = data[p++] + 1;
+                            n = reader.ReadByte() + 1;
                         }
 
                         int a = block - 2, b = block - 1;
@@ -332,10 +327,10 @@ internal static class GraphicsCodec
                     {
                         if ((op & 0xF0) == 0x70)
                         {
-                            n = data[p++] + 1;
+                            n = reader.ReadByte() + 1;
                         }
 
-                        byte c = data[p++];
+                        byte c = reader.ReadByte();
                         for (int i = 0; i < n; i++)
                         {
                             Paint(block++, _ => c);
@@ -350,19 +345,18 @@ internal static class GraphicsCodec
                         if ((op & 0xF0) == 0x80)
                         {
                             set = pairPos;
-                            pairs[2 * set] = data[p++];
-                            pairs[2 * set + 1] = data[p++];
+                            pairs[2 * set] = reader.ReadByte();
+                            pairs[2 * set + 1] = reader.ReadByte();
                             pairPos = (pairPos + 1) & 255;
                         }
                         else
                         {
-                            set = data[p++];
+                            set = reader.ReadByte();
                         }
 
                         for (int i = 0; i < n; i++)
                         {
-                            int flags = (data[p] << 8) | data[p + 1];
-                            p += 2;
+                            int flags = reader.ReadUInt16();
                             Paint(block++, k => pairs[2 * set + ((flags >> (15 - k)) & 1)]);
                         }
                         break;
@@ -376,20 +370,19 @@ internal static class GraphicsCodec
                             set = quadPos;
                             for (int k = 0; k < 4; k++)
                             {
-                                quads[4 * set + k] = data[p++];
+                                quads[4 * set + k] = reader.ReadByte();
                             }
 
                             quadPos = (quadPos + 1) & 255;
                         }
                         else
                         {
-                            set = data[p++];
+                            set = reader.ReadByte();
                         }
 
                         for (int i = 0; i < n; i++)
                         {
-                            uint flags = (uint)((data[p] << 24) | (data[p + 1] << 16) | (data[p + 2] << 8) | data[p + 3]);
-                            p += 4;
+                            uint flags = reader.ReadUInt32();
                             Paint(block++, k => quads[4 * set + (int)((flags >> (30 - 2 * k)) & 3)]);
                         }
                         break;
@@ -403,26 +396,26 @@ internal static class GraphicsCodec
                             set = octetPos;
                             for (int k = 0; k < 8; k++)
                             {
-                                octets[8 * set + k] = data[p++];
+                                octets[8 * set + k] = reader.ReadByte();
                             }
 
                             octetPos = (octetPos + 1) & 255;
                         }
                         else
                         {
-                            set = data[p++];
+                            set = reader.ReadByte();
                         }
 
                         for (int i = 0; i < n; i++)
                         {
                             // Nibbles n0..nB of the 6 bytes: pixels 0-7 are n0 n1 n2 n4 n5 n6, pixels 8-15 n8 n9 nA n3 n7 nB.
+                            var six = reader.ReadBytes(6);
                             var nib = new int[12];
                             for (int k = 0; k < 6; k++)
                             {
-                                nib[2 * k] = data[p + k] >> 4;
-                                nib[2 * k + 1] = data[p + k] & 15;
+                                nib[2 * k] = six[k] >> 4;
+                                nib[2 * k + 1] = six[k] & 15;
                             }
-                            p += 6;
                             int a = (nib[0] << 20) | (nib[1] << 16) | (nib[2] << 12) | (nib[4] << 8) | (nib[5] << 4) | nib[6];
                             int b = (nib[8] << 20) | (nib[9] << 16) | (nib[10] << 12) | (nib[3] << 8) | (nib[7] << 4) | nib[11];
                             Paint(block++, k => octets[8 * set + (((k < 8 ? a : b) >> (21 - 3 * (k & 7))) & 7)]);
@@ -433,9 +426,8 @@ internal static class GraphicsCodec
                     {
                         for (int i = 0; i < n; i++)
                         {
-                            int start = p;
-                            Paint(block++, k => data[start + k]);
-                            p += 16;
+                            var pixels = reader.ReadBytes(16).ToArray();
+                            Paint(block++, k => pixels[k]);
                         }
                         break;
                     }
