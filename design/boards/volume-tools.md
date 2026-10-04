@@ -91,7 +91,12 @@ On the Details tab of the input or a disk image's volume node.
 
 - **Header** (caption on CmSidebarBackground): "VOLUME", then link buttons on the right: **Defragment…** (only when there is something to gain: a split file or more than one free run) and **First Aid…**.
 - **Used bar first:** a line "**2.0 MB** HFS volume · 512-byte blocks" with "4 KB free" right-aligned in mono muted, then an 8 px bar (CmSegmentTrack track, CmAccent used), `aria-label` "99.8% used". Same look as the fork bars on the Forks card.
-- **Allocation map:** muted line "Where the free space lies" with "4 runs · largest 2 blocks" right-aligned, then 64 cells in one row (gap 1, 14 px high, radius 1): each cell is one 64th of the volume's blocks, coloured by what most of it holds: CmAccent used, CmWarning used by a file in more than one piece, CmSegmentTrack free with a CmBorder inset line. Legend below (Used, Split file, Free). The same map is used in the Defragment dialog.
+- **Allocation map:** muted line "Where the free space lies" with "4 runs · largest 2 blocks" right-aligned, then one strip 14 px high (CmRadiusSmall, 1 px CmBorder inset, CmSegmentTrack behind):
+  - **Sized to the width, not a fixed count:** one segment per 2 DIP of the strip's width (about 190 on the card, about 190 in the Defragment dialog), each covering an equal share of the volume's blocks. A volume with fewer blocks than segments gets one block per segment. Redraw on resize.
+  - **Small things win** (so scattered free space looks scattered): a segment with any block of a file in more than one piece is **Split file** (CmWarning); otherwise one with any free block is **Partly free** (CmMapPartial) or **Free** (CmSegmentTrack) when all of it is free; otherwise **Used** (CmAccent).
+  - **Hover** a segment for its block range and contents: "Blocks 1,024–1,045: 2 free, the rest used". The strip's accessible name gives the summary ("4,090 blocks; 1 file in pieces; free space in 4 runs of 2 blocks").
+  - Legend below: Used, Split file, Partly free, Free. The same map is used in the Defragment dialog.
+  - Draw it as one custom control (rectangles per segment, snapped to device pixels), not one element per segment.
 - **Rows:** label column widened to **112 px** and labels shortened, so nothing wraps at 13 px:
 
   | Today | New label | Value |
@@ -112,5 +117,5 @@ On the Details tab of the input or a disk image's volume node.
 
 ## View-model needs
 
-- A layout summary from the HFS writer: per-64th allocation (used / split / free), free runs and the largest, split file count and worst extent count, smallest size now and after defragmenting. One call feeds the card, Defragment and Resize.
+- A layout summary from the HFS writer: the free runs and the extents of files in more than one piece (block ranges, not cells: the view buckets them for its width), the largest free run, split file count and worst extent count, smallest size now and after defragmenting. One call feeds the card, Defragment and Resize.
 - Progress reporting (`IProgress<VolumeProgress>` with step, count, text) and `CancellationToken` through First Aid, Defragment and Resize.

@@ -48,6 +48,7 @@ Each token becomes a `Color` (`<Name>Color`) per theme in `ThemeDictionaries` an
 | **Mac content frame** | | | | |
 | CmCheckerLight | #FFFFFF | #2A2A2D | Checkerboard squares behind previews | `Images.Checkerboard` (fixed) |
 | CmCheckerDark | #ECECE8 | #323236 | Checkerboard squares, 8 DIP | |
+| CmMapPartial | #A9B6E6 | #4A5687 | Allocation map: segment with some free blocks (used is CmAccent, split CmWarning, free CmSegmentTrack) | |
 | CmLoopRegion | #E5EAFB | #263058 | Sound loop range | WaveformView (fixed) |
 | CmPlayhead | #B42318 | #FF8A7A | Sound playhead | |
 
