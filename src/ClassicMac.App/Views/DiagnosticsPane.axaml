@@ -1,0 +1,139 @@
+<!--
+  The diagnostics panel (boards/diagnostics.md): the header bar with its counts, filter and grouping, the column
+  headers, and the rows grouped by file.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             xmlns:views="using:ClassicMac.App.Views"
+             x:Class="ClassicMac.App.Views.DiagnosticsPane"
+             x:DataType="vm:MainViewModel">
+  <DockPanel DataContext="{Binding DiagnosticsPanel}" x:DataType="vm:DiagnosticsPanel">
+    <Border DockPanel.Dock="Top" Classes="chrome diagnostics-header" Classes.collapsed="{Binding !IsExpanded}"
+            Height="{DynamicResource CmPanelHeader}" Padding="4,0,8,0" BorderBrush="{DynamicResource CmBorder}">
+      <DockPanel>
+        <ToggleButton DockPanel.Dock="Left" Classes="flat" IsChecked="{Binding IsExpanded, Mode=TwoWay}" VerticalAlignment="Center"
+                      ToolTip.Tip="Show or hide the diagnostics (Ctrl+Shift+D)" AutomationProperties.Name="Diagnostics">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Classes="chevron" Width="10" Height="10" Data="M2,4 L5,7 L8,4" />
+            <TextBlock Text="Diagnostics" FontWeight="{DynamicResource CmFontWeightStrong}" />
+          </StackPanel>
+        </ToggleButton>
+        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="6" Margin="6,0,0,0" VerticalAlignment="Center">
+          <Border Classes="badge error" IsVisible="{Binding HasErrors}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <views:SeverityIcon Severity="Error" Width="12" Height="12" />
+              <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding IsExpanded}" />
+              <TextBlock Text="{Binding ErrorCount}" IsVisible="{Binding !IsExpanded}" />
+            </StackPanel>
+          </Border>
+          <Border Classes="badge warning" IsVisible="{Binding HasWarnings}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <views:SeverityIcon Severity="Warning" Width="12" Height="12" />
+              <TextBlock Text="{Binding WarningText}" IsVisible="{Binding IsExpanded}" />
+              <TextBlock Text="{Binding WarningCount}" IsVisible="{Binding !IsExpanded}" />
+            </StackPanel>
+          </Border>
+          <!-- Collapsed, only the error and warning numbers show. -->
+          <Border Classes="badge info">
+            <Border.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="IsExpanded" />
+                <Binding Path="HasInfos" />
+              </MultiBinding>
+            </Border.IsVisible>
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <views:SeverityIcon Severity="Info" Width="12" Height="12" />
+              <TextBlock Text="{Binding InfoText}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding IsExpanded}">
+          <TextBox Width="200" Height="26" MinHeight="0" Padding="8,3" PlaceholderText="Filter messages" Text="{Binding Search, Mode=TwoWay}"
+                   AutomationProperties.Name="Filter messages" />
+          <ListBox Classes="segmented" ItemsSource="{Binding Filters}" SelectedItem="{Binding Filter, Mode=TwoWay}" VerticalAlignment="Center">
+            <ListBox.ItemTemplate>
+              <DataTemplate DataType="vm:DiagnosticFilter">
+                <TextBlock Text="{Binding Converter={x:Static views:DiagnosticsLabels.Filter}}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <ToggleButton Classes="flat outlined" Content="By file" IsChecked="{Binding ByFile, Mode=TwoWay}" />
+        </StackPanel>
+        <!-- Collapsed with nothing open: "Nothing opened yet" (boards/empty-state.md). -->
+        <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" Classes="muted" Text="{Binding Placeholder}">
+          <TextBlock.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="!IsExpanded" />
+              <Binding Path="Placeholder" Converter="{x:Static ObjectConverters.IsNotNull}" />
+            </MultiBinding>
+          </TextBlock.IsVisible>
+        </TextBlock>
+        <!-- Collapsed: the latest problem. -->
+        <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis" Classes="muted">
+          <TextBlock.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="!IsExpanded" />
+              <Binding Path="HasLatest" />
+            </MultiBinding>
+          </TextBlock.IsVisible>
+          <Run Text="Latest: " /><Run Text="{Binding Latest.Code, FallbackValue={x:Null}}" Foreground="{DynamicResource CmError}"
+               FontFamily="{DynamicResource CmFontMono}" /><Run Text=" " /><Run Text="{Binding LatestPlace}" />
+        </TextBlock>
+      </DockPanel>
+    </Border>
+
+    <!-- Column headers. -->
+    <Border DockPanel.Dock="Top" Classes="pane" Height="26" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CmDivider}"
+            IsVisible="{Binding IsExpanded}">
+      <Grid ColumnDefinitions="110,260,210,*,90" Classes.grouped="{Binding ByFile}" Classes="diagnostic-columns">
+        <Button Classes="flat" Padding="0" VerticalAlignment="Center" Command="{Binding SortBySeverityCommand}"
+                ToolTip.Tip="Sort by severity" AutomationProperties.Name="Sort by severity">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBlock Classes="caption" Text="SEVERITY" />
+            <TextBlock Classes="caption" Text="{Binding Sort, Converter={x:Static views:DiagnosticsLabels.Sort}}" />
+          </StackPanel>
+        </Button>
+        <TextBlock Grid.Column="1" Classes="caption" Text="SOURCE" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="2" Classes="caption" Text="CODE" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="3" Classes="caption" Text="MESSAGE" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    <ListBox x:Name="DiagnosticList" Classes="pane diagnostics" Classes.grouped="{Binding ByFile}" IsVisible="{Binding IsExpanded}"
+             ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow, Mode=TwoWay}">
+      <ListBox.DataTemplates>
+        <DataTemplate DataType="vm:DiagnosticGroup">
+          <Border Classes="sidebar diagnostic-group">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <PathIcon Classes="chevron" Classes.collapsed="{Binding !IsExpanded}" Width="10" Height="10" Data="M2,4 L5,7 L8,4" />
+              <Image Width="16" Height="16" RenderOptions.BitmapInterpolationMode="None" Source="{Binding Kind, Converter={x:Static views:TreeIcons.KindConverter}}" />
+              <TextBlock Text="{Binding Path}" FontWeight="{DynamicResource CmFontWeightStrong}" />
+              <TextBlock Text="{Binding Counts}" Classes="muted" />
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+        <DataTemplate DataType="vm:DiagnosticEntry">
+          <Border Classes="diagnostic-row">
+            <Grid ColumnDefinitions="110,260,210,*,90" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <views:SeverityIcon Severity="{Binding Diagnostic.Severity}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Severity}" FontWeight="{DynamicResource CmFontWeightStrong}"
+                           Classes.error="{Binding IsError}" Classes.warning="{Binding IsWarning}" Classes.info="{Binding IsInfo}" />
+              </StackPanel>
+              <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Source}" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
+              <TextBlock Grid.Column="2" Classes="mono muted" Text="{Binding Code}" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
+              <TextBlock Grid.Column="3" Text="{Binding Message}" TextTrimming="CharacterEllipsis" />
+              <!-- On the selected row only (style), for an entry with a node. -->
+              <Panel Grid.Column="4" IsVisible="{Binding HasNode}">
+                <Button Classes="link show-item" Content="Show item" HorizontalAlignment="Right"
+                        Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowItemCommand, FallbackValue={x:Null}}"
+                        CommandParameter="{Binding}" ToolTip.Tip="Select it in the tree" />
+              </Panel>
+            </Grid>
+          </Border>
+        </DataTemplate>
+      </ListBox.DataTemplates>
+    </ListBox>
+  </DockPanel>
+</UserControl>
