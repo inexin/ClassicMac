@@ -146,7 +146,7 @@ internal static class HfsCatalogEditing
     // valence); every extents overflow record is the source's except those of the files in overflowFiles and of the
     // B-tree files; and every sector the edit wrote lies in the MDB, the alternate MDB, the bitmap, the catalog and extents
     // files, or the blocks of skipBlocks. So no file kept has changed, without reading any fork.
-    internal static void VerifyKept(HfsVolume result, List<(byte[] Key, byte[] Data)> before, HashSet<string> removedKeys, uint parent,
+    internal static CatalogEditState VerifyKept(HfsVolume result, List<(byte[] Key, byte[] Data)> before, HashSet<string> removedKeys, uint parent,
         List<(byte[] Key, byte[] Data)> overflowBefore, HashSet<uint> overflowFiles, HashSet<uint> skipBlocks)
     {
         var after = OpenCatalog(result, writable: false);
@@ -202,6 +202,8 @@ internal static class HfsCatalogEditing
         {
             throw new InvalidDataException($"The edited HFS volume wrote sector {stray}, outside what the edit may change.");
         }
+
+        return after;
     }
 
     internal sealed class CatalogEditState(HfsVolume source, byte[] mdb, byte[] catalog, byte[] extentsTree,

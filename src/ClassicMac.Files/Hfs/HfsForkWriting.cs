@@ -291,8 +291,12 @@ internal static class HfsForkWriting
         return new ForkResizeResult(changedTree, 0, releasedBlocks);
     }
 
-    internal static void Verify(HfsVolume source, HfsVolume result, string targetPath, HfsFork changedFork, ReadOnlySpan<byte> expected,
-        DateTime writeTime, uint newlyAllocatedBlocks, uint releasedBlocks)
+    // The edited file: its catalog record the source's but for the changed fork's lengths and extents and the
+    // modification date, the changed fork the bytes given, the other fork as it was. The MDB records the write and the
+    // blocks allocated or freed. Every other file was checked by VerifyKept.
+    internal static void Verify(HfsVolume source, HfsVolume result, CatalogEditState after, (byte[] Key, byte[] Data) before,
+        List<(byte[] Key, byte[] Data)> overflowBefore, (uint FirstBlock, uint BlockSize, uint BlockCount) sourceGeometry, string targetPath,
+        HfsFork changedFork, ReadOnlySpan<byte> expected, DateTime writeTime, uint newlyAllocatedBlocks, uint releasedBlocks)
     {
         uint macWriteTime = MacDate.FromDateTime(writeTime).Seconds;
         var sourceMdb = new byte[MdbSize];
@@ -311,37 +315,56 @@ internal static class HfsForkWriting
             throw new InvalidDataException("The rewritten HFS volume metadata did not record its modification and allocation changes.");
         }
 
-        var beforeDiagnostics = new List<Diagnostic>();
-        var afterDiagnostics = new List<Diagnostic>();
-        var before = HfsReader.Instance.Read(source.AsForkData(), new ContainerContext(diagnostics: beforeDiagnostics));
-        var after = HfsReader.Instance.Read(result.AsForkData(), new ContainerContext(diagnostics: afterDiagnostics));
-        if (beforeDiagnostics.Any(d => d.Severity == DiagnosticSeverity.Error) || afterDiagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
+        var record = after.Records.Find(r => r.Key.AsSpan().SequenceEqual(before.Key));
+        if (record.Data is null || record.Data.Length != before.Data.Length || before.Data.Length < 102)
         {
-            throw new InvalidDataException("The original or rewritten HFS volume has structural errors; the edit was not verified.");
+            throw new InvalidDataException($"The rewritten HFS volume did not keep the catalog record of '{targetPath}'.");
         }
 
-        // The target only: its metadata, the changed fork and the other one. Every other file is checked by its records
-        // and blocks (VerifyKept), without reading its forks.
-        var oldFile = before.FirstOrDefault(f => StringComparer.Ordinal.Equals(f.MacPath, targetPath));
-        var newFile = after.FirstOrDefault(f => StringComparer.Ordinal.Equals(f.MacPath, targetPath));
-        if (oldFile is null || newFile is null || before.Count != after.Count)
+        // The fields the edit may change: the changed fork's logical and physical lengths and extents, and the
+        // modification date (+$30); every other byte is the source's.
+        var (lengths, extentRecord) = changedFork == HfsFork.Data ? (0x1A, 0x4A) : (0x24, 0x56);
+        bool May(int at) => at is >= 0x30 and < 0x34 || at >= lengths && at < lengths + 8 || at >= extentRecord && at < extentRecord + 12;
+        var now = new BigEndianReader(record.Data);
+        for (var at = 0; at < before.Data.Length; at++)
         {
-            throw new InvalidDataException("The rewritten HFS volume did not preserve its file list.");
+            if (record.Data[at] != before.Data[at] && !May(at))
+            {
+                throw new InvalidDataException($"The rewritten HFS volume changed metadata incorrectly for '{targetPath}'.");
+            }
         }
 
-        if (!SameMetadata(oldFile, newFile, includeModified: false) || newFile.Modified != new MacDate(macWriteTime))
+        if (U32(now, 0x30) != macWriteTime || U32(now, lengths) != expected.Length)
         {
             throw new InvalidDataException($"The rewritten HFS volume changed metadata incorrectly for '{targetPath}'.");
         }
 
-        var changed = changedFork == HfsFork.Data ? newFile.DataFork : newFile.ResourceFork;
-        var unchanged = changedFork == HfsFork.Data ? newFile.ResourceFork : newFile.DataFork;
-        var oldUnchanged = changedFork == HfsFork.Data ? oldFile.ResourceFork : oldFile.DataFork;
-        if (!changed.ToArray().AsSpan().SequenceEqual(expected) ||
-            !unchanged.ToArray().AsSpan().SequenceEqual(oldUnchanged.ToArray()))
+        var afterOverflow = LeafRecords(after.ExtentsTree).Select(r => (r.Key, r.Data)).ToList();
+        var unchangedFork = changedFork == HfsFork.Data ? HfsFork.Resource : HfsFork.Data;
+        var changed = RecordFork(result, (after.FirstBlock, after.BlockSize, after.BlockCount), record.Data, changedFork, afterOverflow);
+        var kept = RecordFork(result, (after.FirstBlock, after.BlockSize, after.BlockCount), record.Data, unchangedFork, afterOverflow);
+        var keptBefore = RecordFork(source, sourceGeometry, before.Data, unchangedFork, overflowBefore);
+        if (!changed.AsSpan().SequenceEqual(expected) || !kept.AsSpan().SequenceEqual(keptBefore))
         {
             throw new InvalidDataException($"The rewritten HFS volume did not preserve both forks for '{targetPath}'.");
         }
+    }
+
+    // A file's fork from its catalog record: the record's three extents, then its overflow records in order.
+    private static byte[] RecordFork(HfsVolume image, (uint FirstBlock, uint BlockSize, uint BlockCount) geometry, byte[] record, HfsFork fork,
+        List<(byte[] Key, byte[] Data)> overflowRecords)
+    {
+        var (length, extentRecord, forkType) = fork == HfsFork.Data ? (0x1A, 0x4A, (byte)0x00) : (0x24, 0x56, (byte)0xFF);
+        var reader = new BigEndianReader(record);
+        uint fileId = U32(reader, 0x14);
+        var overflow = new Dictionary<(byte Fork, uint File), List<(ushort Start, byte[] Extents)>>
+        {
+            [(forkType, fileId)] = [.. overflowRecords
+                .Where(r => r.Key.Length >= 8 && r.Data.Length >= 12 && r.Key[1] == forkType && U32(new BigEndianReader(r.Key), 2) == fileId)
+                .Select(r => (U16(new BigEndianReader(r.Key), 6), r.Data.AsSpan(0, 12).ToArray()))],
+        };
+        return ReadFork(image, geometry.FirstBlock, geometry.BlockSize, geometry.BlockCount,
+            ParseExtents(new BigEndianReader(record.AsMemory(extentRecord, 12))), U32(reader, length), overflow, forkType, fileId, includeOverflow: true);
     }
 
     internal static bool SameMetadata(MacFile left, MacFile right, bool includeModified) =>

@@ -128,9 +128,8 @@ In rough priority; each item names what blocks it, if anything.
    Digital Corpora journaled Mac OS X image checks out; HFS Plus repair on Mac OS 9-made volumes awaits the Mac RE
    session's re-run, and HFSX has been tried only on built volumes.
 2. **Writing, still to do**: disks with several Mac partitions (and the app's Volume menu on partitioned disks);
-   NDIF changed chunks compressed again, segmented images, a check against Disk Copy; cheaper fork edits
-   (`ReplaceFork` checked as deletions are); the extents tree edited in place rather than rebuilt; `resize` shrinking
-   and a new block size.
+   NDIF changed chunks compressed again, segmented images, a check against Disk Copy; the extents tree edited in
+   place rather than rebuilt; `resize` shrinking and a new block size.
 3. **Fuzzing**: SharpFuzz with libFuzzer per reader in CI. The seeded mutation tests (`tests/Shared/Mutations.cs`)
    cover the containers, resource maps, `dcmp`, every decoder's fixtures, NDIF's two forks and First Aid on HFS and
    HFS Plus; `CLASSICMAC_MUTANTS` runs them deeper.

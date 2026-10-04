@@ -700,6 +700,12 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   keys and child pointers, node order and sibling links, node maps, free-node and leaf-record counts, and key order.
   `HfsWriter.Check` runs these checks without an edit, even on a software-locked volume, and returns the first fault
   (the CLI's `check`).
+- After an edit the result is checked without reading any fork it kept: it opens as the writer opens a volume; every
+  catalog and extents record of a file kept is the source's byte for byte; and every sector written lies in the MDB,
+  the alternate MDB, the bitmap, the B-tree files or the edited fork's blocks. A replaced fork's file is checked by its
+  own record, which may differ from the source's only in that fork's lengths and extents and the modification date, and
+  by its two forks: the replaced one the bytes given, the other as it was [ClassicMac]. Replacing a fork on a 500 MB
+  Mac OS 9 volume takes about 80 ms.
 - The writer follows §3. A catalog edit is made record by record as the BTree manager makes it (§1.8): the records
   removed, then those changed (in place when they fit, else deleted and inserted), then those added, each in key order
   [ClassicMac order]; rotation into the left sibling, splits to the left into the first free node, parent keys

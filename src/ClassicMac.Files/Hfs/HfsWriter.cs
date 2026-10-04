@@ -266,9 +266,12 @@ public static class HfsWriter
 
         ValidateExtentsTree(ReadFork(result, firstBlock, blockSize, blockCount, extFileExtents,
             U32(new BigEndianReader(mdbOut), 0x82), overflow, 0xFF, 3, false));
-        Verify(source, result, canonicalPath, fork, data.Span, writeTime, newlyAllocatedBlocks, releasedBlocks);
+        // Every other file by its records and blocks, then the target by its record and its two forks: no other fork is read.
         var targetBlocks = new HashSet<uint>(extents.SelectMany(e => Enumerable.Range(e.Start, e.Count).Select(b => (uint)b)));
-        VerifyKept(result, catalogBefore, [Convert.ToHexString(match.Key)], 0, overflowBefore, [fileId], targetBlocks);
+        var after = VerifyKept(result, catalogBefore, [Convert.ToHexString(match.Key)], 0, overflowBefore, [fileId], targetBlocks);
+        var targetBefore = catalogBefore.Find(r => r.Key.AsSpan().SequenceEqual(match.Key));
+        Verify(source, result, after, targetBefore, overflowBefore, (firstBlock, blockSize, blockCount), canonicalPath, fork, data.Span, writeTime,
+            newlyAllocatedBlocks, releasedBlocks);
         return result;
     }
 
