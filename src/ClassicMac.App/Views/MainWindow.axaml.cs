@@ -14,14 +14,21 @@ using ClassicMac.App.ViewModels;
 
 namespace ClassicMac.App.Views;
 
-internal sealed partial class MainWindow : Window, IFilePicker, IShell
+internal sealed partial class MainWindow : Window, IFilePicker
 {
+    // The window's parts: the form host's keys, the playhead's timer, the help page's web view, the shell.
+    private readonly FormHostInput formHostInput;
+    private readonly PlayheadFollower playhead;
+    private readonly HelpWebView helpWebView;
+    private readonly WindowShell shell;
+
     public MainWindow()
     {
         InitializeComponent();
-        BindHost();
-        BindSound();
-        BindHelp();
+        formHostInput = new FormHostInput(FormHost);
+        playhead = new PlayheadFollower(this);
+        helpWebView = new HelpWebView(this, HelpHost);
+        shell = new WindowShell(this, WindowMenu);
         // The custom title bar (S1): Windows and macOS extend the client area into the decorations; Linux keeps the
         // system title bar, whose support for this varies by desktop.
         if (!OperatingSystem.IsLinux())
@@ -69,7 +76,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
                 boundPanel = model.DiagnosticsPanel;
                 DiagnosticsRow.Bind(Body.RowDefinitions[1], Body.RowDefinitions[2], boundPanel);
                 model.ItemShown += ShowInTree;
-                BindShell(model);
+                shell.Bind(model);
             }
         };
         Closing += OnClosing;
@@ -336,6 +343,12 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
     }
 
     private readonly SoundFlowPlayer audio = new();
+
+    /// <summary>Whether the playhead timer runs (while a sound plays).</summary>
+    internal bool IsFollowingPlayhead => playhead.IsFollowing;
+
+    /// <summary>The About box while it is open (tests close it).</summary>
+    internal Window? About => shell.About;
 
     public async Task<IReadOnlyList<string>> PickFilesAsync()
     {

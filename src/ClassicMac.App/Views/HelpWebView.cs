@@ -14,14 +14,18 @@ namespace ClassicMac.App.Views;
 // JavaScript off; every navigation it starts goes through the model, which lets only the page itself load and turns a
 // link to a file of the disk into a selection in the tree. Without an engine (or in a window without a native
 // handle, as in tests) the model is told why and shows the source.
-internal sealed partial class MainWindow
+internal sealed class HelpWebView
 {
+    private readonly Window window;
+    private readonly Panel host;
     private WebView? webView;
     private MainViewModel? helpModel;
 
-    private void BindHelp()
+    public HelpWebView(Window window, Panel host)
     {
-        DataContextChanged += (_, _) =>
+        this.window = window;
+        this.host = host;
+        window.DataContextChanged += (_, _) =>
         {
             if (helpModel is not null)
             {
@@ -29,14 +33,14 @@ internal sealed partial class MainWindow
                 helpModel.HelpPreview.PropertyChanged -= OnHelpModelChanged;
             }
 
-            helpModel = DataContext as MainViewModel;
+            helpModel = window.DataContext as MainViewModel;
             if (helpModel is not null)
             {
                 helpModel.PropertyChanged += OnHelpModelChanged;
                 helpModel.HelpPreview.PropertyChanged += OnHelpModelChanged;
             }
         };
-        Closed += (_, _) => webView?.Dispose();
+        window.Closed += (_, _) => webView?.Dispose();
     }
 
     private void OnHelpModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -90,7 +94,7 @@ internal sealed partial class MainWindow
     private string? CreateWebView()
     {
         // A window with no native handle (Avalonia's headless platform gives a zero "STUB" handle) cannot host one.
-        if (TryGetPlatformHandle() is not { } handle || handle.Handle == IntPtr.Zero)
+        if (window.TryGetPlatformHandle() is not { } handle || handle.Handle == IntPtr.Zero)
         {
             return "This window has no native web view, so the page shows as text.";
         }
@@ -120,7 +124,7 @@ internal sealed partial class MainWindow
             view.NavigationStarted += OnHelpNavigation;
             view.NewWindowRequested += OnHelpNewWindow;
             view.StatusTextChanged += (_, e) => helpModel?.HelpPreview.HoverHelpLink(e.StatusText);
-            HelpHost.Children.Add(view);
+            host.Children.Add(view);
             webView = view;
             return null;
         }

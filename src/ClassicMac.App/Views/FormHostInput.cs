@@ -9,20 +9,23 @@ namespace ClassicMac.App.Views;
 
 // The read-then-edit host's keys and double-click (FormEditing.cs): Esc cancels and Ctrl+Enter applies while editing,
 // before a text box can take the keys; a double-click on a read-only "form-row" edits with that row selected.
-internal sealed partial class MainWindow
+internal sealed class FormHostInput
 {
-    private void BindHost()
+    private readonly Control host;
+
+    public FormHostInput(Control host)
     {
-        FormHost.AddHandler(KeyDownEvent, OnHostKeyDown, RoutingStrategies.Tunnel);
-        FormHost.AddHandler(DoubleTappedEvent, OnHostDoubleTapped, RoutingStrategies.Bubble, handledEventsToo: true);
-        FormHost.AddHandler(PointerPressedEvent, (_, e) => SelectFormRow(e.Source), RoutingStrategies.Tunnel, handledEventsToo: true);
-        FormHost.AddHandler(GotFocusEvent, (_, e) => SelectFormRow(e.Source), RoutingStrategies.Bubble);
+        this.host = host;
+        host.AddHandler(InputElement.KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
+        host.AddHandler(InputElement.DoubleTappedEvent, OnDoubleTapped, RoutingStrategies.Bubble, handledEventsToo: true);
+        host.AddHandler(InputElement.PointerPressedEvent, (_, e) => SelectFormRow(e.Source), RoutingStrategies.Tunnel, handledEventsToo: true);
+        host.AddHandler(InputElement.GotFocusEvent, (_, e) => SelectFormRow(e.Source), RoutingStrategies.Bubble);
     }
 
     // A click on a "form-row", or the focus going into one of its inputs, selects its row (and its item in the preview).
     private void SelectFormRow(object? source)
     {
-        if (DataContext is MainViewModel { Forms.Form: { } form } && FormRow(source) is { DataContext: { } item })
+        if (host.DataContext is MainViewModel { Forms.Form: { } form } && FormRow(source) is { DataContext: { } item })
         {
             form.SelectRow(item);
         }
@@ -39,9 +42,9 @@ internal sealed partial class MainWindow
         return row;
     }
 
-    private void OnHostKeyDown(object? sender, KeyEventArgs e)
+    private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MainViewModel { FormEditing.IsEditingForm: true } model)
+        if (host.DataContext is not MainViewModel { FormEditing.IsEditingForm: true } model)
         {
             return;
         }
@@ -63,9 +66,9 @@ internal sealed partial class MainWindow
         }
     }
 
-    private void OnHostDoubleTapped(object? sender, TappedEventArgs e)
+    private void OnDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (DataContext is not MainViewModel { FormEditing.IsEditingForm: false } model || e.Source is not Visual source)
+        if (host.DataContext is not MainViewModel { FormEditing.IsEditingForm: false } model || e.Source is not Visual source)
         {
             return;
         }

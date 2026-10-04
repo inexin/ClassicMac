@@ -9,12 +9,13 @@ using ClassicMac.App.ViewModels;
 namespace ClassicMac.App.Views;
 
 // The shell (S1, S7): the window's part of the shell commands, the Window menu and the theme.
-internal sealed partial class MainWindow
+internal sealed class WindowShell(Window window, MenuItem windowMenu) : IShell
 {
     /// <summary>The About box while it is open (tests close it).</summary>
     internal Window? About { get; private set; }
 
-    private void BindShell(MainViewModel model)
+    /// <summary>Makes this the model's shell, and follows its theme and inputs.</summary>
+    public void Bind(MainViewModel model)
     {
         model.ShellActions.Shell = this;
         if (model.ShellActions.Theme != AppTheme.System)
@@ -56,18 +57,18 @@ internal sealed partial class MainWindow
     // Window ▸ Minimize, Zoom, then one item per open input (checked: the one holding the selection).
     private void BuildWindowMenu(MainViewModel model)
     {
-        WindowMenu.Items.Clear();
-        WindowMenu.Items.Add(new MenuItem { Header = "_Minimize", Command = model.ShellActions.MinimizeCommand });
-        WindowMenu.Items.Add(new MenuItem { Header = "_Zoom", Command = model.ShellActions.ZoomWindowCommand });
+        windowMenu.Items.Clear();
+        windowMenu.Items.Add(new MenuItem { Header = "_Minimize", Command = model.ShellActions.MinimizeCommand });
+        windowMenu.Items.Add(new MenuItem { Header = "_Zoom", Command = model.ShellActions.ZoomWindowCommand });
         if (model.Roots.Count == 0)
         {
             return;
         }
 
-        WindowMenu.Items.Add(new Separator());
+        windowMenu.Items.Add(new Separator());
         foreach (var input in model.Roots)
         {
-            WindowMenu.Items.Add(new MenuItem
+            windowMenu.Items.Add(new MenuItem
             {
                 Header = input.BaseTitle,
                 Command = model.ShellActions.ShowInputCommand,
@@ -79,14 +80,14 @@ internal sealed partial class MainWindow
         }
     }
 
-    public void OpenUri(Uri uri) => _ = Launcher.LaunchUriAsync(uri);
+    public void OpenUri(Uri uri) => _ = window.Launcher.LaunchUriAsync(uri);
 
     public async Task ShowAboutAsync(AboutInfo about)
     {
         About = AboutBox.Create(about, OpenUri);
         try
         {
-            await About.ShowDialog(this);
+            await About.ShowDialog(window);
         }
         finally
         {
@@ -94,9 +95,9 @@ internal sealed partial class MainWindow
         }
     }
 
-    public void Minimize() => WindowState = WindowState.Minimized;
+    public void Minimize() => window.WindowState = WindowState.Minimized;
 
-    public Task CopyTextAsync(string text) => Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
+    public Task CopyTextAsync(string text) => window.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
 
-    public void ToggleZoom() => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    public void ToggleZoom() => window.WindowState = window.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 }
