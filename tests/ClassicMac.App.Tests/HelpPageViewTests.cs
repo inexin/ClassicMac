@@ -152,12 +152,12 @@ public sealed class HelpPageViewTests : IDisposable
         Dispatcher.UIThread.RunJobs();
 
         Assert.Equal("This window has no native web view, so the page shows as text.", model.HelpPreview.WebEngineMessage);
-        Assert.True(window.FindControl<ListBox>("HelpMode")!.IsEffectivelyVisible);
-        var source = window.FindControl<SelectableTextBlock>("HelpSource")!;
+        Assert.True(window.Named<ListBox>("HelpMode")!.IsEffectivelyVisible);
+        var source = window.Named<SelectableTextBlock>("HelpSource")!;
         Assert.True(source.IsEffectivelyVisible);
         Assert.StartsWith("<html><head>", source.Text);
-        Assert.True(window.FindControl<TextBlock>("HelpEngineMessage")!.IsEffectivelyVisible);
-        Assert.False(window.FindControl<Panel>("HelpHost")!.IsEffectivelyVisible);
+        Assert.True(window.Named<TextBlock>("HelpEngineMessage")!.IsEffectivelyVisible);
+        Assert.False(window.Named<Panel>("HelpHost")!.IsEffectivelyVisible);
         window.Close();
     });
 }

@@ -35,7 +35,7 @@ public sealed class InspectorViewTests
             var model = new MainViewModel();
             var window = new MainWindow { DataContext = model };
             window.Show();
-            var header = window.FindControl<Border>("InspectorHeader")!;
+            var header = window.Named<Border>("InspectorHeader")!;
             Assert.False(header.IsVisible); // nothing selected
 
             var open = model.OpenAsync(Forks(folder));
@@ -55,8 +55,8 @@ public sealed class InspectorViewTests
             var type = texts.Single(t => t.Classes.Contains("value") && t.Text == "'STR#'");
             Assert.Equal("IBM Plex Mono", type.FontFamily.Name.Split('#')[^1]);
             // No large icon of its own: the kind's 32-pixel icon shows in the tile, 1:1.
-            var kindIcon = window.FindControl<PixelImage>("HeaderKindIcon")!;
-            var ownIcon = window.FindControl<PixelImage>("HeaderOwnIcon")!;
+            var kindIcon = window.Named<PixelImage>("HeaderKindIcon")!;
+            var ownIcon = window.Named<PixelImage>("HeaderOwnIcon")!;
             Assert.True(kindIcon.IsEffectivelyVisible);
             Assert.Same(TreeIcons.LargeFor(TreeIconKind.Resource), kindIcon.Source);
             Assert.Equal(1.0, kindIcon.Zoom);
@@ -76,7 +76,7 @@ public sealed class InspectorViewTests
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
             // The toolbar's Export… does what the header's does.
-            var toolbarExport = window.FindControl<Border>("Toolbar")!.GetVisualDescendants().OfType<Button>()
+            var toolbarExport = window.Named<Border>("Toolbar")!.GetVisualDescendants().OfType<Button>()
                 .Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Export");
             Assert.Same(model.InspectorActions.HeaderExportCommand, toolbarExport.Command);
             var buttons = header.GetVisualDescendants().OfType<Button>().ToList();
@@ -92,14 +92,14 @@ public sealed class InspectorViewTests
             edit.Command!.Execute(null);
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(1, model.SelectedTab);
-            Assert.True(window.FindControl<DockPanel>("FormHost")!.IsEffectivelyVisible);
+            Assert.True(window.Named<DockPanel>("FormHost")!.IsEffectivelyVisible);
             Assert.False(edit.IsEffectivelyVisible);
             Assert.True(header.GetVisualDescendants().OfType<Border>().Single(b => b.Classes.Contains("editing-badge")).IsEffectivelyVisible);
-            var cancel = window.FindControl<DockPanel>("FormHost")!.GetVisualDescendants().OfType<Button>().Single(b => (string?)b.Content == "Cancel");
+            var cancel = window.Named<DockPanel>("FormHost")!.GetVisualDescendants().OfType<Button>().Single(b => (string?)b.Content == "Cancel");
             cancel.Command!.Execute(null);
             Dispatcher.UIThread.RunJobs();
-            Assert.False(window.FindControl<DockPanel>("EditingFooter")!.IsEffectivelyVisible);   // read only again
-            Assert.True(window.FindControl<StackPanel>("ReadOnlyFooter")!.IsEffectivelyVisible);
+            Assert.False(window.Named<DockPanel>("EditingFooter")!.IsEffectivelyVisible);   // read only again
+            Assert.True(window.Named<StackPanel>("ReadOnlyFooter")!.IsEffectivelyVisible);
 
             // A resource without a form has no Edit button.
             model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "ZZZZ").Children[0];
@@ -127,26 +127,26 @@ public sealed class InspectorViewTests
             model.DiagnosticsPanel.Add(new DiagnosticEntry(new ClassicMac.Core.Diagnostic(ClassicMac.Core.DiagnosticSeverity.Error, "x.y", "m"), "s", model.Roots[0]));
             Dispatcher.UIThread.RunJobs();
 
-            var bar = window.FindControl<Border>("StatusBar")!;
+            var bar = window.Named<Border>("StatusBar")!;
             Assert.Equal(26, bar.Bounds.Height, 6);
             var shown = bar.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).ToList();
             Assert.Equal("Forms.rsrc · resource fork · 1 file", shown[0].Text);
             var errors = shown.Single(t => t.Text == " · 1 error");
             Assert.Equal(Token("CmError"), ColorOf(errors.Foreground));
             Assert.Contains(shown, t => t.Text == model.Status);
-            Assert.False(window.FindControl<StackPanel>("Progress")!.IsEffectivelyVisible);
+            Assert.False(window.Named<StackPanel>("Progress")!.IsEffectivelyVisible);
 
             var progress = model.StatusLine.BeginProgress("Extracting Forms…", 10);
             progress.Apply(4);
             Dispatcher.UIThread.RunJobs();
-            Assert.True(window.FindControl<StackPanel>("Progress")!.IsEffectivelyVisible);
+            Assert.True(window.Named<StackPanel>("Progress")!.IsEffectivelyVisible);
             Assert.DoesNotContain(bar.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible), t => t.Text == model.Status);
             var progressBar = bar.GetVisualDescendants().OfType<ProgressBar>().Single();
             Assert.Equal((4.0, 10.0, 120.0, 6.0), (progressBar.Value, progressBar.Maximum, progressBar.Bounds.Width, progressBar.Bounds.Height));
             Assert.Contains(bar.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "4 of 10" && t.IsEffectivelyVisible);
             progress.Finish("Done.");
             Dispatcher.UIThread.RunJobs();
-            Assert.False(window.FindControl<StackPanel>("Progress")!.IsEffectivelyVisible);
+            Assert.False(window.Named<StackPanel>("Progress")!.IsEffectivelyVisible);
             window.Close();
         }
         finally

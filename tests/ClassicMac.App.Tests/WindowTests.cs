@@ -70,10 +70,10 @@ public class WindowTests
             Assert.Equal(model.ImageGrid.ImageCardWidth, cards[0].Bounds.Width);
             Capture(window, "image-family", baselines);
 
-            window.FindControl<CheckBox>("ShowMasksBox")!.IsChecked = true;
+            window.Named<CheckBox>("ShowMasksBox")!.IsChecked = true;
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(5, window.GetVisualDescendants().OfType<Border>().Count(b => b.Classes.Contains("image-card")));
-            window.FindControl<ScrollViewer>("ImageScroller")!.ScrollToEnd();       // the Finder states, wrapped to the width
+            window.Named<ScrollViewer>("ImageScroller")!.ScrollToEnd();       // the Finder states, wrapped to the width
             Dispatcher.UIThread.RunJobs();
             Capture(window, "image-states", baselines);
 
@@ -88,7 +88,7 @@ public class WindowTests
             Assert.InRange(shown.Count, 1, 100);
             Assert.Contains("'SICN' #1", shown);
             Assert.DoesNotContain("'SICN' #500", shown);
-            var scroller = window.FindControl<ScrollViewer>("ImageScroller")!;
+            var scroller = window.Named<ScrollViewer>("ImageScroller")!;
             scroller.ScrollToEnd();
             Dispatcher.UIThread.RunJobs();
             Assert.Contains("'SICN' #500", Shown());
@@ -119,7 +119,7 @@ public class WindowTests
             model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single().Children[0];
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
-            var cards = window.FindControl<ScrollViewer>("PropertyCards")!;
+            var cards = window.Named<ScrollViewer>("PropertyCards")!;
             Assert.True(cards.IsEffectivelyVisible);
             var rows = cards.GetVisualDescendants().OfType<Grid>().Where(g => g.Classes.Contains("property-row")).ToList();
             Assert.Equal(14, rows.Count);                                              // two runs of seven values
@@ -127,7 +127,7 @@ public class WindowTests
             Assert.Equal(["Copy as _Decimal", "Copy as _Hex", "Copy as _JSON"], font.ContextMenu!.Items.OfType<MenuItem>().Select(i => (string)i.Header!));
             Capture(window, "properties", baselines);
 
-            window.FindControl<ListBox>("PropertyMode")!.SelectedIndex = 1;
+            window.Named<ListBox>("PropertyMode")!.SelectedIndex = 1;
             Dispatcher.UIThread.RunJobs();
             Assert.True(model.PropertyLinks.ShowJson);
             Assert.False(cards.IsEffectivelyVisible);
@@ -180,7 +180,7 @@ public class WindowTests
             Pump(model.PreviewTask);
             Capture(window, "text", baselines);
             // The text keeps clear of the overlay scroll bar on the right.
-            var styledScroller = window.FindControl<ScrollViewer>("StyledTextScroller")!;
+            var styledScroller = window.Named<ScrollViewer>("StyledTextScroller")!;
             Assert.True(styledScroller.Padding.Right >= 24);
 
             model.SelectedTab = 2;
@@ -188,7 +188,7 @@ public class WindowTests
             Capture(window, "hex");
 
             // The tree's context menu, on a resource: the Resource commands and Save Resource As apply, not the file's.
-            var tree = window.FindControl<BrowseTree>("Tree")!;
+            var tree = window.Named<BrowseTree>("Tree")!;
             var menu = tree.ContextMenu!;
             menu.Open(tree);
             Dispatcher.UIThread.RunJobs();
@@ -202,8 +202,8 @@ public class WindowTests
             model.Selected = types.Single(t => t.Type.ToString() == "snd ").Children[0];
             Pump(model.PreviewTask);
             Assert.True(model.Preview.IsSound);
-            Assert.True(window.FindControl<Button>("SaveAsWavButton")!.IsEffectivelyVisible);     // the sound's header actions
-            Assert.True(window.FindControl<Button>("ReplaceFromWavButton")!.IsEffectivelyVisible);
+            Assert.True(window.Named<Button>("SaveAsWavButton")!.IsEffectivelyVisible);     // the sound's header actions
+            Assert.True(window.Named<Button>("ReplaceFromWavButton")!.IsEffectivelyVisible);
             Capture(window, "sound", baselines);
             window.Close();
             Baselines.Verify(baselines);
@@ -490,7 +490,7 @@ public class WindowTests
             model.Selected = type.Children[0];
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
-            var tree = window.FindControl<BrowseTree>("Tree")!;
+            var tree = window.Named<BrowseTree>("Tree")!;
             Assert.Same(type.Children[0], tree.SelectedItem);
             var form = Assert.IsType<StringForm>(model.Forms.Form);
             form.Text = "edited";
@@ -643,7 +643,7 @@ public class WindowTests
             Dispatcher.UIThread.RunJobs();
 
             // S1: on Windows and macOS the window extends into its decorations and shows its own title bar.
-            var titleBar = window.FindControl<Border>("TitleBar")!;
+            var titleBar = window.Named<Border>("TitleBar")!;
             Assert.Equal(!OperatingSystem.IsLinux(), window.ExtendClientAreaToDecorationsHint);
             Assert.Equal(!OperatingSystem.IsLinux(), titleBar.IsVisible);
             Assert.Equal(Avalonia.Input.WindowDecorationsElementRole.TitleBar, Avalonia.Controls.Chrome.WindowDecorationProperties.GetElementRole(titleBar));
@@ -651,7 +651,7 @@ public class WindowTests
             Assert.Contains(titleBar.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Shell.rsrc" && t.IsEffectivelyVisible);
 
             // S2: each toolbar button runs its command and follows its enabled state.
-            var tools = window.FindControl<Border>("Toolbar")!.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("tool"))
+            var tools = window.Named<Border>("Toolbar")!.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("tool"))
                 .ToDictionary(b => Avalonia.Automation.AutomationProperties.GetName(b)!);
             Assert.Equal(["Open", "Save", "Get Info", "Edit Hex", "Export", "Extract All", "Play"], tools.Keys);
             Assert.Same(model.OpenCommand, tools["Open"].Command);
@@ -669,8 +669,8 @@ public class WindowTests
 
             EnabledFollowCommands();
             Assert.False(tools["Edit Hex"].IsEffectivelyEnabled);              // the input: no resource
-            var zoom = window.FindControl<ListBox>("ZoomChoice")!;
-            var depth = window.FindControl<ComboBox>("DepthChoice")!;
+            var zoom = window.Named<ListBox>("ZoomChoice")!;
+            var depth = window.Named<ComboBox>("DepthChoice")!;
             model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "ICN#").Children[0];
             Pump(model.PreviewTask);
             EnabledFollowCommands();
@@ -781,10 +781,10 @@ public class WindowTests
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
             var menu = Assert.IsType<MenuForm>(model.Forms.Form);
-            var host = window.FindControl<DockPanel>("FormHost")!;
+            var host = window.Named<DockPanel>("FormHost")!;
             Assert.True(host.IsEffectivelyVisible);
-            Assert.True(window.FindControl<StackPanel>("ReadOnlyFooter")!.IsEffectivelyVisible);
-            Assert.False(window.FindControl<DockPanel>("EditingFooter")!.IsEffectivelyVisible);
+            Assert.True(window.Named<StackPanel>("ReadOnlyFooter")!.IsEffectivelyVisible);
+            Assert.False(window.Named<DockPanel>("EditingFooter")!.IsEffectivelyVisible);
             var rows = host.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("table-row")).ToList();
             Assert.Equal(5, rows.Count);
             Assert.DoesNotContain(host.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);   // read only
@@ -803,7 +803,7 @@ public class WindowTests
             var preview = host.GetVisualDescendants().OfType<MenuView>().Single();
             Assert.Equal(2, preview.SelectedIndex);
             Assert.Contains("selected", rows[2].Classes);
-            Assert.True(window.FindControl<DockPanel>("EditingFooter")!.IsEffectivelyVisible);
+            Assert.True(window.Named<DockPanel>("EditingFooter")!.IsEffectivelyVisible);
             Assert.Equal("Live preview · unapplied changes", host.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "PreviewTitle").Text);
 
             // The preview selects its row: an item under a click.
@@ -850,8 +850,8 @@ public class WindowTests
             Dispatcher.UIThread.RunJobs();
             var keys = host.GetVisualDescendants().OfType<TextBox>().Where(t => t.Classes.Contains("key")).ToList();
             Assert.Equal([false, false, true, true, false], keys.Select(k => k.Classes.Contains("conflict")));
-            Assert.True(window.FindControl<StackPanel>("FormErrorLine")!.IsEffectivelyVisible);
-            var apply = window.FindControl<DockPanel>("EditingFooter")!.GetVisualDescendants().OfType<Button>().Single(b => (string?)b.Content == "Apply");
+            Assert.True(window.Named<StackPanel>("FormErrorLine")!.IsEffectivelyVisible);
+            var apply = window.Named<DockPanel>("EditingFooter")!.GetVisualDescendants().OfType<Button>().Single(b => (string?)b.Content == "Apply");
             Assert.False(apply.IsEffectivelyEnabled);
             Capture(window, "menu-form-editing", baselines);
 
@@ -874,7 +874,7 @@ public class WindowTests
             Dispatcher.UIThread.RunJobs();
             Assert.False(model.FormEditing.IsEditingForm);
             Assert.Equal("Applied · Undo Edit 'MENU' 129 (Ctrl+Z)", model.FormEditing.LastApplied);
-            Assert.Contains(window.FindControl<StackPanel>("ReadOnlyFooter")!.GetVisualDescendants().OfType<TextBlock>(),
+            Assert.Contains(window.Named<StackPanel>("ReadOnlyFooter")!.GetVisualDescendants().OfType<TextBlock>(),
                 t => t.Text == model.FormEditing.LastApplied && t.IsEffectivelyVisible);
             window.Close();
             Baselines.Verify(baselines);
@@ -904,7 +904,7 @@ public class WindowTests
             var open = model.OpenAsync(path);
             Pump(open);
             Pump(open.Result!.EnsureLoadedAsync());
-            var host = window.FindControl<DockPanel>("FormHost")!;
+            var host = window.Named<DockPanel>("FormHost")!;
             void Select(string type)
             {
                 model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == type).Children[0];
@@ -985,7 +985,7 @@ public class WindowTests
             panel.Add(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "input.unreadable", "No such file."), "Gone.img", null));
             panel.ByFile = false;
             Dispatcher.UIThread.RunJobs();
-            var tree = window.FindControl<BrowseTree>("Tree")!;
+            var tree = window.Named<BrowseTree>("Tree")!;
             var list = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "DiagnosticList");
             Button[] Links() => list.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("show-item") && b.IsEffectivelyVisible).ToArray();
             Assert.Empty(Links());                                            // nothing selected
@@ -1071,7 +1071,7 @@ public class WindowTests
         Assert.Equal(new Thickness(3, 0, 0, 0), presenter.BorderThickness);
         Capture(window, "diagnostics-flat", baselines);
 
-        var body = window.FindControl<Grid>("Body")!;
+        var body = window.Named<Grid>("Body")!;
         body.RowDefinitions[2].Height = new GridLength(240);          // the splitter dragged
         Dispatcher.UIThread.RunJobs();
         window.KeyPress(Avalonia.Input.Key.D, Avalonia.Input.RawInputModifiers.Control | Avalonia.Input.RawInputModifiers.Shift, Avalonia.Input.PhysicalKey.D, "D");
@@ -1149,7 +1149,7 @@ public class WindowTests
             var footer = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "HiddenFooter");
             Assert.True(footer.IsVisible);
             Assert.Contains(footer.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "2 invisible items hidden");
-            var texts = window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<TextBlock>().ToList();
+            var texts = window.Named<BrowseTree>("Tree")!.GetVisualDescendants().OfType<TextBlock>().ToList();
             // A row's name is in runs (before, matched letters, after) for the search highlight.
             var group = texts.Single(t => string.Concat(t.Inlines?.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text) ?? []) == "No name");
             Assert.Equal(Avalonia.Media.FontStyle.Italic, group.FontStyle);
@@ -1170,16 +1170,16 @@ public class WindowTests
             Pump(model.PreviewTask);                                         // the preview and header icon load in the
             Pump(model.InspectorActions.HeaderIconTask);                                      // background: settle before the captures
             Dispatcher.UIThread.RunJobs();
-            window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().Single(i => i.IsSelected).Focus();
+            window.Named<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().Single(i => i.IsSelected).Focus();
             Dispatcher.UIThread.RunJobs();
-            var selected = window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().Single(i => i.IsSelected)
+            var selected = window.Named<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().Single(i => i.IsSelected)
                 .GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("name-token"));
             Assert.Equal(Application.Current!.FindResource(window.ActualThemeVariant, "CmTokenOnSelection"), selected.Background);
             Assert.Equal(Application.Current!.FindResource(window.ActualThemeVariant, "CmSelectionText"), ((TextBlock)selected.Child!).Foreground);
             // The inspector header names it with the same chips, in their plain colours, the bytes on hover.
-            var headerTokens = window.FindControl<ItemsControl>("HeaderNameTokens")!;
+            var headerTokens = window.Named<ItemsControl>("HeaderNameTokens")!;
             Assert.True(headerTokens.IsEffectivelyVisible);
-            Assert.False(window.FindControl<TextBlock>("HeaderName")!.IsEffectivelyVisible);
+            Assert.False(window.Named<TextBlock>("HeaderName")!.IsEffectivelyVisible);
             var headerChips = headerTokens.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("name-token")).ToList();
             Assert.Equal(["nbsp", "tab"], headerChips.Select(c => ((TextBlock)c.Child!).Text));
             Assert.Equal(Application.Current!.FindResource(window.ActualThemeVariant, "CmSegmentTrack"), headerChips[0].Background);
@@ -1212,9 +1212,9 @@ public class WindowTests
             Pump(model.PreviewTask);
             Pump(model.InspectorActions.HeaderIconTask);
             Dispatcher.UIThread.RunJobs();
-            Assert.True(window.FindControl<TextBlock>("HeaderName")!.IsEffectivelyVisible);
-            Assert.Equal("Realmz", window.FindControl<TextBlock>("HeaderName")!.Text);
-            Assert.False(window.FindControl<ItemsControl>("HeaderNameTokens")!.IsEffectivelyVisible);
+            Assert.True(window.Named<TextBlock>("HeaderName")!.IsEffectivelyVisible);
+            Assert.Equal("Realmz", window.Named<TextBlock>("HeaderName")!.Text);
+            Assert.False(window.Named<ItemsControl>("HeaderNameTokens")!.IsEffectivelyVisible);
             window.Close();
             Baselines.Verify(baselines);
         }

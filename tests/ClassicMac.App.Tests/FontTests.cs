@@ -58,7 +58,7 @@ public class FontTests
     {
         var window = new MainWindow { DataContext = new ViewModels.MainViewModel() };
         window.Show();
-        var hex = window.FindControl<ListBox>("HexList")!;
+        var hex = window.Named<ListBox>("HexList")!;
         Assert.Equal("IBM Plex Mono", Shaped(hex.FontFamily).FamilyName);
         Assert.All(window.GetLogicalDescendants().OfType<SelectableTextBlock>().Where(t => t is not StyledTextView),
             t => Assert.Equal("IBM Plex Mono", Shaped(t.FontFamily).FamilyName));

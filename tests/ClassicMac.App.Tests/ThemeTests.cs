@@ -437,7 +437,7 @@ public class ThemeTests
             Dispatcher.UIThread.RunJobs();
             var cursor = window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("hex-cell") && b.Classes.Contains("cursor"));
             var cursorText = cursor.GetVisualDescendants().OfType<TextBlock>().Single();
-            var tree = window.FindControl<BrowseTree>("Tree")!;
+            var tree = window.Named<BrowseTree>("Tree")!;
             InEachTheme(variant =>
             {
                 Assert.Equal(Expected("CmWindowBackground", variant), BrushColour(window.Background));

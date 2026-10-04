@@ -55,19 +55,19 @@ public sealed class FontFamilyViewTests
             font.SelectedPair = font.KernPairs.Single(p => p.Pair == "AV");
             Dispatcher.UIThread.RunJobs();
             window.CaptureRenderedFrame();
-            window.FindControl<ScrollViewer>("FontFamilyView")!.Offset = default;   // the pair's row scrolled into view
+            window.Named<ScrollViewer>("FontFamilyView")!.Offset = default;   // the pair's row scrolled into view
             Dispatcher.UIThread.RunJobs();
             var frame = window.CaptureRenderedFrame()!;
             Dispatcher.UIThread.RunJobs();
 
-            var view = window.FindControl<ScrollViewer>("FontFamilyView")!;
+            var view = window.Named<ScrollViewer>("FontFamilyView")!;
             Assert.True(view.IsEffectivelyVisible);
-            Assert.True(window.FindControl<ListBox>("FontMode")!.IsEffectivelyVisible);
-            Assert.Equal(["9", "12", "14", "TrueType"], window.FindControl<ListBox>("FontSizes")!.Items.OfType<FontSizeChoice>().Select(s => s.Label));
-            Assert.Equal(1, window.FindControl<ListBox>("FontSizes")!.SelectedIndex);
+            Assert.True(window.Named<ListBox>("FontMode")!.IsEffectivelyVisible);
+            Assert.Equal(["9", "12", "14", "TrueType"], window.Named<ListBox>("FontSizes")!.Items.OfType<FontSizeChoice>().Select(s => s.Label));
+            Assert.Equal(1, window.Named<ListBox>("FontSizes")!.SelectedIndex);
 
             // The sample: black glyphs on white, the selected pair on CmMatchSoft, at the zoom (1).
-            var sample = window.FindControl<FontSampleView>("FontSample")!;
+            var sample = window.Named<FontSampleView>("FontSample")!;
             Assert.Equal(new Size(24, 12), sample.Bounds.Size);
             Assert.Equal(Colors.Black, At(frame, sample, new Point(0.5, 0.5), window));          // T's first column
             Assert.Equal(Colors.White, At(frame, sample, new Point(5.5, 0.5), window));          // T's blank last column
@@ -84,7 +84,7 @@ public sealed class FontFamilyViewTests
             Dispatcher.UIThread.RunJobs();
 
             // The matrix: a header of styles, a row per size; a found cell selects its resource, a missing one is muted.
-            var matrix = window.FindControl<Border>("FontMatrix")!;
+            var matrix = window.Named<Border>("FontMatrix")!;
             var links = matrix.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("link") && b.IsVisible).Select(b => b.Content as string).ToList();
             Assert.Equal(["NFNT 1001", "NFNT 1002", "NFNT 1003", "sfnt 1005"], links);
             var missing = matrix.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Classes.Contains("missing") && t.IsVisible).Select(t => t.Text).ToList();
@@ -103,7 +103,7 @@ public sealed class FontFamilyViewTests
             model.PropertyLinks.PropertyModeIndex = 1;
             Dispatcher.UIThread.RunJobs();
             Assert.False(view.IsEffectivelyVisible);
-            Assert.True(window.FindControl<ScrollViewer>("FontJson")!.IsEffectivelyVisible);
+            Assert.True(window.Named<ScrollViewer>("FontJson")!.IsEffectivelyVisible);
             model.PropertyLinks.PropertyModeIndex = 0;
             window.Close();
             Baselines.Verify(baselines);

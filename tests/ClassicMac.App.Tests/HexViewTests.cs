@@ -19,7 +19,7 @@ public sealed class HexViewTests
         ((ISolidColorBrush)Application.Current!.FindResource(Application.Current!.ActualThemeVariant, key)!).Color;
 
     private static Border Cell(Window window, long offset) =>
-        window.FindControl<ListBox>("HexList")!.GetVisualDescendants().OfType<Border>()
+        window.Named<ListBox>("HexList")!.GetVisualDescendants().OfType<Border>()
             .First(b => b.Classes.Contains("hex-cell") && b.DataContext is HexCell c && c.Offset == offset);
 
     [Fact]
@@ -41,28 +41,28 @@ public sealed class HexViewTests
             Dispatcher.UIThread.RunJobs();
 
             // Read only: the grid, no inspector or footer; Edit Bytes offered.
-            Assert.False(window.FindControl<Border>("HexInspector")!.IsEffectivelyVisible);
-            Assert.False(window.FindControl<Border>("HexFooter")!.IsEffectivelyVisible);
-            Assert.False(window.FindControl<Border>("HexEditLine")!.IsEffectivelyVisible);
+            Assert.False(window.Named<Border>("HexInspector")!.IsEffectivelyVisible);
+            Assert.False(window.Named<Border>("HexFooter")!.IsEffectivelyVisible);
+            Assert.False(window.Named<Border>("HexEditLine")!.IsEffectivelyVisible);
             Assert.Contains("zero", Cell(window, 4).Classes);
 
             Pump(model.EditActions.EditHexCommand.ExecuteAsync(null));
             Dispatcher.UIThread.RunJobs();
-            Assert.True(window.FindControl<Border>("HexInspector")!.IsEffectivelyVisible);
-            Assert.True(window.FindControl<Border>("HexFooter")!.IsEffectivelyVisible);
+            Assert.True(window.Named<Border>("HexInspector")!.IsEffectivelyVisible);
+            Assert.True(window.Named<Border>("HexFooter")!.IsEffectivelyVisible);
             // The host's look (E1): its footer, and the 3 px accent line over the values while editing.
-            Assert.Contains("host-footer", window.FindControl<Border>("HexFooter")!.Classes);
-            var line = window.FindControl<Border>("HexEditLine")!;
+            Assert.Contains("host-footer", window.Named<Border>("HexFooter")!.Classes);
+            var line = window.Named<Border>("HexEditLine")!;
             Assert.True(line.IsEffectivelyVisible);
             Assert.Equal((3.0, Token("CmAccent")), (line.Bounds.Height, ((ISolidColorBrush)line.Background!).Color));
-            var inspector = window.FindControl<Border>("HexInspector")!.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+            var inspector = window.Named<Border>("HexInspector")!.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
             Assert.Contains("At 0x0000", inspector);
             Assert.Contains("'Unti'", inspector);
             Assert.Contains("cursor", Cell(window, 0).Classes);
             Assert.Equal(Token("CmHexCursor"), ((ISolidColorBrush)Cell(window, 0).Background!).Color);
 
             // Typing changes a byte: it is tinted; a click moves the cursor; Go to too.
-            var list = window.FindControl<ListBox>("HexList")!;
+            var list = window.Named<ListBox>("HexList")!;
             list.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.D4 });
             list.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.D1 });
             Dispatcher.UIThread.RunJobs();
@@ -80,10 +80,10 @@ public sealed class HexViewTests
             Assert.Equal(5, model.EditActions.HexEdit.Cursor);
 
             // The footer's switch is the editor's mode.
-            var mode = window.FindControl<ListBox>("HexMode")!;
+            var mode = window.Named<ListBox>("HexMode")!;
             mode.SelectedIndex = 1;
             Assert.True(model.EditActions.HexEdit.InsertMode);
-            Assert.Contains(window.FindControl<Border>("HexFooter")!.GetVisualDescendants().OfType<TextBlock>(),
+            Assert.Contains(window.Named<Border>("HexFooter")!.GetVisualDescendants().OfType<TextBlock>(),
                 t => t.Text?.StartsWith("0x0005 = 255 · 1 byte changed", StringComparison.Ordinal) == true);
             window.Close();
         }
@@ -113,7 +113,7 @@ public sealed class HexViewTests
             model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "Rsrc").Children[0];
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
-            var inspector = window.FindControl<Border>("HexInspector")!;
+            var inspector = window.Named<Border>("HexInspector")!;
             Assert.False(inspector.IsEffectivelyVisible);
 
             var at = Cell(window, 1).TranslatePoint(new Point(4, 4), window)!.Value;
@@ -128,7 +128,7 @@ public sealed class HexViewTests
             Assert.Contains("= 7", texts);
             Assert.Contains("selected", Cell(window, 1).Classes);
             Assert.Equal(Token("CmSelectionInactive"), ((ISolidColorBrush)Cell(window, 1).Background!).Color);
-            var character = window.FindControl<ListBox>("HexList")!.GetVisualDescendants().OfType<Border>()
+            var character = window.Named<ListBox>("HexList")!.GetVisualDescendants().OfType<Border>()
                 .First(b => b.Classes.Contains("hex-char") && b.DataContext is HexCell c && c.Offset == 1);
             Assert.Equal(Token("CmSelectionInactive"), ((ISolidColorBrush)character.Background!).Color);
             Assert.Contains("in-field", Cell(window, 0).Classes);
@@ -136,13 +136,13 @@ public sealed class HexViewTests
             Assert.DoesNotContain("in-field", Cell(window, 2).Classes);
 
             // At the default 1200 wide, the last character of a full line ends left of the inspector.
-            var last = window.FindControl<ListBox>("HexList")!.GetVisualDescendants().OfType<Border>()
+            var last = window.Named<ListBox>("HexList")!.GetVisualDescendants().OfType<Border>()
                 .First(b => b.Classes.Contains("hex-char") && b.DataContext is HexCell c && c.Offset == 15);
             var right = last.TranslatePoint(new Point(last.Bounds.Width, 0), window)!.Value.X;
             Assert.True(right <= inspector.TranslatePoint(default, window)!.Value.X, $"text column ends at {right}");
 
             // The inspector's text stays clear of its overlay scroll bar (seen cut on a 'SIZE' byte's bit names).
-            var scroll = window.FindControl<ScrollViewer>("HexInspectorScroll")!;
+            var scroll = window.Named<ScrollViewer>("HexInspectorScroll")!;
             Assert.All(inspector.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible),
                 t => Assert.True(t.TranslatePoint(new Point(t.Bounds.Width, 0), scroll)!.Value.X <= scroll.Bounds.Width - 8, $"“{t.Text}” runs under the scroll bar"));
             // and the widest reading, a 13-character UInt32 ($FF616263 = 4,284,572,259), fits its column.
@@ -193,7 +193,7 @@ public sealed class HexViewTests
             Dispatcher.UIThread.RunJobs();
             window.KeyPress(Key.F, RawInputModifiers.Control, PhysicalKey.F, "f");
             Dispatcher.UIThread.RunJobs();
-            var box = window.FindControl<TextBox>("FindBox")!;
+            var box = window.Named<TextBox>("FindBox")!;
             Assert.True(box.IsFocused);
 
             model.HexFind.FindModeIndex = 1;
@@ -206,7 +206,7 @@ public sealed class HexViewTests
             Assert.Equal("1 of 1", model.HexFind.FindStatus);
             Assert.Contains("match", Cell(window, 4000).Classes);
             Assert.Equal(Token("CmMatch"), ((ISolidColorBrush)Cell(window, 4001).Background!).Color);
-            Assert.True(window.FindControl<TextBlock>("FindStatusText")!.IsEffectivelyVisible);
+            Assert.True(window.Named<TextBlock>("FindStatusText")!.IsEffectivelyVisible);
             window.Close();
         }
         finally
@@ -241,7 +241,7 @@ public sealed class HexViewTests
             Dispatcher.UIThread.RunJobs();
 
             Assert.True(model.DiagnosticsPanel.IsExpanded);
-            var inspector = window.FindControl<Border>("HexInspector")!;
+            var inspector = window.Named<Border>("HexInspector")!;
             var last = inspector.GetVisualDescendants().OfType<TextBlock>().Last(t => t.Text == "Binary");
             var bottom = last.TranslatePoint(new Point(0, last.Bounds.Height), inspector)!.Value.Y;
             Assert.True(bottom <= inspector.Bounds.Height - inspector.Padding.Bottom,

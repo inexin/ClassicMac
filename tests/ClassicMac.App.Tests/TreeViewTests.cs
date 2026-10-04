@@ -182,7 +182,7 @@ public class TreeViewTests
             Assert.All(files.Skip(60), f => Assert.Null(f.IconPng));
 
             // Scrolled to the end: the rows now on screen ask too, and only they.
-            var scroller = window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ScrollViewer>().First();
+            var scroller = window.Named<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ScrollViewer>().First();
             scroller.Offset = new Vector(0, scroller.Extent.Height);
             Settle(window);
             Assert.InRange(NodeImages.ResolvedIcons(files[0]) - resolved, 10, 40);
@@ -238,7 +238,7 @@ public class TreeViewTests
             app.IsDragSource = false;
 
             // Selected in the focused tree: its own meta and mark turn CmSelectionText; the nested rows' meta stays muted.
-            var tree = window.FindControl<BrowseTree>("Tree")!;
+            var tree = window.Named<BrowseTree>("Tree")!;
             ListBoxItem Item(NodeViewModel n) => window.GetVisualDescendants().OfType<BrowseTree>().First().GetVisualDescendants().OfType<ListBoxItem>().Single(i => ReferenceEquals(i.DataContext, n));
             model.Selected = app;
             Item(app).Focus();
@@ -269,7 +269,7 @@ public class TreeViewTests
         parent.Children.Add(loading);
         parent.IsExpanded = true;
         var main = new MainWindow();
-        var tree = new BrowseTree { Name = "Tree", Classes = { "browse" }, ItemTemplate = main.FindControl<BrowseTree>("Tree")!.ItemTemplate, ItemsSource = new VisibleRows([parent]) };
+        var tree = new BrowseTree { Name = "Tree", Classes = { "browse" }, ItemTemplate = main.Named<BrowseTree>("Tree")!.ItemTemplate, ItemsSource = new VisibleRows([parent]) };
         var window = new Window { Width = 300, Height = 200, Content = tree };
         window.Show();
         Dispatcher.UIThread.RunJobs();

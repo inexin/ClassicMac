@@ -66,10 +66,10 @@ public sealed class TreePerformanceTests
             var toEnd = clock.Elapsed;
 
             // Only the rows on screen exist, and the last file's row is on screen and selected.
-            var rows = window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().ToList();
+            var rows = window.Named<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().ToList();
             Assert.InRange(rows.Count, 10, 200);
             var last = rows.Single(r => ReferenceEquals(r.DataContext, many.Children[^1]));
-            var tree = window.FindControl<BrowseTree>("Tree")!;
+            var tree = window.Named<BrowseTree>("Tree")!;
             var top = last.TranslatePoint(default, tree)!.Value.Y;
             Assert.True(top >= 0 && top <= tree.Bounds.Height - last.Bounds.Height + 2, $"row at {top}, tree {tree.Bounds.Height}, row {last.Bounds.Height}");
             Assert.True(last.IsSelected);
@@ -141,7 +141,7 @@ public sealed class TreePerformanceTests
             var many = top.Children.OfType<FolderNode>().Single();
             many.IsExpanded = true;
             Render(window);
-            var tree = window.FindControl<Control>("Tree")!;
+            var tree = window.Named<Control>("Tree")!;
             var scroller = tree.GetVisualDescendants().OfType<ScrollViewer>().First();
 
             (NodeViewModel Node, double Top) FirstRow()
@@ -207,7 +207,7 @@ public sealed class TreePerformanceTests
             var volume = model.Roots[0];
             var top = volume.Children.OfType<FolderNode>().Single();
             var big = top.Children.OfType<FolderNode>().Single();
-            var tree = window.FindControl<BrowseTree>("Tree")!;
+            var tree = window.Named<BrowseTree>("Tree")!;
             void Key(PhysicalKey key, RawInputModifiers modifiers = RawInputModifiers.None)
             {
                 window.KeyPressQwerty(key, modifiers);
@@ -298,8 +298,8 @@ public sealed class TreePerformanceTests
             Render(window);
 
             Assert.Equal("File 4321", model.Selected!.Title);
-            var row = window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().Single(r => ReferenceEquals(r.DataContext, model.Selected));
-            var tree = window.FindControl<BrowseTree>("Tree")!;
+            var row = window.Named<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().Single(r => ReferenceEquals(r.DataContext, model.Selected));
+            var tree = window.Named<BrowseTree>("Tree")!;
             var top = row.TranslatePoint(default, tree)!.Value.Y;
             Assert.True(top >= 0 && top <= tree.Bounds.Height - row.Bounds.Height + 2, $"row at {top}, tree {tree.Bounds.Height}");
             window.Close();
@@ -339,7 +339,7 @@ public sealed class TreePerformanceTests
 
             var selected = Assert.IsType<ResourceNode>(model.Selected);
             Assert.Equal(0x99, selected.Resource.GetData().Span[0]);
-            Assert.Same(selected, window.FindControl<BrowseTree>("Tree")!.SelectedItem);
+            Assert.Same(selected, window.Named<BrowseTree>("Tree")!.SelectedItem);
             window.Close();
         }
         finally

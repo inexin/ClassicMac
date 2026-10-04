@@ -49,7 +49,7 @@ public class AppIconTests
         var window = new MainWindow { DataContext = new MainViewModel() };
         window.Show();
         Assert.NotNull(window.Icon);
-        var icon = window.FindControl<Border>("TitleBar")!.GetVisualDescendants().OfType<AppIconView>().Single();
+        var icon = window.Named<Border>("TitleBar")!.GetVisualDescendants().OfType<AppIconView>().Single();
         foreach (var (scaling, pixels) in new[] { (1.0, 16), (1.25, 20), (1.5, 24), (2.0, 32) })
         {
             window.SetRenderScaling(scaling);
