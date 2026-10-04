@@ -167,12 +167,64 @@ public sealed class HfsResizeTests
         Assert.Contains("in use", refused.Message);
     }
 
+    private static void AssertSameFolders(byte[] before, byte[] after) =>
+        Assert.Equal(HfsReader.Instance.ReadFolders(ForkData.FromBytes(before), new ContainerContext()).Select(f => (f.MacPath, f.CatalogId)),
+            HfsReader.Instance.ReadFolders(ForkData.FromBytes(after), new ContainerContext()).Select(f => (f.MacPath, f.CatalogId)));
+
+    // Past 65,535 blocks of its size the volume is laid out again with the block size Mac OS's initializer gives the new
+    // size: every fork in one extent, the catalog's records otherwise kept.
     [Fact]
-    public void Growing_past_65535_blocks_and_odd_sizes_are_refused()
+    public void Growing_past_65535_blocks_takes_a_larger_block_size()
     {
         var source = Volume(20 * 1024 * 1024);                                         // 512-byte blocks: 32 MB at most
 
-        Assert.Throws<InvalidDataException>(() => HfsWriter.Resize(ForkData.FromBytes(source), 100 * 1024 * 1024));
+        var grown = HfsWriter.Resize(ForkData.FromBytes(source), 100 * 1024 * 1024);
+
+        Assert.Equal(100 * 1024 * 1024, grown.Length);
+        Assert.Equal(2048u, BinaryPrimitives.ReadUInt32BigEndian(grown.AsSpan(Mdb + 0x14)));   // ((204,800 >> 16) + 1) × 512
+        Assert.Equal(source.AsSpan(Mdb + 0x24, 28).ToArray(), grown.AsSpan(Mdb + 0x24, 28).ToArray());   // the name
+        Assert.Equal(source.AsSpan(Mdb + 0x02, 4).ToArray(), grown.AsSpan(Mdb + 0x02, 4).ToArray());     // the creation date
+        AssertSameFiles(source, grown);
+        AssertSameFolders(source, grown);
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(grown)));
+        Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(grown)).Verdict);
+        var after = HfsWriter.CreateFile(ForkData.FromBytes(grown), "Docs:Big", new byte[60 * 1024 * 1024], Array.Empty<byte>(), FinderInfo.Empty);
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(after)));                         // the new space is usable
+    }
+
+    [Fact]
+    public void Fragmented_forks_and_their_overflow_records_are_laid_out_whole()
+    {
+        // Small files with every other one deleted, then a file spread over the gaps: overflow records.
+        var source = HfsWriter.Format(2 * 1024 * 1024, "Frag", new MacDate(3_100_000_000));
+        for (var i = 0; i < 40; i++)
+        {
+            source = HfsWriter.CreateFile(ForkData.FromBytes(source), $"Pad {i:D2}", new byte[1024], Array.Empty<byte>(), FinderInfo.Empty);
+        }
+
+        for (var i = 0; i < 40; i += 2)
+        {
+            source = HfsWriter.DeleteFile(ForkData.FromBytes(source), $"Pad {i:D2}");
+        }
+
+        var spread = Enumerable.Range(0, (U16(source, Mdb + 0x22) - 8) * 512).Select(b => (byte)(b * 13)).ToArray();   // more than the tail
+        source = HfsWriter.CreateFile(ForkData.FromBytes(source), "Spread", spread, new byte[] { 1, 2, 3 }, FinderInfo.Empty);
+        int extentsTree = (U16(source, Mdb + 0x1C) + U16(source, Mdb + 0x86)) * 512;     // 512-byte blocks
+        Assert.True(BinaryPrimitives.ReadUInt32BigEndian(source.AsSpan(extentsTree + 14 + 6)) > 0);   // overflow records
+        Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(source)).Verdict);
+
+        var grown = HfsWriter.Resize(ForkData.FromBytes(source), 40 * 1024 * 1024);
+
+        AssertSameFiles(source, grown);
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(grown)));
+        Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(grown)).Verdict);
+    }
+
+    [Fact]
+    public void The_same_size_and_odd_sizes_are_refused()
+    {
+        var source = Volume(20 * 1024 * 1024);
+
         Assert.Throws<InvalidDataException>(() => HfsWriter.Resize(ForkData.FromBytes(source), source.Length));
         Assert.Throws<ArgumentOutOfRangeException>(() => HfsWriter.Resize(ForkData.FromBytes(source), 30L * 1024 * 1024 + 100));
     }

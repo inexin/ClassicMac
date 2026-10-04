@@ -331,8 +331,9 @@ name HFS cannot hold is a usage error (exit 2). It prints `Wrote <file> (HFS "<n
 `classicmac resize <file> --size <n>` grows or shrinks a plain HFS volume image, with the write options (`-o`, `--in-place`,
 `--dry-run`, `--json`): grown, the new space is free at the end ([hfs.md §3.2](formats/file-systems/hfs.md#32-growing-a-volume));
 shrunk, what lies past the new end is moved down first ([hfs.md §3.3](formats/file-systems/hfs.md#33-shrinking-a-volume)).
-A size needing more than 65,535 allocation blocks of the volume's size, one too small for the blocks in use, a shrink
-with no free run to move an extent to, and a partitioned disk's partition are refused (exit 2). The MCP server's `resize` tool takes `session` and `size`.
+Past 65,535 allocation blocks of its block size the volume is laid out again with the block size Mac OS gives the new
+size (each fork in one extent). A size over 2 GB, one too small for the blocks in use, a shrink with no free run to
+move an extent to, and a partitioned disk's partition are refused (exit 2). The MCP server's `resize` tool takes `session` and `size`.
 
 ### 3.5 Exit codes
 

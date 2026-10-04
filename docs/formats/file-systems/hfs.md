@@ -565,7 +565,20 @@ catalog record or B-tree changes [Doc: Inside Macintosh: Files]. For the new siz
    N' − 2.
 
 ClassicMac's `Resize` checks the result as it checks a deletion (§5.5), comparing each block in use at its new place.
-Growing past 65,535 blocks (a larger block size, every extent rewritten) is not done [ClassicMac].
+
+When the new size needs more than 65,535 blocks of the volume's block size, the volume is laid out again [ClassicMac]:
+
+1. The geometry is what Mac OS 9.0's initializer computes for N' (§3.1): `drAlBlkSiz`, `drVBMSt`, `drAlBlSt`,
+   `drNmAlBlks`, `drClpSiz`, the trees' clump sizes, and an empty extents tree at block 0.
+2. The catalog keeps its nodes, its records and their order, from the block after the extents tree; it grows with free
+   nodes to whole blocks and at least the initializer's catalog size.
+3. Each file's forks, in catalog order, take one extent each after the catalog. The file record gets that extent and a
+   physical length of whole blocks; nothing else in it changes. No overflow record is needed. A volume with bad blocks
+   is refused, and so is an HFS wrapper.
+4. The MDB keeps every other field (name, dates, attributes, counts, `drNxtCNID`, Finder info, boot blocks before
+   it), with `drFreeBks` and `drAllocPtr` set by the new layout, and is copied to N' − 2.
+
+The result must pass the writer's checks, and every file must read back as the source's, by catalog ID and path.
 
 ### 3.3 Shrinking a volume
 
@@ -1065,8 +1078,8 @@ number 0, printed `Problem:  <text>.`). They are ClassicMac's rules, not Disk Fi
   repair.
 - Writing partition maps, disk image formats, MFS or HFS Plus.
 - Open: the Mac OS 9.0 initializer's `drDirCnt` was not traced; the System 7.1 one leaves it 0 (§2.7).
-- Growing a volume past 65,535 allocation blocks (§3.2); shrinking one by splitting extents that no free run holds
-  (§3.3).
+- Shrinking a volume by splitting extents that no free run holds (§3.3); resizing an image past 2 GB, which is made in
+  memory.
 - Open: whether Finder's Erase (of a volume already initialized) passes the initializer values of its own (§3.1).
 - No rule in this document is fitted to data alone.
 

@@ -54,7 +54,7 @@ internal static class HfsResizer
 
         if (count > ushort.MaxValue)
         {
-            throw new InvalidDataException($"The HFS volume would need {count} allocation blocks of {state.BlockSize} bytes; HFS has at most 65,535 (a larger block size is not supported yet).");
+            return Relayout(state, source, size);
         }
 
         long oldCount = state.BlockCount;
@@ -317,5 +317,133 @@ internal static class HfsResizer
         {
             throw new InvalidDataException("An HFS B-tree file is longer than its extents.");
         }
+    }
+
+    // A growth past 65,535 blocks of the volume's size (hfs.md §3.2): the volume laid out again as Mac OS 9.0's
+    // initializer lays out the new size (its block size, bitmap and trees' places, §3.1), the extents tree empty, the
+    // catalog's nodes kept (grown to the initializer's catalog size when smaller) with each file's forks given one extent
+    // each in turn after it, and the MDB's other fields kept.
+    private static byte[] Relayout(CatalogEditState state, byte[] source, long size)
+    {
+        var mdb = new BigEndianReader(source.AsMemory(MdbOffset, MdbSize));
+        if (U16(mdb, 0x7C) == 0x482B)
+        {
+            throw new InvalidDataException("An HFS wrapper around an HFS Plus volume is not resized past 65,535 blocks.");
+        }
+
+        if (LeafRecords(state.ExtentsTree).Any(r => new BigEndianReader(r.Key).ReadUInt32At(2) == 5))
+        {
+            throw new InvalidDataException("A volume with bad blocks is not laid out again.");
+        }
+
+        var result = HfsFormatter.FormatVolume(size, "Untitled").ToArray();
+        var layout = new BigEndianReader(result.AsMemory(MdbOffset, MdbSize));
+        uint blockSize = U32(layout, 0x14);
+        long start = U16(layout, 0x1C), count = U16(layout, 0x12), bitmapStart = U16(layout, 0x0E);
+        long treeBlocks = U16(layout, 0x88);
+
+        // The catalog: its nodes, grown to whole new blocks and at least the initializer's catalog, the new nodes free.
+        var catalog = state.Catalog;
+        long catalogBlocks = Math.Max(treeBlocks, (catalog.Length + blockSize - 1) / blockSize);
+        if (catalogBlocks * blockSize > catalog.Length)
+        {
+            uint oldNodes = (uint)(catalog.Length / NodeSize), newNodes = (uint)(catalogBlocks * blockSize / NodeSize);
+            var grown = new byte[catalogBlocks * blockSize];
+            catalog.CopyTo(grown, 0);
+            uint mapNodes = ExtendBTreeNodeMap(grown, oldNodes, newNodes);
+            var header = new BigEndianWriter(grown);
+            header.WriteUInt32At(14 + 22, newNodes);
+            header.WriteUInt32At(14 + 26, U32(new BigEndianReader(grown), 14 + 26) + (newNodes - oldNodes) - mapNodes);
+            catalog = grown;
+        }
+        else
+        {
+            catalog = catalog.ToArray();
+        }
+
+        // Each file's forks in one extent each, in catalog order, after the trees.
+        var files = HfsReader.Instance.Read(state.Source.AsForkData(), new ContainerContext()).ToDictionary(f => f.CatalogId!.Value);
+        long next = treeBlocks + catalogBlocks;
+        long areaStart = start * BlockSize;
+        foreach (var record in LeafRecords(catalog).Where(r => r.Data.Length >= 0x62 && r.Data[0] == 2))
+        {
+            int data = DataOffset(catalog, record);
+            uint id = new BigEndianReader(record.Data).ReadUInt32At(0x14);
+            if (!files.TryGetValue(id, out var file))
+            {
+                throw new InvalidDataException($"File {id} could not be read to lay it out again.");
+            }
+
+            foreach (var (fork, logical, physical, extents) in new[] { (file.DataFork, 0x1A, 0x1E, 0x4A), (file.ResourceFork, 0x24, 0x28, 0x56) })
+            {
+                var bytes = fork.ToArray();
+                var writer = new BigEndianWriter(catalog);
+                if (new BigEndianReader(catalog).ReadUInt32At(data + logical) != bytes.Length)
+                {
+                    throw new InvalidDataException($"File {id}'s fork reads back shorter than its length.");
+                }
+
+                long blocks = (bytes.Length + blockSize - 1) / blockSize;
+                if (next + blocks > count)
+                {
+                    throw new InvalidDataException("The volume's files do not fit the new size.");
+                }
+
+                catalog.AsSpan(data + extents, 12).Clear();
+                if (blocks > 0)
+                {
+                    writer.WriteUInt16At(data + extents, next);
+                    writer.WriteUInt16At(data + extents + 2, blocks);
+                    bytes.CopyTo(result, areaStart + next * blockSize);
+                }
+
+                writer.WriteUInt32At(data + physical, blocks * blockSize);
+                next += blocks;
+            }
+        }
+
+        catalog.CopyTo(result, areaStart + treeBlocks * blockSize);
+        int bitmapOffset = (int)(bitmapStart * BlockSize);
+        result.AsSpan(bitmapOffset, (int)(areaStart - bitmapOffset)).Clear();
+        for (long block = 0; block < next; block++)
+        {
+            result[bitmapOffset + block / 8] |= (byte)(0x80 >> (int)(block % 8));
+        }
+
+        // The MDB: the source's, with the new layout's geometry, clump sizes and trees' places.
+        var sector = source.AsSpan(MdbOffset, BlockSize).ToArray();
+        var writerMdb = new BigEndianWriter(sector);
+        foreach (var (offset, length) in new[] { (0x0E, 2), (0x12, 2), (0x14, 4), (0x18, 4), (0x1C, 2), (0x4A, 4), (0x4E, 4), (0x82, 4), (0x86, 12) })
+        {
+            result.AsSpan(MdbOffset + offset, length).CopyTo(sector.AsSpan(offset));
+        }
+
+        writerMdb.WriteUInt16At(0x10, next);                                            // drAllocPtr
+        writerMdb.WriteUInt16At(0x22, count - next);                                    // drFreeBks
+        writerMdb.WriteUInt32At(0x92, catalogBlocks * blockSize);                       // drCTFlSize
+        sector.AsSpan(0x96, 12).Clear();
+        writerMdb.WriteUInt16At(0x96, treeBlocks);                                      // drCTExtRec
+        writerMdb.WriteUInt16At(0x98, catalogBlocks);
+        writerMdb.WriteUInt32At(0x06, MacDate.FromDateTime(Now).Seconds);               // drLsMod
+        writerMdb.WriteUInt32At(0x46, unchecked(U32(mdb, 0x46) + 1));                   // drWrCnt
+        sector.CopyTo(result, MdbOffset);
+        sector.CopyTo(result, size - 2 * BlockSize);
+        source.AsSpan(0, MdbOffset).CopyTo(result);                                     // the boot blocks
+
+        // Checked as a shrink is: the writer's checks, the folders, and every file read back as the source's.
+        if (HfsWriter.Check(ForkData.FromBytes(result)) is { } fault)
+        {
+            throw new InvalidDataException($"The volume laid out again does not pass the writer's checks: {fault}");
+        }
+
+        var after = HfsReader.Instance.Read(ForkData.FromBytes(result), new ContainerContext());
+        if (after.Count != files.Count || after.Any(f => !files.TryGetValue(f.CatalogId!.Value, out var was) || was.MacPath != f.MacPath
+                || !was.DataFork.ToArray().AsSpan().SequenceEqual(f.DataFork.ToArray())
+                || !was.ResourceFork.ToArray().AsSpan().SequenceEqual(f.ResourceFork.ToArray())))
+        {
+            throw new InvalidDataException("The volume laid out again has files that differ from the source's.");
+        }
+
+        return result;
     }
 }

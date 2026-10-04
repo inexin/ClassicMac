@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `resize` grows an HFS volume past 65,535 allocation blocks (hfs.md §3.2): the volume is laid out again with the
+  block size Mac OS's initializer gives the new size, every fork in one extent, the catalog and MDB otherwise kept.
 - `resize` shrinks an HFS volume (hfs.md §3.3): extents past the new end move to free space below it, the result
   checked file by file; a size too small for the blocks in use is refused.
 - First Aid prints Disk First Aid's numbers where the live runs showed them: #55 and #60 as "4, node" and "4, 0", HFS
