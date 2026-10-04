@@ -228,32 +228,32 @@ public sealed record InspectorHeader(NodeViewModel Node, string Name, string Kin
 
 // The inspector's header and the editing of forms in place (the Edit tab is gone: a form opens from the header's
 // Edit button, in the Preview tab, until Apply or Cancel).
-public sealed partial class MainViewModel
+public sealed partial class InspectorActions(MainViewModel main) : ObservableObject
 {
     /// <summary>The selection's header; null with nothing selected.</summary>
     public InspectorHeader? Header
     {
         get
         {
-            var header = InspectorHeader.For(Selected, FormEditing.IsEditingForm ? Form?.DraftLength : null);
-            if (header is not null && AliasActions.SelectedAlias is { } alias && ReferenceEquals(alias.Alias, Selected))
+            var header = InspectorHeader.For(main.Selected, main.FormEditing.IsEditingForm ? main.Form?.DraftLength : null);
+            if (header is not null && main.AliasActions.SelectedAlias is { } alias && ReferenceEquals(alias.Alias, main.Selected))
             {
                 header = header with { Kind = InspectorHeader.AliasKind(alias), Original = alias.Path };
             }
 
             // A resource shown through a template says which (boards/template-form.md).
-            return header is not null && Form is TemplateForm { ShownThrough: { } through }
+            return header is not null && main.Form is TemplateForm { ShownThrough: { } through }
                 ? header with { Facts = [.. header.Facts, new InspectorFact("Shown through", through, false)] }
                 : header;
         }
     }
 
     /// <summary>What the header's Export… does for the selection: save a resource, export a file's or type's resources, or extract all.</summary>
-    public IRelayCommand HeaderExportCommand => Selected switch
+    public IRelayCommand HeaderExportCommand => main.Selected switch
     {
-        ResourceNode => SaveResourceAsCommand,
-        FileNode or ResourceTypeNode or InputNode { Root.Children.Count: 0 } => ExportResourcesCommand,
-        _ => ExtractAllCommand,
+        ResourceNode => main.SaveResourceAsCommand,
+        FileNode or ResourceTypeNode or InputNode { Root.Children.Count: 0 } => main.ExportResourcesCommand,
+        _ => main.ExtractAllCommand,
     };
 
     /// <summary>The selection's large icon for the header's tile (PNG), once loaded; null while loading or when it has none.</summary>
@@ -272,22 +272,25 @@ public sealed partial class MainViewModel
         }
 
         var png = await Task.Run(() => NodeViewModel.LargeIcon(node));
-        if (ReferenceEquals(Selected, node))
+        if (ReferenceEquals(main.Selected, node))
         {
             HeaderIconPng = png;
         }
     }
 
+    // The header changed for another reason than the selection (an edit, a draft, the type and creator database).
+    internal void NotifyHeader() => OnPropertyChanged(nameof(Header));
+
     // The header, its Export… and editing follow the selection.
-    private void OnSelectionChangedForInspector()
+    internal void OnSelectionChangedForInspector()
     {
-        FormEditing.IsEditingForm = false;
-        FormEditing.LastApplied = null;
+        main.FormEditing.IsEditingForm = false;
+        main.FormEditing.LastApplied = null;
         HeaderIconPng = null;
-        HeaderIconTask = LoadHeaderIconAsync(Selected);
+        HeaderIconTask = LoadHeaderIconAsync(main.Selected);
         OnPropertyChanged(nameof(Header));
         OnPropertyChanged(nameof(HeaderExportCommand));
-        SoundHeaderActions.OnSelectionChangedForSoundHeader();
-        FormEditing.EditFormCommand.NotifyCanExecuteChanged();
+        main.SoundHeaderActions.OnSelectionChangedForSoundHeader();
+        main.FormEditing.EditFormCommand.NotifyCanExecuteChanged();
     }
 }

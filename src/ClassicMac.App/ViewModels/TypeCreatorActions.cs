@@ -91,6 +91,6 @@ public sealed partial class TypeCreatorActions(MainViewModel main) : ObservableO
         main.TreeDisplay.KindDatabase = database;
         HasTypeCreatorDatabase = database is not null;
         main.Details = DetailsViewModel.For(main.Selected, main.DetailsActions.ProblemsIn(main.Selected), main.AliasActions.SelectedAlias);
-        main.RaisePropertyChanged(nameof(MainViewModel.Header));
+        main.InspectorActions.NotifyHeader();
     }
 }

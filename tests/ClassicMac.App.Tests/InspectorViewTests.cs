@@ -62,7 +62,7 @@ public sealed class InspectorViewTests
             Assert.Equal(1.0, kindIcon.Zoom);
             Assert.False(ownIcon.IsEffectivelyVisible);
             Assert.Empty(header.GetVisualDescendants().OfType<TreeIcon>());
-            model.HeaderIconPng = ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(32, 32, new byte[32 * 32 * 4]);
+            model.InspectorActions.HeaderIconPng = ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(32, 32, new byte[32 * 32 * 4]);
             Dispatcher.UIThread.RunJobs();
             Assert.True(ownIcon.IsEffectivelyVisible);
             Assert.Equal((32, 1.0), (ownIcon.Source!.PixelSize.Width, ownIcon.Zoom));
@@ -78,7 +78,7 @@ public sealed class InspectorViewTests
             // The toolbar's Export… does what the header's does.
             var toolbarExport = window.FindControl<Border>("Toolbar")!.GetVisualDescendants().OfType<Button>()
                 .Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Export");
-            Assert.Same(model.HeaderExportCommand, toolbarExport.Command);
+            Assert.Same(model.InspectorActions.HeaderExportCommand, toolbarExport.Command);
             var buttons = header.GetVisualDescendants().OfType<Button>().ToList();
             Assert.Same(model.SaveResourceAsCommand, buttons.Single(b => (string?)b.Content == "Export…").Command);
             var edit = buttons.Single(b => (string?)b.Content == "Edit");

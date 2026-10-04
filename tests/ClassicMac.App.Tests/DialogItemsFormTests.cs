@@ -143,7 +143,7 @@ public sealed class DialogItemsFormTests : IDisposable
     public async Task The_header_counts_the_items_and_names_their_dialog()
     {
         var (model, _) = await Open(withDialog: true);
-        var facts = model.Header!.Facts;
+        var facts = model.InspectorActions.Header!.Facts;
         Assert.Contains(facts, f => f is { Label: "Items", Value: "5" });
         Assert.Contains(facts, f => f is { Label: "Used by", Value: "'DLOG' 128", IsMono: true });
     }

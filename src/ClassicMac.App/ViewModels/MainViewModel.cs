@@ -68,6 +68,11 @@ public interface IFilePicker
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    private InspectorActions? inspectorActions;
+
+    /// <summary>The inspector's header: the selection's title, icon, kind and actions.</summary>
+    public InspectorActions InspectorActions => inspectorActions ??= new(this);
+
     private FormEditing? formEditing;
 
     /// <summary>The read-then-edit host: Edit, Apply and Cancel for the selection's form, and its footer.</summary>
@@ -509,7 +514,7 @@ public sealed partial class MainViewModel : ObservableObject
         TakeHexEdit();                       // unchanged bytes (changed ones were applied or discarded before the move)
         AliasActions.SelectedAlias = Aliases.Of(value, Roots);
         Details = DetailsViewModel.For(value, DetailsActions.ProblemsIn(value), AliasActions.SelectedAlias);
-        OnSelectionChangedForInspector();
+        InspectorActions.OnSelectionChangedForInspector();
         // The hex view comes once the preview is known: only a resource without one shows its bytes.
         Hex = HexViewModel.Empty;
         HexSource = null;

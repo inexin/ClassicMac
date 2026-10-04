@@ -48,7 +48,7 @@ public sealed class FontFamilyViewTests
             input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "FOND").IsExpanded = true;
             model.Selected = fond;
             Headless.Pump(model.PreviewTask);
-            Headless.Pump(model.HeaderIconTask);
+            Headless.Pump(model.InspectorActions.HeaderIconTask);
             Dispatcher.UIThread.RunJobs();
             var font = model.Preview.FontFamily!;
             font.SampleText = "ToAV";

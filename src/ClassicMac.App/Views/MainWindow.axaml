@@ -1102,7 +1102,7 @@
             </StackPanel>
           </Button>
           <Border Classes="tool-divider" />
-          <Button Classes="flat tool" Command="{Binding HeaderExportCommand}" ToolTip.Tip="Export the selection" AutomationProperties.Name="Export">
+          <Button Classes="flat tool" Command="{Binding InspectorActions.HeaderExportCommand}" ToolTip.Tip="Export the selection" AutomationProperties.Name="Export">
             <StackPanel>
               <Path Classes="tool-icon" Data="M9,11 V2 M5.5,5.5 L9,2 L12.5,5.5 M2,11 V15 H16 V11" />
               <TextBlock Text="Export…" />
@@ -1293,10 +1293,10 @@
 
         <!-- The inspector (boards/main-window.md, S3): the selection's header, then its tabs. -->
         <DockPanel Grid.Column="2" Classes="pane">
-        <Border x:Name="InspectorHeader" DockPanel.Dock="Top" Classes="inspector-header" IsVisible="{Binding Header, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <Border x:Name="InspectorHeader" DockPanel.Dock="Top" Classes="inspector-header" IsVisible="{Binding InspectorActions.Header, Converter={x:Static ObjectConverters.IsNotNull}}">
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-              <Button Content="Export…" Command="{Binding HeaderExportCommand}" IsVisible="{Binding !SoundHeaderActions.IsSoundResource}" />
+              <Button Content="Export…" Command="{Binding InspectorActions.HeaderExportCommand}" IsVisible="{Binding !SoundHeaderActions.IsSoundResource}" />
               <!-- A sound's actions (boards/sound.md): replaced, not edited. -->
               <Button x:Name="SaveAsWavButton" Content="Save as WAV…" Command="{Binding SoundHeaderActions.SaveAsWavCommand}" IsVisible="{Binding SoundHeaderActions.IsSoundResource}" />
               <Button x:Name="ReplaceFromWavButton" Content="Replace from WAV…" Command="{Binding SoundHeaderActions.ReplaceFromWavCommand}" IsVisible="{Binding SoundHeaderActions.IsSoundResource}" />
@@ -1311,19 +1311,19 @@
               <Panel>
                 <!-- The selection's own large icon (an icon's image, a picture's thumbnail, a file's Finder icon), else its
                      kind's 32-pixel icon; both 1:1. -->
-                <views:PixelImage x:Name="HeaderOwnIcon" Source="{Binding HeaderIconPng, Converter={x:Static views:Images.FromPng}}" Zoom="1"
+                <views:PixelImage x:Name="HeaderOwnIcon" Source="{Binding InspectorActions.HeaderIconPng, Converter={x:Static views:Images.FromPng}}" Zoom="1"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                  IsVisible="{Binding HeaderIconPng, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                <views:PixelImage x:Name="HeaderKindIcon" Source="{Binding Header.Node.IconKind, Converter={x:Static views:TreeIcons.LargeConverter}, FallbackValue={x:Null}}" Zoom="1"
+                                  IsVisible="{Binding InspectorActions.HeaderIconPng, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <views:PixelImage x:Name="HeaderKindIcon" Source="{Binding InspectorActions.Header.Node.IconKind, Converter={x:Static views:TreeIcons.LargeConverter}, FallbackValue={x:Null}}" Zoom="1"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                  IsVisible="{Binding HeaderIconPng, Converter={x:Static ObjectConverters.IsNull}}" />
+                                  IsVisible="{Binding InspectorActions.HeaderIconPng, Converter={x:Static ObjectConverters.IsNull}}" />
               </Panel>
             </Border>
             <StackPanel Classes="titles">
               <!-- A file in a "No name" group is named with its row's chips (boards/tree-no-name.md), its bytes on hover. -->
-              <ItemsControl x:Name="HeaderNameTokens" Classes="name-tokens" ItemsSource="{Binding Header.Node.NameTokens, FallbackValue={x:Null}}"
-                            IsVisible="{Binding Header.Node.HasNameTokens, FallbackValue=False}"
-                            ToolTip.Tip="{Binding Header.Node.NameBytes, FallbackValue={x:Null}}" HorizontalAlignment="Left" Margin="0,4,0,3">
+              <ItemsControl x:Name="HeaderNameTokens" Classes="name-tokens" ItemsSource="{Binding InspectorActions.Header.Node.NameTokens, FallbackValue={x:Null}}"
+                            IsVisible="{Binding InspectorActions.Header.Node.HasNameTokens, FallbackValue=False}"
+                            ToolTip.Tip="{Binding InspectorActions.Header.Node.NameBytes, FallbackValue={x:Null}}" HorizontalAlignment="Left" Margin="0,4,0,3">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
                     <StackPanel Orientation="Horizontal" />
@@ -1337,17 +1337,17 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <TextBlock x:Name="HeaderName" Classes="heading" Text="{Binding Header.Name, FallbackValue={x:Null}}"
-                         IsVisible="{Binding !Header.Node.HasNameTokens, FallbackValue=True}" />
-              <TextBlock Classes="muted kind" Text="{Binding Header.Kind, FallbackValue={x:Null}}" />
+              <TextBlock x:Name="HeaderName" Classes="heading" Text="{Binding InspectorActions.Header.Name, FallbackValue={x:Null}}"
+                         IsVisible="{Binding !InspectorActions.Header.Node.HasNameTokens, FallbackValue=True}" />
+              <TextBlock Classes="muted kind" Text="{Binding InspectorActions.Header.Kind, FallbackValue={x:Null}}" />
               <!-- An alias file: where its original is, and Show Original (Ctrl+R) when it is found. -->
-              <StackPanel x:Name="AliasOriginal" Classes="alias-original" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Header.HasOriginal, FallbackValue=False}">
-                <TextBlock Classes="mono original" Text="{Binding Header.Original, FallbackValue={x:Null}}" TextTrimming="CharacterEllipsis"
-                           ToolTip.Tip="{Binding Header.Original, FallbackValue={x:Null}}" VerticalAlignment="Center" />
+              <StackPanel x:Name="AliasOriginal" Classes="alias-original" Orientation="Horizontal" Spacing="8" IsVisible="{Binding InspectorActions.Header.HasOriginal, FallbackValue=False}">
+                <TextBlock Classes="mono original" Text="{Binding InspectorActions.Header.Original, FallbackValue={x:Null}}" TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding InspectorActions.Header.Original, FallbackValue={x:Null}}" VerticalAlignment="Center" />
                 <Button x:Name="ShowOriginalButton" Content="Show Original" Command="{Binding AliasActions.ShowOriginalCommand}"
                         IsVisible="{Binding AliasActions.AliasStrip, Converter={x:Static ObjectConverters.IsNotNull}}" ToolTip.Tip="Ctrl+R" />
               </StackPanel>
-              <ItemsControl ItemsSource="{Binding Header.Facts, FallbackValue={x:Null}}">
+              <ItemsControl ItemsSource="{Binding InspectorActions.Header.Facts, FallbackValue={x:Null}}">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
                     <WrapPanel />

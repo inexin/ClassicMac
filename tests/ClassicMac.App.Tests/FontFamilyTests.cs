@@ -207,12 +207,12 @@ public sealed class FontFamilyTests : IDisposable
     public async Task The_header_has_the_family_s_facts_and_an_Aa_tile()
     {
         var (model, input, _) = await Open();
-        var header = model.Header!;
+        var header = model.InspectorActions.Header!;
         Assert.Equal("Font family in Fonts.rsrc", header.Kind);
         Assert.Equal(["Type", "Family ID", "Version", "Strikes", "Fixed width"], header.Facts.Select(f => f.Label));
         Assert.Equal(["'FOND'", "128", "0", "5 bitmap, 1 TrueType", "Yes"], header.Facts.Select(f => f.Value));
-        await model.HeaderIconTask;
-        using var icon = SkiaSharp.SKBitmap.Decode(model.HeaderIconPng!);
+        await model.InspectorActions.HeaderIconTask;
+        using var icon = SkiaSharp.SKBitmap.Decode(model.InspectorActions.HeaderIconPng!);
         Assert.Equal((11, 12), (icon.Width, icon.Height));                // "Aa" in the 12 pt strike (the largest); no "a": the missing symbol
     }
 

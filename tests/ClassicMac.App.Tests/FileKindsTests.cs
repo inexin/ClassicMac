@@ -99,7 +99,7 @@ public sealed class FileKindsTests : IDisposable
         Assert.Equal(source, FileKinds.Source(found));
 
         model.Selected = file;
-        Assert.Equal($"{char.ToUpperInvariant(kind[0])}{kind[1..]} in Docs", model.Header!.Kind);
+        Assert.Equal($"{char.ToUpperInvariant(kind[0])}{kind[1..]} in Docs", model.InspectorActions.Header!.Kind);
         var rows = model.Details.Groups.Single(g => g.Title == "File").Rows;
         Assert.Equal((kind, source), (rows.Single(r => r.Label == "Kind").Value, rows.Single(r => r.Label == "Kind from").Value));
         Assert.Equal($"{kind}\n{source}", file.KindTip!.ToString());
@@ -112,7 +112,7 @@ public sealed class FileKindsTests : IDisposable
         Assert.Equal("application program", FileKinds.Of((FileNode)Node(input, "SimpleText")).Text);
         Assert.Equal("system file", FileKinds.Of((FileNode)Node(input, "System Resources")).Text);
         model.Selected = Node(input, "Teach");
-        Assert.Equal("Application program in kinds.img", model.Header!.Kind);
+        Assert.Equal("Application program in kinds.img", model.InspectorActions.Header!.Kind);
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public sealed class FileKindsTests : IDisposable
         Assert.Equal("Type/Creator database: 2 kinds from “tcdb.xlsx”.", model.Status);
         var rows = model.Details.Groups.Single(g => g.Title == "File").Rows;     // the selection's details follow
         Assert.Equal(("Widget widget file", "TCDB (your copy)"), (rows.Single(r => r.Label == "Kind").Value, rows.Single(r => r.Label == "Kind from").Value));
-        Assert.Equal("Widget widget file in Docs", model.Header!.Kind);
+        Assert.Equal("Widget widget file in Docs", model.InspectorActions.Header!.Kind);
         Assert.Equal("SimpleText text document", FileKinds.Of((FileNode)Node(input, "Docs", "Read Me")).Text);   // the volume first
         Assert.True(model.TypeCreatorActions.HasTypeCreatorDatabase);
 

@@ -48,7 +48,7 @@ public sealed class InspectorTests : IDisposable
 
         model.Selected = names;
 
-        var header = model.Header!;
+        var header = model.InspectorActions.Header!;
         Assert.Same(names, header.Node);
         Assert.Equal("128 “Names”", header.Name);
         Assert.Equal("String list in Prefs", header.Kind);
@@ -61,8 +61,8 @@ public sealed class InspectorTests : IDisposable
 
         var other = Child<ResourceTypeNode>(prefs, "'ZZZZ' (1)").Children[0];
         model.Selected = other;
-        Assert.Equal("'ZZZZ' resource in Prefs", model.Header!.Kind);
-        Assert.Equal("none", Facts(model.Header)["Attributes"].Value);
+        Assert.Equal("'ZZZZ' resource in Prefs", model.InspectorActions.Header!.Kind);
+        Assert.Equal("none", Facts(model.InspectorActions.Header)["Attributes"].Value);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class InspectorTests : IDisposable
 
         model.Selected = Child<ResourceTypeNode>(prefs, "'STR#' (2)");
 
-        var header = model.Header!;
+        var header = model.InspectorActions.Header!;
         Assert.Equal("'STR#'", header.Name);
         Assert.Equal("String lists in Prefs", header.Kind);
         Assert.Equal(["Type", "Resources", "Size"], header.Facts.Select(f => f.Label));
@@ -92,7 +92,7 @@ public sealed class InspectorTests : IDisposable
         var prefs = Child<FileNode>(input, "Prefs");
 
         model.Selected = prefs;
-        var header = model.Header!;
+        var header = model.InspectorActions.Header!;
         Assert.Equal(("Prefs", "SimpleText text document in inspect.img"), (header.Name, header.Kind));   // SimpleText is not on the disk: the table
         Assert.Equal(["Type / creator", "Total size", "Resources"], header.Facts.Select(f => f.Label));
         Assert.Equal(new InspectorFact("Type / creator", "TEXT · ttxt", true), Facts(header)["Type / creator"]);
@@ -100,28 +100,28 @@ public sealed class InspectorTests : IDisposable
         await prefs.EnsureLoadedAsync();
         model.Selected = input;
         model.Selected = prefs;
-        Assert.Equal("3", Facts(model.Header!)["Resources"].Value);
-        Assert.Equal($"{4 + prefs.File.ResourceFork.Length:N0} bytes", Facts(model.Header!)["Total size"].Value);
+        Assert.Equal("3", Facts(model.InspectorActions.Header!)["Resources"].Value);
+        Assert.Equal($"{4 + prefs.File.ResourceFork.Length:N0} bytes", Facts(model.InspectorActions.Header!)["Total size"].Value);
 
         model.Selected = Child<FileNode>(input, "App");
-        Assert.Equal("Application program in inspect.img", model.Header!.Kind);
-        Assert.Equal("none", Facts(model.Header)["Resources"].Value);
+        Assert.Equal("Application program in inspect.img", model.InspectorActions.Header!.Kind);
+        Assert.Equal("none", Facts(model.InspectorActions.Header)["Resources"].Value);
 
         var docs = Child<FolderNode>(input, "Docs");
         model.Selected = docs;
-        Assert.Equal(("Docs", "Folder in inspect.img"), (model.Header!.Name, model.Header.Kind));
-        Assert.Equal("2", Facts(model.Header)["Items"].Value);
+        Assert.Equal(("Docs", "Folder in inspect.img"), (model.InspectorActions.Header!.Name, model.InspectorActions.Header.Kind));
+        Assert.Equal("2", Facts(model.InspectorActions.Header)["Items"].Value);
         model.Selected = Child<FileNode>(docs, "One");
-        Assert.Equal("SimpleText text document in Docs", model.Header!.Kind);
+        Assert.Equal("SimpleText text document in Docs", model.InspectorActions.Header!.Kind);
 
         model.Selected = input;
-        Assert.Equal(("inspect.img", "HFS volume"), (model.Header!.Name, model.Header.Kind));
-        Assert.Equal(["Files", "Size"], model.Header.Facts.Select(f => f.Label));
-        Assert.Equal("4", Facts(model.Header)["Files"].Value);
-        Assert.Equal(NodeViewModel.FormatSize(new FileInfo(path).Length), Facts(model.Header)["Size"].Value);
+        Assert.Equal(("inspect.img", "HFS volume"), (model.InspectorActions.Header!.Name, model.InspectorActions.Header.Kind));
+        Assert.Equal(["Files", "Size"], model.InspectorActions.Header.Facts.Select(f => f.Label));
+        Assert.Equal("4", Facts(model.InspectorActions.Header)["Files"].Value);
+        Assert.Equal(NodeViewModel.FormatSize(new FileInfo(path).Length), Facts(model.InspectorActions.Header)["Size"].Value);
 
         model.Selected = null;
-        Assert.Null(model.Header);
+        Assert.Null(model.InspectorActions.Header);
     }
 
     [Fact]
@@ -130,12 +130,12 @@ public sealed class InspectorTests : IDisposable
         var model = new MainViewModel();
         var input = (await model.OpenAsync(Disk()))!;
         var changed = new System.Collections.Concurrent.ConcurrentQueue<string?>();
-        model.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
+        model.InspectorActions.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
 
         model.Selected = Child<FileNode>(input, "App");
 
-        Assert.Contains(nameof(MainViewModel.Header), changed);
-        Assert.Equal("App", model.Header!.Name);
+        Assert.Contains(nameof(InspectorActions.Header), changed);
+        Assert.Equal("App", model.InspectorActions.Header!.Name);
     }
 
     [Fact]
@@ -146,19 +146,19 @@ public sealed class InspectorTests : IDisposable
         var prefs = Child<FileNode>(input, "Prefs");
         await prefs.EnsureLoadedAsync();
         var changed = new System.Collections.Concurrent.ConcurrentQueue<string?>();
-        model.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
+        model.InspectorActions.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
 
         model.Selected = Child<ResourceTypeNode>(prefs, "'STR#' (2)").Children[0];
-        Assert.Same(model.SaveResourceAsCommand, model.HeaderExportCommand);
-        Assert.Contains(nameof(MainViewModel.HeaderExportCommand), changed);
+        Assert.Same(model.SaveResourceAsCommand, model.InspectorActions.HeaderExportCommand);
+        Assert.Contains(nameof(InspectorActions.HeaderExportCommand), changed);
         model.Selected = prefs;
-        Assert.Same(model.ExportResourcesCommand, model.HeaderExportCommand);
+        Assert.Same(model.ExportResourcesCommand, model.InspectorActions.HeaderExportCommand);
         model.Selected = Child<ResourceTypeNode>(prefs, "'STR#' (2)");
-        Assert.Same(model.ExportResourcesCommand, model.HeaderExportCommand);
+        Assert.Same(model.ExportResourcesCommand, model.InspectorActions.HeaderExportCommand);
         model.Selected = Child<FolderNode>(input, "Docs");
-        Assert.Same(model.ExtractAllCommand, model.HeaderExportCommand);
+        Assert.Same(model.ExtractAllCommand, model.InspectorActions.HeaderExportCommand);
         model.Selected = input;
-        Assert.Same(model.ExtractAllCommand, model.HeaderExportCommand);
+        Assert.Same(model.ExtractAllCommand, model.InspectorActions.HeaderExportCommand);
     }
 
     // A plain resource file: STR# 128 has a form.
@@ -269,16 +269,16 @@ public sealed class InspectorTests : IDisposable
         await icons.EnsureLoadedAsync();
 
         model.Selected = Resource(icons, "ics#", 128);
-        Assert.Equal(["Type", "ID", "Members", "Size", "Attributes"], model.Header!.Facts.Select(f => f.Label));
-        Assert.Equal(new InspectorFact("Members", "ICN# · icl8 · ics#", true), Facts(model.Header)["Members"]);
+        Assert.Equal(["Type", "ID", "Members", "Size", "Attributes"], model.InspectorActions.Header!.Facts.Select(f => f.Label));
+        Assert.Equal(new InspectorFact("Members", "ICN# · icl8 · ics#", true), Facts(model.InspectorActions.Header)["Members"]);
         model.Selected = Resource(icons, "ics#", 129);
-        Assert.Equal("ics#", Facts(model.Header!)["Members"].Value);
+        Assert.Equal("ics#", Facts(model.InspectorActions.Header!)["Members"].Value);
         model.Selected = Resource(icons, "icns", 130);
-        Assert.Equal("ICN#", Facts(model.Header!)["Members"].Value);
+        Assert.Equal("ICN#", Facts(model.InspectorActions.Header!)["Members"].Value);
         model.Selected = Resource(icons, "TEXT", 128);
-        Assert.DoesNotContain("Members", Facts(model.Header!).Keys);
+        Assert.DoesNotContain("Members", Facts(model.InspectorActions.Header!).Keys);
         model.Selected = Resource(icons, "CURS", 128);
-        Assert.DoesNotContain("Members", Facts(model.Header!).Keys);
+        Assert.DoesNotContain("Members", Facts(model.InspectorActions.Header!).Keys);
     }
 
     private static (int Width, int Height, uint TopLeft, uint TopRight) Png(byte[] png)
@@ -300,12 +300,12 @@ public sealed class InspectorTests : IDisposable
 
         async Task<(int Width, int Height, uint TopLeft, uint TopRight)?> Select(NodeViewModel node)
         {
-            var previous = model.HeaderIconPng;
+            var previous = model.InspectorActions.HeaderIconPng;
             model.Selected = node;
             // The previous one goes at once (the new one may already be there: it loads on another thread).
-            Assert.True(model.HeaderIconPng is null || !ReferenceEquals(previous, model.HeaderIconPng));
-            await model.HeaderIconTask;
-            return model.HeaderIconPng is { } png ? Png(png) : null;
+            Assert.True(model.InspectorActions.HeaderIconPng is null || !ReferenceEquals(previous, model.InspectorActions.HeaderIconPng));
+            await model.InspectorActions.HeaderIconTask;
+            return model.InspectorActions.HeaderIconPng is { } png ? Png(png) : null;
         }
 
         // The family's 32-pixel member (all black), not its small one (left half), whichever member is selected.
@@ -350,13 +350,13 @@ public sealed class InspectorTests : IDisposable
         var pictures = input.Children.OfType<ResourceTypeNode>().Single().Children.OfType<ResourceNode>().ToList();
 
         model.Selected = pictures[0];
-        await model.HeaderIconTask;
-        Assert.Equal((iconWidth, iconHeight, Black, Black), Png(model.HeaderIconPng!));
+        await model.InspectorActions.HeaderIconTask;
+        Assert.Equal((iconWidth, iconHeight, Black, Black), Png(model.InspectorActions.HeaderIconPng!));
 
         // A picture that does not decode has none (the kind icon shows).
         model.Selected = pictures[1];
-        await model.HeaderIconTask;
-        Assert.Null(model.HeaderIconPng);
+        await model.InspectorActions.HeaderIconTask;
+        Assert.Null(model.InspectorActions.HeaderIconPng);
     }
 
     [Theory]

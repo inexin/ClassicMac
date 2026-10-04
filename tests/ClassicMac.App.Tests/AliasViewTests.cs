@@ -56,8 +56,8 @@ public sealed class AliasViewTests : IDisposable
         model.Selected = Node(input, "Moved alias");
         Pump(model.PreviewTask);
         Assert.Same(note, model.AliasActions.SelectedAlias?.Target);
-        Assert.Equal("Alias to Note · SimpleText text document", model.Header!.Kind);
-        Assert.Equal("Aliases: Docs: Note", model.Header.Original);
+        Assert.Equal("Alias to Note · SimpleText text document", model.InspectorActions.Header!.Kind);
+        Assert.Equal("Aliases: Docs: Note", model.InspectorActions.Header.Original);
         Assert.Equal("Text", model.Preview.Kind.ToString());                // the original's preview
         Assert.Equal("Hello", model.Preview.Text);
         Assert.Equal("Alias of Aliases: Docs: Note", model.AliasActions.AliasStrip);
@@ -81,7 +81,7 @@ public sealed class AliasViewTests : IDisposable
         var (model, input) = Open();
         model.Selected = Node(input, "Stuff alias");
         Assert.Same(Node(input, "Stuff"), model.AliasActions.SelectedAlias?.Target);
-        Assert.Equal("Alias to Stuff · folder", model.Header!.Kind);
+        Assert.Equal("Alias to Stuff · folder", model.InspectorActions.Header!.Kind);
         model.Selected = Node(input, "Chain alias");
         Assert.Same(Node(input, "Note alias"), model.AliasActions.SelectedAlias?.Target);  // the Finder's Show Original goes one step
     });
@@ -94,11 +94,11 @@ public sealed class AliasViewTests : IDisposable
         Pump(model.PreviewTask);
         Assert.True(model.AliasActions.AliasNotFound);
         Assert.Null(model.AliasActions.AliasStrip);
-        Assert.Equal("Alias to Gone · original missing", model.Header!.Kind);
+        Assert.Equal("Alias to Gone · original missing", model.InspectorActions.Header!.Kind);
         Assert.Equal(AliasState.Missing, model.AliasActions.SelectedAlias!.Resolution.State);
         Assert.Equal("Original missing", model.AliasActions.AliasNotFoundTitle);
         Assert.Equal("The original is not on Aliases any more.", model.AliasActions.AliasNotFoundReason);
-        Assert.Equal("Aliases: Old: Gone", model.Header.Original);
+        Assert.Equal("Aliases: Old: Gone", model.InspectorActions.Header.Original);
         Assert.Equal("Aliases", model.AliasActions.SelectedAlias!.Resolution.Alias.VolumeName.ToMacRoman());
         Assert.False(model.AliasActions.ShowOriginalCommand.CanExecute(null));
         var card = model.Details.Groups.Single(g => g.Title == "Alias").Rows.ToDictionary(r => r.Label, r => r.Value);
@@ -115,14 +115,14 @@ public sealed class AliasViewTests : IDisposable
         var (model, input) = Open();
         model.Selected = Node(input, "Elsewhere alias");
         Pump(model.PreviewTask);
-        Assert.Equal("Alias to Map · on another disk", model.Header!.Kind);
+        Assert.Equal("Alias to Map · on another disk", model.InspectorActions.Header!.Kind);
         Assert.Equal("On a disk that is not open", model.AliasActions.AliasNotFoundTitle);
         Assert.Equal("The original is on the 800K floppy disk “Bag of Holding”, which is not open.", model.AliasActions.AliasNotFoundReason);
-        Assert.Equal("Bag of Holding: Map", model.Header.Original);
+        Assert.Equal("Bag of Holding: Map", model.InspectorActions.Header.Original);
 
         model.Selected = Node(input, "Server alias");
         Pump(model.PreviewTask);
-        Assert.Equal("Alias to Plans · on a network volume", model.Header!.Kind);
+        Assert.Equal("Alias to Plans · on a network volume", model.InspectorActions.Header!.Kind);
         Assert.Equal("On a network volume", model.AliasActions.AliasNotFoundTitle);
         Assert.Equal("The original is on the network volume “Shared” on the server “Studio” (zone “Office”, as “lars”).",
             model.AliasActions.AliasNotFoundReason);

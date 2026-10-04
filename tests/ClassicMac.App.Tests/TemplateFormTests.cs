@@ -176,16 +176,16 @@ public sealed class TemplateFormTests : IDisposable
         await model.PreviewTask;
         var form = Assert.IsType<TemplateForm>(model.Form);
         Assert.True(model.FormEditing.ShowsForm);
-        string Size() => model.Header!.Facts.Single(f => f.Label == "Size").Value;
-        Assert.Equal(new InspectorFact("Shown through", "'TMPL' 1000 “BNDL” in Bundle.rsrc", false), model.Header!.Facts.Single(f => f.Label == "Shown through"));
+        string Size() => model.InspectorActions.Header!.Facts.Single(f => f.Label == "Size").Value;
+        Assert.Equal(new InspectorFact("Shown through", "'TMPL' 1000 “BNDL” in Bundle.rsrc", false), model.InspectorActions.Header!.Facts.Single(f => f.Label == "Shown through"));
         Assert.Equal("'TMPL' 1000 “BNDL” in Bundle.rsrc", form.ShownThrough);
         Assert.Equal($"{Data.Length} bytes", Size());
 
         model.FormEditing.EditFormCommand.Execute(null);
         var changed = new List<string?>();
-        model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        model.InspectorActions.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
         ((TemplateListRow)form.Fields[3]).AddCommand.Execute(null);
-        Assert.Contains(nameof(MainViewModel.Header), changed);
+        Assert.Contains(nameof(InspectorActions.Header), changed);
         Assert.Equal($"{Data.Length + 6} bytes", Size());
         model.FormEditing.CancelFormCommand.Execute(null);
         Assert.Equal($"{Data.Length} bytes", Size());

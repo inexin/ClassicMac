@@ -80,7 +80,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
             form.IsEditing = value;
         }
 
-        main.RaisePropertyChanged(nameof(MainViewModel.Header));
+        main.InspectorActions.NotifyHeader();
     }
 
     private ResourceForm? sizedForm;
@@ -90,7 +90,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
     {
         if (IsEditingForm)
         {
-            main.RaisePropertyChanged(nameof(MainViewModel.Header));
+            main.InspectorActions.NotifyHeader();
         }
     }
 
@@ -115,7 +115,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
 
         OnPropertyChanged(nameof(ShowsForm));
         OnPropertyChanged(nameof(FormHint));
-        main.RaisePropertyChanged(nameof(MainViewModel.Header));
+        main.InspectorActions.NotifyHeader();
     }
 
     /// <summary>A dialog's or alert's item list link: selects that 'DITL' among its file's resources.</summary>

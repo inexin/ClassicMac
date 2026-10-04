@@ -202,14 +202,14 @@ public sealed class ShellTests : IDisposable
 
         model.Selected = Resource(input, "STR ");
         await model.PreviewTask;
-        await model.HeaderIconTask;
+        await model.InspectorActions.HeaderIconTask;
         // The selection's preview and header icon finish on the thread pool and raise PropertyChanged there: a
         // concurrent queue takes them, and the new selection's tasks are awaited before the names are looked at.
         var changed = new System.Collections.Concurrent.ConcurrentQueue<string?>();
         model.ShellActions.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
         await model.DeleteResourceCommand.ExecuteAsync(null);
         await model.PreviewTask;
-        await model.HeaderIconTask;
+        await model.InspectorActions.HeaderIconTask;
         Assert.True(model.ShellActions.TitleUnsaved);
         Assert.Equal("Icons.rsrc • — ClassicMac", model.ShellActions.WindowTitle);
         Assert.Contains(nameof(ShellActions.TitleUnsaved), changed.ToArray());
