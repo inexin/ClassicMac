@@ -112,13 +112,13 @@ public sealed class HelpPagePreview : IWebPreview
 }
 
 // The help page's Rendered | Source switch and its links (boards: the document preview's switch, as Properties | JSON).
-public sealed partial class MainViewModel
+public sealed partial class HelpPreview(MainViewModel main) : ObservableObject
 {
     /// <summary>The switch's segments, in <see cref="HelpModeIndex"/> order: Rendered, then Source (a help page's HTML) or Text (a document's).</summary>
-    public IReadOnlyList<string> WebModes => ["Rendered", Preview.IsDocument ? "Text" : "Source"];
+    public IReadOnlyList<string> WebModes => ["Rendered", main.Preview.IsDocument ? "Text" : "Source"];
 
     /// <summary>The address the web view loads: the help page, or the document's page shown.</summary>
-    public string? WebUri => Preview.Web?.DataUri;
+    public string? WebUri => main.Preview.Web?.DataUri;
 
     /// <summary>Whether a help page shows its source rather than the rendered page (kept for the session).</summary>
     [ObservableProperty]
@@ -147,10 +147,10 @@ public sealed partial class MainViewModel
     public bool HasWebEngineMessage => WebEngineMessage is not null;
 
     /// <summary>Whether the help page shows in the web view.</summary>
-    public bool ShowsHelpRendered => Preview.IsWebPage && !ShowHelpSource && WebEngineMessage is null;
+    public bool ShowsHelpRendered => main.Preview.IsWebPage && !ShowHelpSource && WebEngineMessage is null;
 
     /// <summary>Whether the help page shows as its source: on request, or when there is no web view.</summary>
-    public bool ShowsHelpSource => Preview.IsWebPage && (ShowHelpSource || WebEngineMessage is not null);
+    public bool ShowsHelpSource => main.Preview.IsWebPage && (ShowHelpSource || WebEngineMessage is not null);
 
     /// <summary>
     /// The web view asks to go to <paramref name="url"/>: true to let it (the page itself); otherwise a page or file
@@ -165,12 +165,12 @@ public sealed partial class MainViewModel
             return true;
         }
 
-        if (Preview.Document is { } document)
+        if (main.Preview.Document is { } document)
         {
             return FollowDocumentLink(document, url, link);
         }
 
-        if (link.Kind != HelpLinkKind.File || Preview.Help is not { } page)
+        if (link.Kind != HelpLinkKind.File || main.Preview.Help is not { } page)
         {
             HelpStatus = link.Description;
             return false;
@@ -188,7 +188,7 @@ public sealed partial class MainViewModel
         }
 
         HelpStatus = null;
-        Selected = target;
+        main.Selected = target;
         return false;
     }
 
@@ -225,14 +225,14 @@ public sealed partial class MainViewModel
     /// <summary>The web view's hovered link (null when none): the status line says where it goes.</summary>
     public void HoverHelpLink(string? url) => HelpStatus = string.IsNullOrEmpty(url) ? null : HelpPages.Classify(url).Description;
 
-    private void OnHelpPreviewChanged()
+    internal void OnHelpPreviewChanged()
     {
         if (watchedDocument is not null)
         {
             watchedDocument.PropertyChanged -= OnDocumentChanged;
         }
 
-        watchedDocument = Preview.Document;
+        watchedDocument = main.Preview.Document;
         if (watchedDocument is not null)
         {
             watchedDocument.PropertyChanged += OnDocumentChanged;

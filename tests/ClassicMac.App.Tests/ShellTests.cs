@@ -58,44 +58,44 @@ public sealed class ShellTests : IDisposable
     public async Task Zoom_in_out_and_actual_size_step_through_the_zooms_of_a_zoomable_preview()
     {
         var (model, input) = await Open();
-        Assert.False(model.ZoomInCommand.CanExecute(null));             // the input: no zoomable preview yet
+        Assert.False(model.ShellActions.ZoomInCommand.CanExecute(null));             // the input: no zoomable preview yet
         model.Selected = Resource(input, "ICN#");
         await model.PreviewTask;
         Assert.Equal(4, model.Zoom);                                      // small icons open enlarged
-        Assert.True(model.IsZoomable);
-        Assert.True(model.ZoomInCommand.CanExecute(null));
-        model.ZoomInCommand.Execute(null);
+        Assert.True(model.ShellActions.IsZoomable);
+        Assert.True(model.ShellActions.ZoomInCommand.CanExecute(null));
+        model.ShellActions.ZoomInCommand.Execute(null);
         Assert.Equal(8, model.Zoom);
-        Assert.False(model.ZoomInCommand.CanExecute(null));
-        model.ZoomOutCommand.Execute(null);
-        model.ZoomOutCommand.Execute(null);
+        Assert.False(model.ShellActions.ZoomInCommand.CanExecute(null));
+        model.ShellActions.ZoomOutCommand.Execute(null);
+        model.ShellActions.ZoomOutCommand.Execute(null);
         Assert.Equal(2, model.Zoom);
-        model.ActualSizeCommand.Execute(null);
+        model.ShellActions.ActualSizeCommand.Execute(null);
         Assert.Equal(1, model.Zoom);
-        Assert.False(model.ZoomOutCommand.CanExecute(null));
-        Assert.False(model.ActualSizeCommand.CanExecute(null));
+        Assert.False(model.ShellActions.ZoomOutCommand.CanExecute(null));
+        Assert.False(model.ShellActions.ActualSizeCommand.CanExecute(null));
 
         model.Selected = Resource(input, "TEXT");
         await model.PreviewTask;
-        Assert.False(model.ZoomInCommand.CanExecute(null));
-        Assert.False(model.ZoomOutCommand.CanExecute(null));
-        Assert.False(model.ActualSizeCommand.CanExecute(null));
-        Assert.False(model.IsZoomable);
+        Assert.False(model.ShellActions.ZoomInCommand.CanExecute(null));
+        Assert.False(model.ShellActions.ZoomOutCommand.CanExecute(null));
+        Assert.False(model.ShellActions.ActualSizeCommand.CanExecute(null));
+        Assert.False(model.ShellActions.IsZoomable);
     }
 
     [Fact]
     public void Screen_depths_have_labels_and_one_is_chosen()
     {
         var model = new MainViewModel();
-        Assert.Equal(["1-bit", "2-bit", "4-bit", "8-bit (256)", "16-bit", "32-bit"], model.ScreenDepthChoices.Select(c => c.Label));
-        Assert.Equal(32, model.SelectedDepthChoice.Depth);
+        Assert.Equal(["1-bit", "2-bit", "4-bit", "8-bit (256)", "16-bit", "32-bit"], model.ShellActions.ScreenDepthChoices.Select(c => c.Label));
+        Assert.Equal(32, model.ShellActions.SelectedDepthChoice.Depth);
         var changed = new List<string?>();
-        model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
-        model.SetScreenDepthCommand.Execute(8);
+        model.ShellActions.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        model.ShellActions.SetScreenDepthCommand.Execute(8);
         Assert.Equal(8, model.ScreenDepth);
-        Assert.Equal("8-bit (256)", model.SelectedDepthChoice.Label);
-        Assert.Contains(nameof(MainViewModel.SelectedDepthChoice), changed);
-        model.SelectedDepthChoice = model.ScreenDepthChoices[0];
+        Assert.Equal("8-bit (256)", model.ShellActions.SelectedDepthChoice.Label);
+        Assert.Contains(nameof(ShellActions.SelectedDepthChoice), changed);
+        model.ShellActions.SelectedDepthChoice = model.ShellActions.ScreenDepthChoices[0];
         Assert.Equal(1, model.ScreenDepth);
     }
 
@@ -107,10 +107,10 @@ public sealed class ShellTests : IDisposable
     {
         var store = new MemorySettingsStore(new AppSettings(GroupNoName: false, Theme: theme == AppTheme.Dark ? AppTheme.Light : AppTheme.Dark));
         var model = new MainViewModel(store);
-        Assert.Equal(store.Settings.Theme, model.Theme);
-        model.SetThemeCommand.Execute(theme);
-        Assert.Equal(theme, model.Theme);
-        Assert.Equal((theme == AppTheme.System, theme == AppTheme.Light, theme == AppTheme.Dark), (model.IsSystemTheme, model.IsLightTheme, model.IsDarkTheme));
+        Assert.Equal(store.Settings.Theme, model.ShellActions.Theme);
+        model.ShellActions.SetThemeCommand.Execute(theme);
+        Assert.Equal(theme, model.ShellActions.Theme);
+        Assert.Equal((theme == AppTheme.System, theme == AppTheme.Light, theme == AppTheme.Dark), (model.ShellActions.IsSystemTheme, model.ShellActions.IsLightTheme, model.ShellActions.IsDarkTheme));
         Assert.Equal(new AppSettings(GroupNoName: false, Theme: theme), store.Settings);  // the other settings kept
 
         model.TreeDisplay.HideInvisible = false;                                         // and the theme kept by them
@@ -122,9 +122,9 @@ public sealed class ShellTests : IDisposable
     {
         var model = new MainViewModel();
         var changed = new List<string?>();
-        model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
-        model.Theme = AppTheme.Dark;
-        Assert.Equal([nameof(MainViewModel.Theme), nameof(MainViewModel.IsSystemTheme), nameof(MainViewModel.IsLightTheme), nameof(MainViewModel.IsDarkTheme)],
+        model.ShellActions.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        model.ShellActions.Theme = AppTheme.Dark;
+        Assert.Equal([nameof(ShellActions.Theme), nameof(ShellActions.IsSystemTheme), nameof(ShellActions.IsLightTheme), nameof(ShellActions.IsDarkTheme)],
             changed.Where(n => n is not null && n.Contains("Theme", StringComparison.Ordinal)));
     }
 
@@ -132,12 +132,13 @@ public sealed class ShellTests : IDisposable
     public void Window_commands_go_to_the_window()
     {
         var shell = new FakeShell();
-        var model = new MainViewModel { Shell = shell };
-        model.MinimizeCommand.Execute(null);
-        model.ZoomWindowCommand.Execute(null);
-        model.ZoomWindowCommand.Execute(null);
+        var model = new MainViewModel();
+        model.ShellActions.Shell = shell;
+        model.ShellActions.MinimizeCommand.Execute(null);
+        model.ShellActions.ZoomWindowCommand.Execute(null);
+        model.ShellActions.ZoomWindowCommand.Execute(null);
         Assert.Equal((1, 2), (shell.Minimized, shell.Zoomed));
-        new MainViewModel().MinimizeCommand.Execute(null);                // no window: nothing happens
+        new MainViewModel().ShellActions.MinimizeCommand.Execute(null);                // no window: nothing happens
     }
 
     [Fact]
@@ -148,27 +149,28 @@ public sealed class ShellTests : IDisposable
         var second = (await model.OpenAsync(Fork("Two.rsrc")))!;
         Assert.Same(second, model.Selected);
         first.IsExpanded = false;
-        Assert.True(model.ShowInputCommand.CanExecute(first));
-        Assert.False(model.ShowInputCommand.CanExecute(null));
-        await model.ShowInputCommand.ExecuteAsync(first);
+        Assert.True(model.ShellActions.ShowInputCommand.CanExecute(first));
+        Assert.False(model.ShellActions.ShowInputCommand.CanExecute(null));
+        await model.ShellActions.ShowInputCommand.ExecuteAsync(first);
         Assert.Same(first, model.Selected);
         Assert.True(first.IsExpanded);
-        Assert.True(model.IsSelectedInput(first));
-        Assert.False(model.IsSelectedInput(second));
+        Assert.True(model.ShellActions.IsSelectedInput(first));
+        Assert.False(model.ShellActions.IsSelectedInput(second));
     }
 
     [Fact]
     public async Task Help_opens_the_readme_and_the_issue_form_and_about_shows_the_about_box()
     {
         var shell = new FakeShell();
-        var model = new MainViewModel { Shell = shell };
-        model.OpenHelpCommand.Execute(null);
-        model.ReportProblemCommand.Execute(null);
+        var model = new MainViewModel();
+        model.ShellActions.Shell = shell;
+        model.ShellActions.OpenHelpCommand.Execute(null);
+        model.ShellActions.ReportProblemCommand.Execute(null);
         Assert.Equal([new Uri("https://github.com/inexin/ClassicMac#readme"), new Uri("https://github.com/inexin/ClassicMac/issues/new")], shell.Opened);
-        await model.AboutCommand.ExecuteAsync(null);
+        await model.ShellActions.AboutCommand.ExecuteAsync(null);
         Assert.Same(AboutInfo.Current, Assert.Single(shell.Abouts));
-        new MainViewModel().OpenHelpCommand.Execute(null);                // no window: nothing happens
-        await new MainViewModel().AboutCommand.ExecuteAsync(null);
+        new MainViewModel().ShellActions.OpenHelpCommand.Execute(null);                // no window: nothing happens
+        await new MainViewModel().ShellActions.AboutCommand.ExecuteAsync(null);
     }
 
     [Fact]
@@ -191,12 +193,12 @@ public sealed class ShellTests : IDisposable
     public async Task The_title_names_the_selected_input_and_marks_unsaved_edits()
     {
         var model = new MainViewModel();
-        Assert.Null(model.TitleFile);
-        Assert.Equal("ClassicMac", model.WindowTitle);
+        Assert.Null(model.ShellActions.TitleFile);
+        Assert.Equal("ClassicMac", model.ShellActions.WindowTitle);
         var (_, input) = await Open(model);
-        Assert.Equal("Icons.rsrc", model.TitleFile);
-        Assert.False(model.TitleUnsaved);
-        Assert.Equal("Icons.rsrc — ClassicMac", model.WindowTitle);
+        Assert.Equal("Icons.rsrc", model.ShellActions.TitleFile);
+        Assert.False(model.ShellActions.TitleUnsaved);
+        Assert.Equal("Icons.rsrc — ClassicMac", model.ShellActions.WindowTitle);
 
         model.Selected = Resource(input, "STR ");
         await model.PreviewTask;
@@ -204,19 +206,19 @@ public sealed class ShellTests : IDisposable
         // The selection's preview and header icon finish on the thread pool and raise PropertyChanged there: a
         // concurrent queue takes them, and the new selection's tasks are awaited before the names are looked at.
         var changed = new System.Collections.Concurrent.ConcurrentQueue<string?>();
-        model.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
+        model.ShellActions.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
         await model.DeleteResourceCommand.ExecuteAsync(null);
         await model.PreviewTask;
         await model.HeaderIconTask;
-        Assert.True(model.TitleUnsaved);
-        Assert.Equal("Icons.rsrc • — ClassicMac", model.WindowTitle);
-        Assert.Contains(nameof(MainViewModel.TitleUnsaved), changed.ToArray());
-        Assert.Contains(nameof(MainViewModel.WindowTitle), changed.ToArray());
+        Assert.True(model.ShellActions.TitleUnsaved);
+        Assert.Equal("Icons.rsrc • — ClassicMac", model.ShellActions.WindowTitle);
+        Assert.Contains(nameof(ShellActions.TitleUnsaved), changed.ToArray());
+        Assert.Contains(nameof(ShellActions.WindowTitle), changed.ToArray());
         await model.UndoCommand.ExecuteAsync(null);
         await model.PreviewTask;
-        Assert.False(model.TitleUnsaved);
+        Assert.False(model.ShellActions.TitleUnsaved);
 
         model.Selected = null;
-        Assert.Equal("ClassicMac", model.WindowTitle);
+        Assert.Equal("ClassicMac", model.ShellActions.WindowTitle);
     }
 }

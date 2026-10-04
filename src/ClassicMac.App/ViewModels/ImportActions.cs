@@ -12,6 +12,7 @@ using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders.Images;
 using ClassicMac.Resources.Decoders.Sound;
 using ClassicMac.Resources.Editing;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ClassicMac.App.ViewModels;
@@ -19,7 +20,7 @@ namespace ClassicMac.App.ViewModels;
 /// <summary>What an import makes: the resource type (or <see cref="MainViewModel.IconFamily"/>), ID and name.</summary>
 public sealed record ImportChoice(string Type, short Id, string Name);
 
-public sealed partial class MainViewModel
+public sealed partial class ImportActions(MainViewModel main) : ObservableObject
 {
     /// <summary>The import choice that makes every icon of a Finder icon family.</summary>
     public const string IconFamily = "Icon family (ICN#, icl4, icl8, ics#, ics4, ics8)";
@@ -29,20 +30,22 @@ public sealed partial class MainViewModel
 
     // Resource ▸ Import: a PNG (or other image) or WAV file made into a new resource, or into the data of the one
     // of that type and ID, as one undoable edit.
-    [RelayCommand(CanExecute = nameof(CanNewResource))]
+    private bool CanImport() => main.CanNewResource();
+
+    [RelayCommand(CanExecute = nameof(CanImport))]
     private async Task Import()
     {
-        if (!await ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (FileOwner(Selected) is not { } owner || FilePicker is null || EditDialogs is null)
+        if (MainViewModel.FileOwner(main.Selected) is not { } owner || main.FilePicker is null || main.EditDialogs is null)
         {
             return;
         }
 
-        if ((await FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
+        if ((await main.FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
         {
             return;
         }
@@ -64,17 +67,17 @@ public sealed partial class MainViewModel
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException or NotSupportedException)
         {
-            Status = $"“{fileName}” could not be imported: {e.Message}";
+            main.Status = $"“{fileName}” could not be imported: {e.Message}";
             return;
         }
 
-        var fork = StateFor(owner).Session.Fork;
+        var fork = main.StateFor(owner).Session.Fork;
         IReadOnlyList<string> types = isSound ? ["snd "] : [.. ImageImport.Types, IconFamily];
-        var selected = (Selected as ResourceNode)?.Resource;
+        var selected = (main.Selected as ResourceNode)?.Resource;
         var type = selected is not null && types.Contains(selected.Type.ToString()) ? selected.Type.ToString() : types[0];
         short id = selected is not null && selected.Type.ToString() == type ? selected.Id : ResourceEditRules.NextFreeId(fork, FourCC.FromString(type));
         var source = isSound ? SoundSource(sound!) : ImageSource(image!);
-        if (await EditDialogs.ImportAsync(fileName, types, new ImportChoice(type, id, ""), source) is not { } choice)
+        if (await main.EditDialogs.ImportAsync(fileName, types, new ImportChoice(type, id, ""), source) is not { } choice)
         {
             return;
         }
@@ -87,13 +90,13 @@ public sealed partial class MainViewModel
         }
         catch (Exception e) when (e is ArgumentException or NotSupportedException)
         {
-            Status = e.Message;
+            main.Status = e.Message;
             return;
         }
 
         var edits = new List<IResourceEdit>();
         var replaced = made.Select(m => fork.Find(FourCC.FromString(m.Type), choice.Id)).OfType<Resource>().ToList();
-        if (replaced.Count > 0 && !await EditDialogs.ConfirmAsync("Import",
+        if (replaced.Count > 0 && !await main.EditDialogs.ConfirmAsync("Import",
                 $"Replace the data of {string.Join(", ", replaced)} with “{fileName}”?"))
         {
             return;
@@ -112,7 +115,7 @@ public sealed partial class MainViewModel
 
                 continue;
             }
-            if (await Validate(fork, new ResourceInfo(madeType, choice.Id, choice.Name, ResourceAttributes.None), null) is not { } valid)
+            if (await main.Validate(fork, new ResourceInfo(madeType, choice.Id, choice.Name, ResourceAttributes.None), null) is not { } valid)
             {
                 return;
             }
@@ -124,7 +127,7 @@ public sealed partial class MainViewModel
                 select = () => add.Added;
             }
         }
-        Execute(owner, edits.Count == 1 ? edits[0] : new CompoundEdit($"Import {fileName}", [.. edits]), select);
+        main.Execute(owner, edits.Count == 1 ? edits[0] : new CompoundEdit($"Import {fileName}", [.. edits]), select);
     }
 
     // An image's size and depth ("32 × 32 · 24-bit", or 32-bit with alpha when a pixel is not opaque), and what each
@@ -158,8 +161,8 @@ public sealed partial class MainViewModel
             return [];
         }
 
-        var options = CurrentDecodeOptions;
-        return made.Select(m => PreviewViewModel.ForData(m.Type, m.Data, options, ReadOptions) is { Images.Count: > 0 } preview
+        var options = main.CurrentDecodeOptions;
+        return made.Select(m => PreviewViewModel.ForData(m.Type, m.Data, options, main.ReadOptions) is { Images.Count: > 0 } preview
                 ? preview.Images[0] with { Caption = m.Type }
                 : null)
             .OfType<PreviewImage>().ToList();
@@ -167,7 +170,7 @@ public sealed partial class MainViewModel
 
     // A sound's rate, channels, sample size and length, as its preview says them; nothing drawn.
     private ImportSource SoundSource(byte[] sound) =>
-        new(PreviewViewModel.ForData("snd ", sound, CurrentDecodeOptions, ReadOptions).SoundDetails, _ => []);
+        new(PreviewViewModel.ForData("snd ", sound, main.CurrentDecodeOptions, main.ReadOptions).SoundDetails, _ => []);
 
     // Any image Avalonia decodes, converted to unpremultiplied RGBA.
     private static RgbaBitmap ReadImage(string path)

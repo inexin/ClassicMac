@@ -60,7 +60,7 @@ public sealed partial class SoundHeaderActions(MainViewModel main) : ObservableO
     [RelayCommand(CanExecute = nameof(CanReplaceFromWav))]
     private async Task ReplaceFromWav()
     {
-        if (!await main.ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }

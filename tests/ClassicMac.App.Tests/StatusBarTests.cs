@@ -43,21 +43,21 @@ public sealed class StatusBarTests : IDisposable
     public async Task The_summary_names_the_selected_input_its_format_and_files()
     {
         var model = new MainViewModel();
-        Assert.Null(model.Summary);
+        Assert.Null(model.StatusLine.Summary);
         var first = (await model.OpenAsync(Disk("first.img", 3)))!;
         var second = (await model.OpenAsync(Disk("second.img", 5)))!;
         var changed = new System.Collections.Concurrent.ConcurrentQueue<string?>();
-        model.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
+        model.StatusLine.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
 
         model.Selected = first.Children.OfType<FileNode>().First();
 
-        Assert.Equal(new StatusSummary("first.img", "HFS volume", 3, 0, 0), model.Summary);
-        Assert.Equal("first.img · HFS volume · 3 files", model.Summary!.Text);
-        Assert.Contains(nameof(MainViewModel.Summary), changed);
+        Assert.Equal(new StatusSummary("first.img", "HFS volume", 3, 0, 0), model.StatusLine.Summary);
+        Assert.Equal("first.img · HFS volume · 3 files", model.StatusLine.Summary!.Text);
+        Assert.Contains(nameof(StatusLine.Summary), changed);
         model.Selected = second;
-        Assert.Equal("second.img · HFS volume · 5 files", model.Summary!.Text);
+        Assert.Equal("second.img · HFS volume · 5 files", model.StatusLine.Summary!.Text);
         model.Selected = null;
-        Assert.Equal("first.img", model.Summary!.Name); // nothing selected: the first input
+        Assert.Equal("first.img", model.StatusLine.Summary!.Name); // nothing selected: the first input
     }
 
     [Theory]
@@ -86,7 +86,7 @@ public sealed class StatusBarTests : IDisposable
         var second = (await model.OpenAsync(Disk("second.img", 1)))!;
         model.Selected = first;
         var changed = new System.Collections.Concurrent.ConcurrentQueue<string?>();
-        model.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
+        model.StatusLine.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
 
         model.DiagnosticsPanel.Add(Entry(DiagnosticSeverity.Error, first.Children[0]));
         model.DiagnosticsPanel.Add(Entry(DiagnosticSeverity.Error, first));
@@ -95,36 +95,36 @@ public sealed class StatusBarTests : IDisposable
         model.DiagnosticsPanel.Add(Entry(DiagnosticSeverity.Error, second));
         model.DiagnosticsPanel.Add(Entry(DiagnosticSeverity.Warning, null, "first.img")); // about the file, before it had a node
 
-        Assert.Equal((2, 2), (model.Summary!.Errors, model.Summary.Warnings));
-        Assert.Contains(nameof(MainViewModel.Summary), changed);
+        Assert.Equal((2, 2), (model.StatusLine.Summary!.Errors, model.StatusLine.Summary.Warnings));
+        Assert.Contains(nameof(StatusLine.Summary), changed);
         model.Selected = second;
-        Assert.Equal((1, 0), (model.Summary!.Errors, model.Summary.Warnings));
+        Assert.Equal((1, 0), (model.StatusLine.Summary!.Errors, model.StatusLine.Summary.Warnings));
     }
 
     [Fact]
     public async Task Progress_shows_what_runs_and_how_far()
     {
         var model = new MainViewModel();
-        Assert.False(model.IsWorking);
-        Assert.Null(model.ProgressCount);
+        Assert.False(model.StatusLine.IsWorking);
+        Assert.Null(model.StatusLine.ProgressCount);
 
-        var progress = model.BeginProgress("Extracting Disk…", 3906);
+        var progress = model.StatusLine.BeginProgress("Extracting Disk…", 3906);
 
-        Assert.True(model.IsWorking);
-        Assert.Equal(("Extracting Disk…", 0, 3906), (model.ProgressText, model.ProgressValue, model.ProgressMaximum));
-        Assert.Equal("0 of 3,906", model.ProgressCount);
-        Assert.False(model.IsProgressIndeterminate);
+        Assert.True(model.StatusLine.IsWorking);
+        Assert.Equal(("Extracting Disk…", 0, 3906), (model.StatusLine.ProgressText, model.StatusLine.ProgressValue, model.StatusLine.ProgressMaximum));
+        Assert.Equal("0 of 3,906", model.StatusLine.ProgressCount);
+        Assert.False(model.StatusLine.IsProgressIndeterminate);
         progress.Apply(1240);
-        Assert.Equal("1,240 of 3,906", model.ProgressCount);
-        Assert.Equal(1240, model.ProgressValue);
+        Assert.Equal("1,240 of 3,906", model.StatusLine.ProgressCount);
+        Assert.Equal(1240, model.StatusLine.ProgressValue);
 
         progress.Finish("Done.");
-        Assert.False(model.IsWorking);
-        Assert.Null(model.ProgressText);
+        Assert.False(model.StatusLine.IsWorking);
+        Assert.Null(model.StatusLine.ProgressText);
         Assert.Equal("Done.", model.Status);
         progress.Apply(3000); // a late report changes nothing
-        Assert.False(model.IsWorking);
-        Assert.Equal(1240, model.ProgressValue);
+        Assert.False(model.StatusLine.IsWorking);
+        Assert.Equal(1240, model.StatusLine.ProgressValue);
         await Task.CompletedTask;
     }
 
@@ -132,12 +132,12 @@ public sealed class StatusBarTests : IDisposable
     public void Work_without_a_count_is_indeterminate()
     {
         var model = new MainViewModel { Status = "Before" };
-        var progress = model.BeginProgress("Reading Disk…", 0);
-        Assert.True(model.IsProgressIndeterminate);
-        Assert.Null(model.ProgressCount);
+        var progress = model.StatusLine.BeginProgress("Reading Disk…", 0);
+        Assert.True(model.StatusLine.IsProgressIndeterminate);
+        Assert.Null(model.StatusLine.ProgressCount);
         progress.Finish(null);
-        Assert.False(model.IsWorking);
-        Assert.False(model.IsProgressIndeterminate);
+        Assert.False(model.StatusLine.IsWorking);
+        Assert.False(model.StatusLine.IsProgressIndeterminate);
         Assert.Equal("Before", model.Status);
     }
 
@@ -146,18 +146,18 @@ public sealed class StatusBarTests : IDisposable
     {
         var model = new MainViewModel();
         var texts = new System.Collections.Concurrent.ConcurrentQueue<string?>();
-        model.PropertyChanged += (_, e) =>
+        model.StatusLine.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MainViewModel.ProgressText))
+            if (e.PropertyName == nameof(StatusLine.ProgressText))
             {
-                texts.Enqueue(model.ProgressText);
+                texts.Enqueue(model.StatusLine.ProgressText);
             }
         };
 
         await model.OpenAsync(Disk("open.img", 1));
 
         Assert.Equal(["Reading open.img…", null], texts);
-        Assert.False(model.IsWorking);
+        Assert.False(model.StatusLine.IsWorking);
     }
 
     // The long exports show progress with their total, and leave the result in the status.
@@ -174,11 +174,11 @@ public sealed class StatusBarTests : IDisposable
         var file = input.Children.OfType<FileNode>().First();
         await file.EnsureLoadedAsync();
         var seen = new System.Collections.Concurrent.ConcurrentQueue<(string? Text, int Maximum)>();
-        model.PropertyChanged += (_, e) =>
+        model.StatusLine.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MainViewModel.ProgressText))
+            if (e.PropertyName == nameof(StatusLine.ProgressText))
             {
-                seen.Enqueue((model.ProgressText, model.ProgressMaximum));
+                seen.Enqueue((model.StatusLine.ProgressText, model.StatusLine.ProgressMaximum));
             }
         };
 
@@ -201,7 +201,7 @@ public sealed class StatusBarTests : IDisposable
             _ => ("Exporting File 0…", 1),
         }, (text, maximum));
         Assert.Null(seen.Last().Text);
-        Assert.False(model.IsWorking);
+        Assert.False(model.StatusLine.IsWorking);
         Assert.NotNull(model.Status);
     }
 }

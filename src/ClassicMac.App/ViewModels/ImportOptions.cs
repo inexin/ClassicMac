@@ -30,7 +30,7 @@ public sealed partial class ImportOptions : ObservableObject
         [
             Option("PICT", "Picture", "PICT"),
             Option("cicn", "Color icon", "cicn"),
-            Option(MainViewModel.IconFamily, "Icon family", "ICN# icl4 icl8 ics# ics4 ics8"),
+            Option(ImportActions.IconFamily, "Icon family", "ICN# icl4 icl8 ics# ics4 ics8"),
             Option(KindKey, "One icon kind", null),
             Option("CURS", "Cursor", "CURS"),
             Option("crsr", "Color cursor", "crsr"),

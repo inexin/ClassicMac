@@ -86,10 +86,10 @@ public sealed class FormHostTests : IDisposable
         await Select(model, input, "MENU");
         model.EditFormCommand.Execute(null);
         Assert.IsType<MenuForm>(model.Form).Title = "Fichier";
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
         model.CancelFormCommand.Execute(null);
         Assert.False(model.IsEditingForm);
-        Assert.False(model.HasDraft);
+        Assert.False(model.Drafts.HasDraft);
         var fresh = Assert.IsType<MenuForm>(model.Form);
         Assert.Equal("File", fresh.Title);
         Assert.False(fresh.IsEditing);

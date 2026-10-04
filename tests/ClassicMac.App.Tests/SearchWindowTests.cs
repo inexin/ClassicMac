@@ -46,29 +46,29 @@ public sealed class SearchWindowTests : IDisposable
         Assert.Contains(Named<Border>(window, "StatusBar").GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Ready" && t.IsEffectivelyVisible);
 
         // The baseline shows fixed paths (the temporary folder's name changes from run to run).
-        model.RecentFiles.Insert(0, new RecentFile(@"C:\Mac\Mac OS 9.hfv", true));
-        model.RecentFiles.Insert(1, new RecentFile(@"C:\Mac\Archives\Tools.sit", true));
-        var shown = model.RecentFiles.Skip(2).ToList();
+        model.EmptyState.RecentFiles.Insert(0, new RecentFile(@"C:\Mac\Mac OS 9.hfv", true));
+        model.EmptyState.RecentFiles.Insert(1, new RecentFile(@"C:\Mac\Archives\Tools.sit", true));
+        var shown = model.EmptyState.RecentFiles.Skip(2).ToList();
         foreach (var file in shown)
         {
-            model.RecentFiles.Remove(file);
+            model.EmptyState.RecentFiles.Remove(file);
         }
-        model.RecentFiles.Add(new RecentFile(@"D:\Old\Games.img", false));
+        model.EmptyState.RecentFiles.Add(new RecentFile(@"D:\Old\Games.img", false));
         Dispatcher.UIThread.RunJobs();
         Baselines.Check(window, "empty-state", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
-        model.RecentFiles.Clear();
+        model.EmptyState.RecentFiles.Clear();
         foreach (var file in shown)
         {
-            model.RecentFiles.Add(file);
+            model.EmptyState.RecentFiles.Add(file);
         }
         Dispatcher.UIThread.RunJobs();
 
         // A drag over the window marks the drop zone.
         var zone = Named<Border>(window, "DropZone");
-        model.IsDropTarget = true;
+        model.EmptyState.IsDropTarget = true;
         Dispatcher.UIThread.RunJobs();
         Assert.Contains("active", zone.Classes);
-        model.IsDropTarget = false;
+        model.EmptyState.IsDropTarget = false;
 
         // A click on a recent file opens it; the empty state goes.
         var rows = empty.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("recent")).ToList();
@@ -93,7 +93,7 @@ public sealed class SearchWindowTests : IDisposable
         var clear = Named<Border>(window, "EmptyState").GetVisualDescendants().OfType<Button>().Single(b => b.Content as string == "Clear list");
         clear.Command!.Execute(null);
         Dispatcher.UIThread.RunJobs();
-        Assert.Empty(model.RecentFiles);
+        Assert.Empty(model.EmptyState.RecentFiles);
         Assert.False(Named<Control>(window, "RecentList").IsVisible);
         window.Close();
     });
@@ -127,7 +127,7 @@ public sealed class SearchWindowTests : IDisposable
         Assert.True(filter.IsFocused);
         window.KeyTextInput("rea");
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("rea", model.FilterText);
+        Assert.Equal("rea", model.TreeSearch.FilterText);
         var tree = Named<BrowseTree>(window, "Tree");
         // A row filtered out leaves the list of rows.
         Assert.DoesNotContain(tree.GetVisualDescendants().OfType<ListBoxItem>(), i => i.DataContext is FileNode { Name: "Manual" });
@@ -139,7 +139,7 @@ public sealed class SearchWindowTests : IDisposable
 
         window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("", model.FilterText);
+        Assert.Equal("", model.TreeSearch.FilterText);
         Assert.Contains(tree.GetVisualDescendants().OfType<ListBoxItem>(), i => i.DataContext is FileNode { Name: "Manual" } && i.IsVisible);
         window.Close();
     });
@@ -158,7 +158,7 @@ public sealed class SearchWindowTests : IDisposable
 
         window.KeyTextInput("re");
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("re", model.TypeAheadText);
+        Assert.Equal("re", model.TreeSearch.TypeAheadText);
         Assert.True(pill.IsVisible);
         Assert.Contains("1 of 2 loaded matches", Texts(pill));
         Assert.IsType<FileNode>(model.Selected);
@@ -173,11 +173,11 @@ public sealed class SearchWindowTests : IDisposable
         Assert.Equal("Read Me", model.Selected!.Name);
         window.KeyPress(Key.Back, RawInputModifiers.None, PhysicalKey.Backspace, null);
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("r", model.TypeAheadText);
+        Assert.Equal("r", model.TreeSearch.TypeAheadText);
 
         window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
         Dispatcher.UIThread.RunJobs();
-        Assert.False(model.IsTypeAheadOpen);
+        Assert.False(model.TreeSearch.IsTypeAheadOpen);
         Assert.False(pill.IsVisible);
         window.Close();
         Baselines.Verify(baselines);

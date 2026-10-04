@@ -9,7 +9,7 @@ namespace ClassicMac.App.ViewModels;
 
 // View ▸ Type/Creator Database…: a type and creator database the user supplies (TCDB's spreadsheet), asked for kinds
 // after the volume's and ClassicMac's own (docs/formats/resources/finder.md §2.6). Its path is kept in the settings.
-public sealed partial class MainViewModel
+public sealed partial class TypeCreatorActions(MainViewModel main) : ObservableObject
 {
     /// <summary>Whether a type and creator database is loaded (View ▸ Forget Type/Creator Database is enabled).</summary>
     [ObservableProperty]
@@ -19,7 +19,7 @@ public sealed partial class MainViewModel
     /// <summary>The kept database's reading at start (tests wait for it); done when there is none.</summary>
     public Task TypeCreatorDatabaseLoading { get; private set; } = Task.CompletedTask;
 
-    private void InitTypeCreatorDatabase(string? path)
+    internal void InitTypeCreatorDatabase(string? path)
     {
         _ = Task.Run(() => TypeCreatorDatabase.Shipped);    // the shipped data, read once, before the first kind needs it
         if (path is not null)
@@ -37,7 +37,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception e) when (IsReadFailure(e))
         {
-            Status = CannotRead(path, e);
+            main.Status = CannotRead(path, e);
         }
     }
 
@@ -45,7 +45,7 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private async Task ChooseTypeCreatorDatabase()
     {
-        if (FilePicker is null || await FilePicker.PickFileAsync("Type/Creator Database", [".xlsx"]) is not { } path)
+        if (main.FilePicker is null || await main.FilePicker.PickFileAsync("Type/Creator Database", [".xlsx"]) is not { } path)
         {
             return;
         }
@@ -57,13 +57,13 @@ public sealed partial class MainViewModel
         }
         catch (Exception e) when (IsReadFailure(e))
         {
-            Status = CannotRead(path, e);
+            main.Status = CannotRead(path, e);
             return;
         }
 
         Use(database);
-        settings.Save(settings.Load() with { TypeCreatorDatabase = path });
-        Status = $"Type/Creator database: {database.Count} kind{(database.Count == 1 ? "" : "s")} from “{Path.GetFileName(path)}”.";
+        main.settings.Save(main.settings.Load() with { TypeCreatorDatabase = path });
+        main.Status = $"Type/Creator database: {database.Count} kind{(database.Count == 1 ? "" : "s")} from “{Path.GetFileName(path)}”.";
     }
 
     /// <summary>View ▸ Forget Type/Creator Database: kinds come from the volume and ClassicMac's table only.</summary>
@@ -71,7 +71,7 @@ public sealed partial class MainViewModel
     private void ForgetTypeCreatorDatabase()
     {
         Use(null);
-        settings.Save(settings.Load() with { TypeCreatorDatabase = null });
+        main.settings.Save(main.settings.Load() with { TypeCreatorDatabase = null });
     }
 
     private static TypeCreatorDatabase Read(string path)
@@ -88,9 +88,9 @@ public sealed partial class MainViewModel
     // The tree's kinds ask the display options for it; the selection's details and header are shown again.
     private void Use(TypeCreatorDatabase? database)
     {
-        TreeDisplay.KindDatabase = database;
+        main.TreeDisplay.KindDatabase = database;
         HasTypeCreatorDatabase = database is not null;
-        Details = DetailsViewModel.For(Selected, DetailsActions.ProblemsIn(Selected), AliasActions.SelectedAlias);
-        OnPropertyChanged(nameof(Header));
+        main.Details = DetailsViewModel.For(main.Selected, main.DetailsActions.ProblemsIn(main.Selected), main.AliasActions.SelectedAlias);
+        main.RaisePropertyChanged(nameof(MainViewModel.Header));
     }
 }

@@ -64,7 +64,8 @@ public sealed class DetailsTests : IDisposable
         disk.File(HfsBuilder.Root, "Read Me", "hello"u8.ToArray(), []);
         var path = Path.Combine(folder, "Disk.img");
         File.WriteAllBytes(path, disk.Build("Disk"));
-        var model = new MainViewModel { Shell = new FakeShell() };
+        var model = new MainViewModel();
+        model.ShellActions.Shell = new FakeShell();
         var input = (await model.OpenAsync(path))!;
         var realmz = (FileNode)input.Children.OfType<FolderNode>().Single().Children.Single();
         await realmz.EnsureLoadedAsync();
@@ -294,7 +295,7 @@ public sealed class DetailsTests : IDisposable
     public async Task Copy_all_puts_every_row_on_the_clipboard_as_plain_lines()
     {
         var (model, _, realmz, _) = await Open();
-        var shell = (FakeShell)model.Shell!;
+        var shell = (FakeShell)model.ShellActions.Shell!;
         model.Selected = realmz;
         await model.DetailsActions.CopyDetailsCommand.ExecuteAsync(null);
         var lines = shell.Copied!.Split('\n');

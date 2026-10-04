@@ -26,12 +26,14 @@ internal sealed partial class MainWindow
             if (helpModel is not null)
             {
                 helpModel.PropertyChanged -= OnHelpModelChanged;
+                helpModel.HelpPreview.PropertyChanged -= OnHelpModelChanged;
             }
 
             helpModel = DataContext as MainViewModel;
             if (helpModel is not null)
             {
                 helpModel.PropertyChanged += OnHelpModelChanged;
+                helpModel.HelpPreview.PropertyChanged += OnHelpModelChanged;
             }
         };
         Closed += (_, _) => webView?.Dispose();
@@ -39,7 +41,9 @@ internal sealed partial class MainWindow
 
     private void OnHelpModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is MainViewModel model && e.PropertyName is nameof(MainViewModel.Preview) or nameof(MainViewModel.ShowsHelpRendered) or nameof(MainViewModel.WebUri))
+        // The model's Preview, or its HelpPreview's switch and page.
+        if (helpModel is { } model && (sender is MainViewModel && e.PropertyName == nameof(MainViewModel.Preview)
+            || sender is HelpPreview && e.PropertyName is nameof(HelpPreview.ShowsHelpRendered) or nameof(HelpPreview.WebUri)))
         {
             ShowHelpPage(model);
         }
@@ -48,17 +52,17 @@ internal sealed partial class MainWindow
     // The page into the web view, made the first time a page is to be rendered.
     private async void ShowHelpPage(MainViewModel model)
     {
-        if (model.Preview.Web is not { } page || model.ShowHelpSource)
+        if (model.Preview.Web is not { } page || model.HelpPreview.ShowHelpSource)
         {
             return;
         }
 
-        if (webView is null && model.WebEngineMessage is null)
+        if (webView is null && model.HelpPreview.WebEngineMessage is null)
         {
-            model.WebEngineMessage = CreateWebView();
+            model.HelpPreview.WebEngineMessage = CreateWebView();
         }
 
-        if (webView is null || model.WebEngineMessage is not null)
+        if (webView is null || model.HelpPreview.WebEngineMessage is not null)
         {
             return;
         }
@@ -78,7 +82,7 @@ internal sealed partial class MainWindow
         catch (Exception e) when (e is InvalidOperationException or PlatformNotSupportedException or IOException or UnauthorizedAccessException
             or System.Runtime.InteropServices.COMException)
         {
-            model.WebEngineMessage = $"The web view could not start ({e.Message}), so the page shows as text.";
+            model.HelpPreview.WebEngineMessage = $"The web view could not start ({e.Message}), so the page shows as text.";
         }
     }
 
@@ -115,7 +119,7 @@ internal sealed partial class MainWindow
             view.IsStatusBarEnabled = false;
             view.NavigationStarted += OnHelpNavigation;
             view.NewWindowRequested += OnHelpNewWindow;
-            view.StatusTextChanged += (_, e) => helpModel?.HoverHelpLink(e.StatusText);
+            view.StatusTextChanged += (_, e) => helpModel?.HelpPreview.HoverHelpLink(e.StatusText);
             HelpHost.Children.Add(view);
             webView = view;
             return null;
@@ -129,7 +133,7 @@ internal sealed partial class MainWindow
     // Every navigation goes through the model: only the page itself loads.
     private void OnHelpNavigation(object? sender, NativeWebViewNavigationStartedEventArgs e)
     {
-        if (helpModel is not null && e.Uri is { } uri && !helpModel.FollowHelpLink(uri.OriginalString))
+        if (helpModel is not null && e.Uri is { } uri && !helpModel.HelpPreview.FollowHelpLink(uri.OriginalString))
         {
             e.Cancel = true;
         }
@@ -140,7 +144,7 @@ internal sealed partial class MainWindow
         e.Handled = true;
         if (e.Uri is { } uri)
         {
-            helpModel?.FollowHelpLink(uri.OriginalString);
+            helpModel?.HelpPreview.FollowHelpLink(uri.OriginalString);
         }
     }
 }

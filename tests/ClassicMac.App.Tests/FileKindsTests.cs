@@ -170,7 +170,7 @@ public sealed class FileKindsTests : IDisposable
         var picker = new Picker(path);
         model.FilePicker = picker;
 
-        await model.ChooseTypeCreatorDatabaseCommand.ExecuteAsync(null);
+        await model.TypeCreatorActions.ChooseTypeCreatorDatabaseCommand.ExecuteAsync(null);
         Assert.Equal("Type/Creator Database", picker.Title);
         Assert.Equal(path, store.Settings.TypeCreatorDatabase);
         Assert.Equal("Type/Creator database: 2 kinds from “tcdb.xlsx”.", model.Status);
@@ -178,17 +178,17 @@ public sealed class FileKindsTests : IDisposable
         Assert.Equal(("Widget widget file", "TCDB (your copy)"), (rows.Single(r => r.Label == "Kind").Value, rows.Single(r => r.Label == "Kind from").Value));
         Assert.Equal("Widget widget file in Docs", model.Header!.Kind);
         Assert.Equal("SimpleText text document", FileKinds.Of((FileNode)Node(input, "Docs", "Read Me")).Text);   // the volume first
-        Assert.True(model.HasTypeCreatorDatabase);
+        Assert.True(model.TypeCreatorActions.HasTypeCreatorDatabase);
 
         // The next session reads it from the settings.
         var again = new MainViewModel(store);
-        await again.TypeCreatorDatabaseLoading;
+        await again.TypeCreatorActions.TypeCreatorDatabaseLoading;
         var (_, reopened) = await Open(again);
         Assert.Equal("Widget widget file", FileKinds.Of((FileNode)Node(reopened, "Docs", "Mystery")).Text);
 
-        model.ForgetTypeCreatorDatabaseCommand.Execute(null);
+        model.TypeCreatorActions.ForgetTypeCreatorDatabaseCommand.Execute(null);
         Assert.Null(store.Settings.TypeCreatorDatabase);
-        Assert.False(model.HasTypeCreatorDatabase);
+        Assert.False(model.TypeCreatorActions.HasTypeCreatorDatabase);
         Assert.Equal("document", FileKinds.Of(mystery).Text);
     }
 
@@ -200,13 +200,13 @@ public sealed class FileKindsTests : IDisposable
         var path = Path.Combine(folder, "notes.xlsx");
         File.WriteAllText(path, "not a spreadsheet");
         model.FilePicker = new Picker(path);
-        await model.ChooseTypeCreatorDatabaseCommand.ExecuteAsync(null);
+        await model.TypeCreatorActions.ChooseTypeCreatorDatabaseCommand.ExecuteAsync(null);
         Assert.StartsWith("“notes.xlsx” could not be read as a type and creator database:", model.Status, StringComparison.Ordinal);
         Assert.Null(store.Settings.TypeCreatorDatabase);
-        Assert.False(model.HasTypeCreatorDatabase);
+        Assert.False(model.TypeCreatorActions.HasTypeCreatorDatabase);
 
         model.FilePicker = new Picker(null);                                   // cancelled: nothing changes
-        await model.ChooseTypeCreatorDatabaseCommand.ExecuteAsync(null);
+        await model.TypeCreatorActions.ChooseTypeCreatorDatabaseCommand.ExecuteAsync(null);
         Assert.Null(store.Settings.TypeCreatorDatabase);
     }
 
@@ -216,8 +216,8 @@ public sealed class FileKindsTests : IDisposable
         var gone = Path.Combine(folder, "gone.xlsx");
         var store = new MemorySettingsStore(new AppSettings(TypeCreatorDatabase: gone));
         var model = new MainViewModel(store);
-        await model.TypeCreatorDatabaseLoading;
-        Assert.False(model.HasTypeCreatorDatabase);
+        await model.TypeCreatorActions.TypeCreatorDatabaseLoading;
+        Assert.False(model.TypeCreatorActions.HasTypeCreatorDatabase);
         Assert.StartsWith("“gone.xlsx” could not be read as a type and creator database:", model.Status, StringComparison.Ordinal);
         Assert.Equal(gone, store.Settings.TypeCreatorDatabase);                // a drive not there today
     }

@@ -100,7 +100,8 @@ public sealed class PropertyViewTests : IDisposable
     public async Task Copy_puts_a_rows_value_on_the_clipboard()
     {
         var shell = new CopyShell();
-        var model = new MainViewModel { Shell = shell };
+        var model = new MainViewModel();
+        model.ShellActions.Shell = shell;
         Assert.False(model.PropertyLinks.CopyPropertyCommand.CanExecute(null));
         await model.PropertyLinks.CopyPropertyCommand.ExecuteAsync("0x780A");
         Assert.Equal("0x780A", shell.Copied);

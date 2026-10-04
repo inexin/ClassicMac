@@ -206,7 +206,7 @@ public sealed partial class MainViewModel
         HostForm(value);
     }
 
-    private void UpdateForm(NodeViewModel? node)
+    internal void UpdateForm(NodeViewModel? node)
     {
         ResourceForm? typed = null, template = null;
         if (node is ResourceNode r && FileOwner(r) is { } owner)
@@ -243,16 +243,16 @@ public sealed partial class MainViewModel
                 return;
             }
 
-            if (askingDraft || HasDraft)
+            if (Drafts.askingDraft || Drafts.HasDraft)
             {
-                if (!askingDraft)
+                if (!Drafts.askingDraft)
                 {
                     DraftTask = UseTemplateAfterDraftAsync(value);
                 }
                 // The check box (bound two-way) already shows the new value: told again, it shows the kept one.
                 if (useTemplate != value)
                 {
-                    Refuse(nameof(UseTemplate));
+                    Drafts.Refuse(nameof(UseTemplate));
                 }
 
                 return;
@@ -264,7 +264,7 @@ public sealed partial class MainViewModel
 
     private async Task UseTemplateAfterDraftAsync(bool value)
     {
-        if (await ResolveDraftAsync())
+        if (await Drafts.ResolveDraftAsync())
         {
             UseTemplate = value;
         }
@@ -278,7 +278,7 @@ public sealed partial class MainViewModel
     private bool CanApplyForm() => Form is not null && Selected is ResourceNode && FormError is null;
 
     [RelayCommand(CanExecute = nameof(CanApplyForm))]
-    private void ApplyForm()
+    internal void ApplyForm()
     {
         if (Form is not { } form || Selected is not ResourceNode node || FileOwner(node) is not { } owner)
         {

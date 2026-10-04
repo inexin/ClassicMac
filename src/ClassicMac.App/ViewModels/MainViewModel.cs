@@ -67,6 +67,61 @@ public interface IFilePicker
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    private TreeSearch? treeSearch;
+
+    /// <summary>The tree's filter and type-ahead, and Show item.</summary>
+    public TreeSearch TreeSearch => treeSearch ??= new(this);
+
+    private ShellActions? shellActions;
+
+    /// <summary>The shell: the title, zoom and screen depth, the theme, the Window menu and About.</summary>
+    public ShellActions ShellActions => shellActions ??= new(this);
+
+    private SoundPlayback? soundPlayback;
+
+    /// <summary>The sound preview's transport: play, stop, the playhead and the loop.</summary>
+    public SoundPlayback SoundPlayback => soundPlayback ??= new(this);
+
+    private TypeCreatorActions? typeCreatorActions;
+
+    /// <summary>The type and creator database: its entry for the selection, and forgetting it.</summary>
+    public TypeCreatorActions TypeCreatorActions => typeCreatorActions ??= new(this);
+
+    private EmptyState? emptyState;
+
+    /// <summary>The empty state shown while nothing is open, with the files opened last.</summary>
+    public EmptyState EmptyState => emptyState ??= new(this);
+
+    private VolumeActions? volumeActions;
+
+    /// <summary>New file, import, new folder and delete in a volume.</summary>
+    public VolumeActions VolumeActions => volumeActions ??= new(this);
+
+    private HelpPreview? helpPreview;
+
+    /// <summary>The help page's Rendered | Source switch and its links.</summary>
+    public HelpPreview HelpPreview => helpPreview ??= new(this);
+
+    private ImportActions? importActions;
+
+    /// <summary>Resource ▸ Import: an image or WAV file made into a resource.</summary>
+    public ImportActions ImportActions => importActions ??= new(this);
+
+    private HexFind? hexFind;
+
+    /// <summary>Find in the Hex tab.</summary>
+    public HexFind HexFind => hexFind ??= new(this);
+
+    private StatusLine? statusLine;
+
+    /// <summary>The status bar: the selected input's summary, the work in progress and the status text.</summary>
+    public StatusLine StatusLine => statusLine ??= new(this);
+
+    private Drafts? drafts;
+
+    /// <summary>Unapplied edits: asked about before the selection moves, an undo or redo, or a close.</summary>
+    public Drafts Drafts => drafts ??= new(this);
+
     private DragOut? dragOut;
 
     /// <summary>Drag and drop out of the tree, through a temporary folder.</summary>
@@ -145,16 +200,16 @@ public sealed partial class MainViewModel : ObservableObject
                 return;
             }
 
-            if (askingDraft || HasDraft)
+            if (Drafts.askingDraft || Drafts.HasDraft)
             {
-                if (!askingDraft)
+                if (!Drafts.askingDraft)
                 {
-                    DraftTask = SelectAfterDraftAsync(value);
+                    DraftTask = Drafts.SelectAfterDraftAsync(value);
                 }
                 // The tree (bound two-way) already shows the new node: told again, it shows the kept one.
                 if (!ReferenceEquals(selected, value))
                 {
-                    Refuse(nameof(Selected));
+                    Drafts.Refuse(nameof(Selected));
                 }
 
                 return;
@@ -201,16 +256,12 @@ public sealed partial class MainViewModel : ObservableObject
     public IReadOnlyList<int> Zooms { get; } = [1, 2, 4, 8];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SelectedDepthChoice))]
     private int screenDepth = 32;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ZoomInCommand), nameof(ZoomOutCommand), nameof(ActualSizeCommand))]
     private int zoom = 1;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(PlaySoundCommand), nameof(ZoomInCommand), nameof(ZoomOutCommand), nameof(ActualSizeCommand))]
-    [NotifyPropertyChangedFor(nameof(IsZoomable))]
     private PreviewViewModel preview = PreviewViewModel.None;
 
     [ObservableProperty]
@@ -244,7 +295,7 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task<InputNode?> OpenAsync(string path)
     {
         Status = $"Reading {Path.GetFileName(path)}…";
-        var reading = BeginProgress($"Reading {Path.GetFileName(path)}…", 0);
+        var reading = StatusLine.BeginProgress($"Reading {Path.GetFileName(path)}…", 0);
         var diagnostics = new List<Diagnostic>();
         try
         {
@@ -260,8 +311,8 @@ public sealed partial class MainViewModel : ObservableObject
             var input = new InputNode(path, host, root, ContainerOptions, ReadOptions, Report, TreeDisplay);
             Roots.Add(input);
             UpdateHiddenCount();
-            AddRecent(path);
-            ReapplySearch();
+            EmptyState.AddRecent(path);
+            TreeSearch.ReapplySearch();
             foreach (var d in diagnostics)
             {
                 Report(new DiagnosticEntry(d, Tree.SourceOf(input, d), input));
@@ -357,16 +408,28 @@ public sealed partial class MainViewModel : ObservableObject
         PreviewTask = MakePreviewAsync(AliasActions.SelectedAlias is { } alias ? alias.Target : value);
     }
 
-    partial void OnScreenDepthChanged(int value) => PreviewTask = MakePreviewAsync(Selected);
+    partial void OnScreenDepthChanged(int value)
+    {
+        ShellActions.ViewChanged();
+        PreviewTask = MakePreviewAsync(Selected);
+    }
 
-    partial void OnZoomChanged(int value) => Images = ItemsAt(Preview, value);
+    partial void OnZoomChanged(int value)
+    {
+        ShellActions.ViewChanged();
+        Images = ItemsAt(Preview, value);
+    }
+
+    partial void OnPreviewChanging(PreviewViewModel value) => SoundPlayback.OnPreviewChanging();
 
     partial void OnPreviewChanged(PreviewViewModel value)
     {
+        SoundPlayback.PlaySoundCommand.NotifyCanExecuteChanged();
+        ShellActions.ViewChanged();
         Images = ItemsAt(value, Zoom);
-        OnSoundPreviewChanged();
+        SoundPlayback.OnSoundPreviewChanged();
         PropertyLinks.OnPropertyPreviewChanged();
-        OnHelpPreviewChanged();
+        HelpPreview.OnHelpPreviewChanged();
     }
 
     partial void OnHexSourceChanged(HexSource? value) => HexLines = value is null ? null : new HexLines(value.Data);
@@ -468,6 +531,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Raised when "Show item" has selected a node: the view brings its tree row into view.</summary>
     public event Action<NodeViewModel>? ItemShown;
+
+    internal void RaiseItemShown(NodeViewModel node) => ItemShown?.Invoke(node);
 
     /// <summary>
     /// "Show item" on a diagnostic's row: selects its node as a row click does (its ancestors open, and unapplied

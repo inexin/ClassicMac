@@ -90,28 +90,28 @@ public sealed class HelpPageViewTests : IDisposable
         model.Selected = page;
         await model.PreviewTask;
 
-        Assert.True(model.FollowHelpLink(model.Preview.Help!.DataUri));                // the page itself loads
-        Assert.Null(model.HelpStatus);
+        Assert.True(model.HelpPreview.FollowHelpLink(model.Preview.Help!.DataUri));                // the page itself loads
+        Assert.Null(model.HelpPreview.HelpStatus);
 
-        Assert.False(model.FollowHelpLink("help:openbook='Mac Help'"));
-        Assert.Equal("A Help Viewer command (not followed here): help:openbook='Mac Help'", model.HelpStatus);
+        Assert.False(model.HelpPreview.FollowHelpLink("help:openbook='Mac Help'"));
+        Assert.Equal("A Help Viewer command (not followed here): help:openbook='Mac Help'", model.HelpPreview.HelpStatus);
         Assert.Same(page, model.Selected);
-        Assert.False(model.FollowHelpLink("http://www.apple.com/"));
-        Assert.StartsWith("An address outside the disk", model.HelpStatus);
-        Assert.False(model.FollowHelpLink(HelpPages.Origin + "Help/gone.htm"));
-        Assert.Equal("Not on the disk: Help:gone.htm", model.HelpStatus);
+        Assert.False(model.HelpPreview.FollowHelpLink("http://www.apple.com/"));
+        Assert.StartsWith("An address outside the disk", model.HelpPreview.HelpStatus);
+        Assert.False(model.HelpPreview.FollowHelpLink(HelpPages.Origin + "Help/gone.htm"));
+        Assert.Equal("Not on the disk: Help:gone.htm", model.HelpPreview.HelpStatus);
 
-        Assert.False(model.FollowHelpLink(HelpPages.Origin + "Help/next.htm#s"));      // not followed by the web view…
+        Assert.False(model.HelpPreview.FollowHelpLink(HelpPages.Origin + "Help/next.htm#s"));      // not followed by the web view…
         Assert.Same(Child(HelpFolder(input), "next.htm"), model.Selected);            // …the tree selects it instead
         await model.PreviewTask;
         Assert.Equal("next.htm", model.Preview.Help!.Title);
-        Assert.Null(model.HelpStatus);
+        Assert.Null(model.HelpPreview.HelpStatus);
 
         // Hovering a link says where it goes.
-        model.HoverHelpLink(HelpPages.Origin + "Help/page");
-        Assert.Equal("Opens Help:page", model.HelpStatus);
-        model.HoverHelpLink(null);
-        Assert.Null(model.HelpStatus);
+        model.HelpPreview.HoverHelpLink(HelpPages.Origin + "Help/page");
+        Assert.Equal("Opens Help:page", model.HelpPreview.HelpStatus);
+        model.HelpPreview.HoverHelpLink(null);
+        Assert.Null(model.HelpPreview.HelpStatus);
     }
 
     [Fact]
@@ -120,19 +120,19 @@ public sealed class HelpPageViewTests : IDisposable
         var (model, input) = await Open(Book());
         model.Selected = Child(HelpFolder(input), "page");
         await model.PreviewTask;
-        Assert.Equal(["Rendered", "Source"], model.WebModes);
-        Assert.Equal(0, model.HelpModeIndex);
-        Assert.True(model.ShowsHelpRendered);
-        Assert.False(model.ShowsHelpSource);
-        model.HelpModeIndex = 1;
-        Assert.False(model.ShowsHelpRendered);
-        Assert.True(model.ShowsHelpSource);
-        model.HelpModeIndex = 0;
+        Assert.Equal(["Rendered", "Source"], model.HelpPreview.WebModes);
+        Assert.Equal(0, model.HelpPreview.HelpModeIndex);
+        Assert.True(model.HelpPreview.ShowsHelpRendered);
+        Assert.False(model.HelpPreview.ShowsHelpSource);
+        model.HelpPreview.HelpModeIndex = 1;
+        Assert.False(model.HelpPreview.ShowsHelpRendered);
+        Assert.True(model.HelpPreview.ShowsHelpSource);
+        model.HelpPreview.HelpModeIndex = 0;
 
-        model.WebEngineMessage = "No web engine: install the WebView2 runtime.";
-        Assert.False(model.ShowsHelpRendered);
-        Assert.True(model.ShowsHelpSource);
-        Assert.True(model.HasWebEngineMessage);
+        model.HelpPreview.WebEngineMessage = "No web engine: install the WebView2 runtime.";
+        Assert.False(model.HelpPreview.ShowsHelpRendered);
+        Assert.True(model.HelpPreview.ShowsHelpSource);
+        Assert.True(model.HelpPreview.HasWebEngineMessage);
     }
 
     // In a headless window there is no native web view: the page shows as its source, with why.
@@ -151,7 +151,7 @@ public sealed class HelpPageViewTests : IDisposable
         window.CaptureRenderedFrame();
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("This window has no native web view, so the page shows as text.", model.WebEngineMessage);
+        Assert.Equal("This window has no native web view, so the page shows as text.", model.HelpPreview.WebEngineMessage);
         Assert.True(window.FindControl<ListBox>("HelpMode")!.IsEffectivelyVisible);
         var source = window.FindControl<SelectableTextBlock>("HelpSource")!;
         Assert.True(source.IsEffectivelyVisible);

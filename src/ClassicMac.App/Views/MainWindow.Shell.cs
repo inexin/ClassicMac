@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -17,27 +16,28 @@ internal sealed partial class MainWindow
 
     private void BindShell(MainViewModel model)
     {
-        model.Shell = this;
-        if (model.Theme != AppTheme.System)
+        model.ShellActions.Shell = this;
+        if (model.ShellActions.Theme != AppTheme.System)
         {
-            ApplyTheme(model.Theme);
+            ApplyTheme(model.ShellActions.Theme);
         }
 
-        model.PropertyChanged += (_, e) => OnModelChanged(model, e);
+        model.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.Selected))
+            {
+                BuildWindowMenu(model);
+            }
+        };
+        model.ShellActions.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ShellActions.Theme))
+            {
+                ApplyTheme(model.ShellActions.Theme);
+            }
+        };
         model.Roots.CollectionChanged += (_, _) => BuildWindowMenu(model);
         BuildWindowMenu(model);
-    }
-
-    private void OnModelChanged(MainViewModel model, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(MainViewModel.Theme))
-        {
-            ApplyTheme(model.Theme);
-        }
-        else if (e.PropertyName == nameof(MainViewModel.Selected))
-        {
-            BuildWindowMenu(model);
-        }
     }
 
     private static void ApplyTheme(AppTheme theme)
@@ -57,8 +57,8 @@ internal sealed partial class MainWindow
     private void BuildWindowMenu(MainViewModel model)
     {
         WindowMenu.Items.Clear();
-        WindowMenu.Items.Add(new MenuItem { Header = "_Minimize", Command = model.MinimizeCommand });
-        WindowMenu.Items.Add(new MenuItem { Header = "_Zoom", Command = model.ZoomWindowCommand });
+        WindowMenu.Items.Add(new MenuItem { Header = "_Minimize", Command = model.ShellActions.MinimizeCommand });
+        WindowMenu.Items.Add(new MenuItem { Header = "_Zoom", Command = model.ShellActions.ZoomWindowCommand });
         if (model.Roots.Count == 0)
         {
             return;
@@ -70,11 +70,11 @@ internal sealed partial class MainWindow
             WindowMenu.Items.Add(new MenuItem
             {
                 Header = input.BaseTitle,
-                Command = model.ShowInputCommand,
+                Command = model.ShellActions.ShowInputCommand,
                 CommandParameter = input,
                 ToggleType = MenuItemToggleType.Radio,
                 GroupName = "inputs",
-                IsChecked = model.IsSelectedInput(input),
+                IsChecked = model.ShellActions.IsSelectedInput(input),
             });
         }
     }

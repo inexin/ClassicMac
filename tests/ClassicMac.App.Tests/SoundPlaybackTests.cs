@@ -35,7 +35,8 @@ public sealed class SoundPlaybackTests : IDisposable
         var path = Path.Combine(folder, "disk.img");
         File.WriteAllBytes(path, disk.Build("Disk"));
         var player = new FakeAudioPlayer();
-        var model = new MainViewModel { AudioPlayer = player };
+        var model = new MainViewModel();
+        model.SoundPlayback.AudioPlayer = player;
         var input = (await model.OpenAsync(path))!;
         var file = input.Children.OfType<FileNode>().Single();
         await file.EnsureLoadedAsync();
@@ -58,52 +59,52 @@ public sealed class SoundPlaybackTests : IDisposable
             preview.SoundFacts.Select(f => (f.Label, f.Value)));
         Assert.Equal(new SoundLoop(10 / Rate, 990 / Rate), preview.SoundLoop);
         Assert.Equal((10, 990), preview.SoundLoopFrames);
-        Assert.True(model.HasSoundLoop);
-        Assert.Equal(("0:00.00", "/ 0:00.09"), (model.PlayheadText, model.SoundDurationText));
+        Assert.True(model.SoundPlayback.HasSoundLoop);
+        Assert.Equal(("0:00.00", "/ 0:00.09"), (model.SoundPlayback.PlayheadText, model.SoundPlayback.SoundDurationText));
     }
 
     [Fact]
     public async Task Play_starts_at_the_beginning_and_the_playhead_follows_the_player()
     {
         var (model, _, _, player) = await Open();
-        model.PlaySoundCommand.Execute(null);
+        model.SoundPlayback.PlaySoundCommand.Execute(null);
         Assert.Equal((0d, (SoundLoop?)null), (player.Played[0].Start, player.Played[0].Loop));
 
         player.Position = 0.05;
-        model.RefreshPlayhead();
-        Assert.Equal(0.05, model.Playhead);
-        Assert.Equal("0:00.05", model.PlayheadText);
+        model.SoundPlayback.RefreshPlayhead();
+        Assert.Equal(0.05, model.SoundPlayback.Playhead);
+        Assert.Equal("0:00.05", model.SoundPlayback.PlayheadText);
 
         player.Finish();                                                    // ended by itself: back to the start
-        Assert.False(model.IsPlaying);
-        Assert.Equal(0, model.Playhead);
+        Assert.False(model.SoundPlayback.IsPlaying);
+        Assert.Equal(0, model.SoundPlayback.Playhead);
         player.Position = 0.07;
-        model.RefreshPlayhead();                                            // not playing: no change
-        Assert.Equal(0, model.Playhead);
+        model.SoundPlayback.RefreshPlayhead();                                            // not playing: no change
+        Assert.Equal(0, model.SoundPlayback.Playhead);
 
-        model.PlaySoundCommand.Execute(null);
+        model.SoundPlayback.PlaySoundCommand.Execute(null);
         player.Position = 0.03;
-        model.RefreshPlayhead();
-        model.StopSoundCommand.Execute(null);
-        Assert.Equal(0, model.Playhead);
+        model.SoundPlayback.RefreshPlayhead();
+        model.SoundPlayback.StopSoundCommand.Execute(null);
+        Assert.Equal(0, model.SoundPlayback.Playhead);
     }
 
     [Fact]
     public async Task A_click_on_the_waveform_seeks_or_starts_there()
     {
         var (model, _, _, player) = await Open();
-        model.SeekSoundCommand.Execute(0.04);                                // stopped: plays from there
-        Assert.True(model.IsPlaying);
+        model.SoundPlayback.SeekSoundCommand.Execute(0.04);                                // stopped: plays from there
+        Assert.True(model.SoundPlayback.IsPlaying);
         Assert.Equal(0.04, player.Played.Single().Start);
-        Assert.Equal(0.04, model.Playhead);
+        Assert.Equal(0.04, model.SoundPlayback.Playhead);
 
-        model.SeekSoundCommand.Execute(0.08);                                // playing: moves the playback
+        model.SoundPlayback.SeekSoundCommand.Execute(0.08);                                // playing: moves the playback
         Assert.Equal([0.08], player.Seeks);
-        Assert.Equal(0.08, model.Playhead);
+        Assert.Equal(0.08, model.SoundPlayback.Playhead);
         Assert.Single(player.Played);
 
-        model.SeekSoundCommand.Execute(-1.0);                               // clamped to the sound
-        model.SeekSoundCommand.Execute(5.0);
+        model.SoundPlayback.SeekSoundCommand.Execute(-1.0);                               // clamped to the sound
+        model.SoundPlayback.SeekSoundCommand.Execute(5.0);
         Assert.Equal([0.08, 0, 1000 / Rate], player.Seeks);
     }
 
@@ -112,12 +113,12 @@ public sealed class SoundPlaybackTests : IDisposable
     {
         var (model, _, _, player) = await Open();
         var loop = model.Preview.SoundLoop;
-        model.RepeatLoop = true;
+        model.SoundPlayback.RepeatLoop = true;
         Assert.Empty(player.Loops);                                         // not playing: nothing to tell the player
-        model.PlaySoundCommand.Execute(null);
+        model.SoundPlayback.PlaySoundCommand.Execute(null);
         Assert.Equal(loop, player.Played[0].Loop);
-        model.RepeatLoop = false;
-        model.RepeatLoop = true;
+        model.SoundPlayback.RepeatLoop = false;
+        model.SoundPlayback.RepeatLoop = true;
         Assert.Equal([null, loop], player.Loops);
     }
 
@@ -125,10 +126,10 @@ public sealed class SoundPlaybackTests : IDisposable
     public async Task Space_plays_and_stops()
     {
         var (model, _, _, player) = await Open();
-        model.ToggleSoundCommand.Execute(null);
-        Assert.True(model.IsPlaying);
-        model.ToggleSoundCommand.Execute(null);
-        Assert.False(model.IsPlaying);
+        model.SoundPlayback.ToggleSoundCommand.Execute(null);
+        Assert.True(model.SoundPlayback.IsPlaying);
+        model.SoundPlayback.ToggleSoundCommand.Execute(null);
+        Assert.False(model.SoundPlayback.IsPlaying);
         Assert.Equal(1, player.Stops);
         Assert.Single(player.Played);
     }
@@ -144,11 +145,11 @@ public sealed class SoundPlaybackTests : IDisposable
         Assert.Equal("No preview for 'snd ' 129", preview.ErrorTitle);
         Assert.Contains("sound.unknown-format", preview.ErrorDetail);
         Assert.Equal("Format 3 is neither 1 nor 2. · sound.unknown-format", preview.ErrorDetail);
-        Assert.False(model.PlaySoundCommand.CanExecute(null));
-        Assert.False(model.HasSoundLoop);
+        Assert.False(model.SoundPlayback.PlaySoundCommand.CanExecute(null));
+        Assert.False(model.SoundPlayback.HasSoundLoop);
         Assert.Equal(1, model.SelectedTab);
 
-        model.ShowInHexCommand.Execute(null);
+        model.SoundPlayback.ShowInHexCommand.Execute(null);
         Assert.Equal(2, model.SelectedTab);
         Assert.True(model.HasHex);
         Assert.Equal(new byte[] { 0, 3, 0, 0 }, model.HexSource!.Data.ToArray());
@@ -156,7 +157,7 @@ public sealed class SoundPlaybackTests : IDisposable
         var path = Path.Combine(folder, "raw.bin");
         var picker = new Picker(path);
         model.FilePicker = picker;
-        await model.SaveRawDataCommand.ExecuteAsync(null);
+        await model.SoundPlayback.SaveRawDataCommand.ExecuteAsync(null);
         Assert.Equal(new byte[] { 0, 3, 0, 0 }, File.ReadAllBytes(path));
         Assert.Equal([".bin"], picker.Asked.Single().Extensions);
         _ = player;

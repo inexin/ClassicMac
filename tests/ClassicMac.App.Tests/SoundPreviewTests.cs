@@ -33,7 +33,8 @@ public class SoundPreviewTests : IDisposable
         disk.File(HfsBuilder.Root, "Sounds", [], PreviewTests.Fork(("snd ", 128, "Sine", Sound()), ("snd ", 129, "Other", other)));
         var path = Path.Combine(folder, "disk.img");
         File.WriteAllBytes(path, disk.Build("Disk"));
-        var model = new MainViewModel { AudioPlayer = player };
+        var model = new MainViewModel();
+        model.SoundPlayback.AudioPlayer = player;
         var input = (await model.OpenAsync(path))!;
         var file = input.Children.OfType<FileNode>().Single();
         await file.EnsureLoadedAsync();
@@ -54,20 +55,20 @@ public class SoundPreviewTests : IDisposable
         Assert.Equal(1, model.SelectedTab);
         Assert.Equal("11127.273 Hz, mono, 8-bit, 0.09 s (1,000 frames), loop 10–990, base note 72", model.Preview.SoundDetails);
         Assert.Equal(1000, model.Preview.Sound!.Frames);
-        Assert.True(model.PlaySoundCommand.CanExecute(null));
-        Assert.False(model.StopSoundCommand.CanExecute(null));
+        Assert.True(model.SoundPlayback.PlaySoundCommand.CanExecute(null));
+        Assert.False(model.SoundPlayback.StopSoundCommand.CanExecute(null));
 
-        model.PlaySoundCommand.Execute(null);
+        model.SoundPlayback.PlaySoundCommand.Execute(null);
 
         Assert.Same(model.Preview.Sound, Assert.Single(player.Played).Sound);
-        Assert.True(model.IsPlaying);
-        Assert.False(model.PlaySoundCommand.CanExecute(null));
-        Assert.True(model.StopSoundCommand.CanExecute(null));
+        Assert.True(model.SoundPlayback.IsPlaying);
+        Assert.False(model.SoundPlayback.PlaySoundCommand.CanExecute(null));
+        Assert.True(model.SoundPlayback.StopSoundCommand.CanExecute(null));
 
         player.Finish();
 
-        Assert.False(model.IsPlaying);
-        Assert.True(model.PlaySoundCommand.CanExecute(null));
+        Assert.False(model.SoundPlayback.IsPlaying);
+        Assert.True(model.SoundPlayback.PlaySoundCommand.CanExecute(null));
     }
 
     [Fact]
@@ -77,12 +78,12 @@ public class SoundPreviewTests : IDisposable
         var (model, sound) = await Open(player);
         model.Selected = sound;
         await model.PreviewTask;
-        model.PlaySoundCommand.Execute(null);
+        model.SoundPlayback.PlaySoundCommand.Execute(null);
 
         model.Selected = sound.Parent;
         await model.PreviewTask;
 
-        Assert.False(model.IsPlaying);
+        Assert.False(model.SoundPlayback.IsPlaying);
         Assert.Equal(1, player.Stops);
     }
 
@@ -110,9 +111,9 @@ public class SoundPreviewTests : IDisposable
         model.Selected = sound;
         await model.PreviewTask;
 
-        Assert.False(model.PlaySoundCommand.CanExecute(null));
-        Assert.Equal("Sound cannot play here: no device.", model.PlaybackNote);
-        Assert.Equal("No audio output.", (await Open(null)).Model.PlaybackNote);
+        Assert.False(model.SoundPlayback.PlaySoundCommand.CanExecute(null));
+        Assert.Equal("Sound cannot play here: no device.", model.SoundPlayback.PlaybackNote);
+        Assert.Equal("No audio output.", (await Open(null)).Model.SoundPlayback.PlaybackNote);
     }
 
     [Fact]

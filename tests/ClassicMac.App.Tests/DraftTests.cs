@@ -16,9 +16,9 @@ public sealed class DraftTests : EditTestsBase
         await model.PreviewTask;                                            // its preview done, so only the refusal could change it
         var form = Assert.IsType<StringForm>(model.Form);
         var details = model.Details;
-        Assert.False(model.HasDraft);
+        Assert.False(model.Drafts.HasDraft);
         form.Text = "edited";
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
 
         dialogs.Pending = new TaskCompletionSource<DraftChoice>();
         var changes = new System.Collections.Concurrent.ConcurrentQueue<string?>();  // background preview tasks raise on the thread pool
@@ -40,7 +40,7 @@ public sealed class DraftTests : EditTestsBase
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
         Assert.Same(form, model.Form);
         Assert.Equal("edited", form.Text);
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
         Assert.Equal("hello"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
     }
 
@@ -55,7 +55,7 @@ public sealed class DraftTests : EditTestsBase
         await model.DraftTask;
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
         Assert.Equal("hi", Assert.IsType<StringForm>(model.Form).Text);
-        Assert.False(model.HasDraft);
+        Assert.False(model.Drafts.HasDraft);
         Assert.Equal("hello"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
         Assert.False(model.HasUnsavedChanges);
     }
@@ -91,7 +91,7 @@ public sealed class DraftTests : EditTestsBase
         var form = Assert.IsType<StringForm>(model.Form);
         form.Text = "edited";
         form.Text = "hello";
-        Assert.False(model.HasDraft);
+        Assert.False(model.Drafts.HasDraft);
         model.Selected = Resource(file, 129);
         Assert.Empty(dialogs.DraftAsked);
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
@@ -99,7 +99,7 @@ public sealed class DraftTests : EditTestsBase
         // The Apply button applies the draft: the form is clean again.
         Assert.IsType<StringForm>(model.Form).Text = "ho";
         model.ApplyFormCommand.Execute(null);
-        Assert.False(model.HasDraft);
+        Assert.False(model.Drafts.HasDraft);
         model.Selected = file;
         Assert.Empty(dialogs.DraftAsked);
     }
@@ -143,13 +143,13 @@ public sealed class DraftTests : EditTestsBase
         model.Selected = Node(0);
         var form = Assert.IsType<WindowForm>(model.Form);
         form.Title = "Other";
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
         form.Title = "日本";                                                 // not Mac OS Roman: the form's error is the draft's
         Assert.NotNull(model.FormError);
         model.Selected = Node(1);
         Assert.Equal(model.FormError, Assert.Single(dialogs.DraftAsked).Error);
         form.Title = "Untitled";
-        Assert.False(model.HasDraft);
+        Assert.False(model.Drafts.HasDraft);
         model.Selected = Node(1);
         Assert.Same(Node(1), model.Selected);
     }
@@ -161,7 +161,7 @@ public sealed class DraftTests : EditTestsBase
         model.Selected = Resource(file, 129);
         model.BeginHexEditCommand.Execute(null);
         model.HexEdit!.Delete();
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
 
         dialogs.Draft = DraftChoice.Cancel;
         model.Selected = Resource(file, 128);
@@ -251,7 +251,7 @@ public sealed class DraftTests : EditTestsBase
         Assert.Equal(2, model.Roots.Count);                                 // opened, but the draft stays selected
         Assert.Single(dialogs.DraftAsked);
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
     }
 
     [Fact]
@@ -271,7 +271,7 @@ public sealed class DraftTests : EditTestsBase
         Assert.NotNull(file.Resources!.Fork!.Find(Str, 130));               // nothing undone, deleted or duplicated
         Assert.NotNull(file.Resources.Fork.Find(Str, 128));
         Assert.Equal(3, file.Resources.Fork.Resources.Count());
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
 
         dialogs.Draft = DraftChoice.Apply;
         await model.UndoCommand.ExecuteAsync(null);                         // the draft applied, then undone
@@ -305,7 +305,7 @@ public sealed class DraftTests : EditTestsBase
         Assert.Equal(["draft 'STR ' 128", "draft 'STR ' 128", "save Prefs.bin"], dialogs.Log);
         Assert.Single(model.Roots);
         Assert.Equal("edited"u8.ToArray(), file.Resources!.Fork!.Find(Str, 128)!.GetData().ToArray());
-        Assert.False(model.HasDraft);
+        Assert.False(model.Drafts.HasDraft);
     }
 
     [Fact]
@@ -315,7 +315,7 @@ public sealed class DraftTests : EditTestsBase
         model.Selected = Resource(file, 128);
         Assert.IsType<StringForm>(model.Form).Text = "edited";
         Assert.False(model.HasUnsavedChanges);
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
 
         dialogs.Draft = DraftChoice.Cancel;
         Assert.False(await model.ConfirmQuitAsync());
@@ -399,12 +399,12 @@ public sealed class DraftTests : EditTestsBase
         dialogs.Draft = DraftChoice.Cancel;
         await model.SaveCommand.ExecuteAsync(null);
         Assert.False(File.Exists(path + ".orig"));                          // not saved
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
 
         dialogs.Draft = DraftChoice.Apply;
         await model.SaveCommand.ExecuteAsync(null);
         Assert.Equal("edited"u8.ToArray(), Saved(path).Find(Str, 128)!.GetData().ToArray());
-        Assert.False(model.HasDraft);
+        Assert.False(model.Drafts.HasDraft);
         Assert.False(model.HasUnsavedChanges);
         Assert.Equal(2, dialogs.DraftAsked.Count);
     }
@@ -424,7 +424,7 @@ public sealed class DraftTests : EditTestsBase
         Assert.Null(saved.Find(Str, 129));
         Assert.Equal("hello"u8.ToArray(), saved.Find(Str, 128)!.GetData().ToArray());
         Assert.Equal("hello", Assert.IsType<StringForm>(model.Form).Text);
-        Assert.False(model.HasDraft);
+        Assert.False(model.Drafts.HasDraft);
     }
 
     // Save follows edits made deep in a form or in the hex view: each one re-evaluates it, and it can then save.
@@ -511,6 +511,6 @@ public sealed class DraftTests : EditTestsBase
         model.HexEdit!.TypeDigit(4);
         Assert.True(changes() > 0);
         Assert.True(model.SaveCommand.CanExecute(null));
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
     }
 }

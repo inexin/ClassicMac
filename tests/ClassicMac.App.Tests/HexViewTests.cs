@@ -196,14 +196,14 @@ public sealed class HexViewTests
             var box = window.FindControl<TextBox>("FindBox")!;
             Assert.True(box.IsFocused);
 
-            model.FindModeIndex = 1;
+            model.HexFind.FindModeIndex = 1;
             box.Text = "needle";
             window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
             Dispatcher.UIThread.RunJobs();
             window.CaptureRenderedFrame();
             Dispatcher.UIThread.RunJobs();
 
-            Assert.Equal("1 of 1", model.FindStatus);
+            Assert.Equal("1 of 1", model.HexFind.FindStatus);
             Assert.Contains("match", Cell(window, 4000).Classes);
             Assert.Equal(Token("CmMatch"), ((ISolidColorBrush)Cell(window, 4001).Background!).Color);
             Assert.True(window.FindControl<TextBlock>("FindStatusText")!.IsEffectivelyVisible);

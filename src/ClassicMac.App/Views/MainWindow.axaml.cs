@@ -57,13 +57,13 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
 
             model.PropertyChanged -= OnPreviewChanged;
             model.PropertyChanged += OnPreviewChanged;
-            model.ChangeRefused -= OnChangeRefused;
-            model.ChangeRefused += OnChangeRefused;
-            model.HexLineShown -= OnHexLineShown;
-            model.HexLineShown += OnHexLineShown;
+            model.Drafts.ChangeRefused -= OnChangeRefused;
+            model.Drafts.ChangeRefused += OnChangeRefused;
+            model.HexFind.HexLineShown -= OnHexLineShown;
+            model.HexFind.HexLineShown += OnHexLineShown;
             model.FilePicker = this;
             model.EditDialogs ??= new EditDialogs(this);
-            model.AudioPlayer ??= audio;
+            model.SoundPlayback.AudioPlayer ??= audio;
             if (!ReferenceEquals(boundPanel, model.DiagnosticsPanel))
             {
                 boundPanel = model.DiagnosticsPanel;
@@ -295,7 +295,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
 
     private void OnChangeRefused(object? sender, string property)
     {
-        if (sender is not MainViewModel model)
+        if (DataContext is not MainViewModel model)
         {
             return;
         }
@@ -320,7 +320,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
     // discarded, and saved or discarded.
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (quitting || DataContext is not MainViewModel model || !model.HasDraft && !model.HasUnsavedChanges)
+        if (quitting || DataContext is not MainViewModel model || !model.Drafts.HasDraft && !model.HasUnsavedChanges)
         {
             return;
         }
@@ -386,7 +386,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
         e.DragEffects = !draggingOut && e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None;
         if (DataContext is MainViewModel model)
         {
-            model.IsDropTarget = e.DragEffects != DragDropEffects.None;
+            model.EmptyState.IsDropTarget = e.DragEffects != DragDropEffects.None;
         }
     }
 
@@ -394,7 +394,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
     {
         if (DataContext is MainViewModel model)
         {
-            model.IsDropTarget = false;
+            model.EmptyState.IsDropTarget = false;
         }
     }
 
@@ -402,7 +402,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
     {
         if (DataContext is MainViewModel dropped)
         {
-            dropped.IsDropTarget = false;
+            dropped.EmptyState.IsDropTarget = false;
         }
         if (draggingOut || DataContext is not MainViewModel model)
         {
@@ -438,7 +438,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
 
         if (inHex && e.Key == Key.F3 && DataContext is MainViewModel hexModel)
         {
-            (e.KeyModifiers == KeyModifiers.Shift ? hexModel.FindPreviousCommand : hexModel.FindNextCommand).Execute(null);
+            (e.KeyModifiers == KeyModifiers.Shift ? hexModel.HexFind.FindPreviousCommand : hexModel.HexFind.FindNextCommand).Execute(null);
             e.Handled = true;
             return;
         }
@@ -473,29 +473,29 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
         {
             return;
         }
-        model.TypeAhead(e.Text);
+        model.TreeSearch.TypeAhead(e.Text);
         e.Handled = true;
     }
 
     private void OnTreeKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MainViewModel { IsTypeAheadOpen: true } model)
+        if (DataContext is not MainViewModel { TreeSearch.IsTypeAheadOpen: true } model)
         {
             return;
         }
         switch (e.Key)
         {
             case Key.F3 when e.KeyModifiers == KeyModifiers.Shift:
-                model.PreviousMatchCommand.Execute(null);
+                model.TreeSearch.PreviousMatchCommand.Execute(null);
                 break;
             case Key.F3:
-                model.NextMatchCommand.Execute(null);
+                model.TreeSearch.NextMatchCommand.Execute(null);
                 break;
             case Key.Back:
-                model.TypeAheadBackspace();
+                model.TreeSearch.TypeAheadBackspace();
                 break;
             case Key.Escape:
-                model.ClearTypeAheadCommand.Execute(null);
+                model.TreeSearch.ClearTypeAheadCommand.Execute(null);
                 break;
             default:
                 return;

@@ -22,14 +22,21 @@ namespace ClassicMac.App.ViewModels;
 public sealed partial class MainViewModel
 {
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SaveResourceAsCommand), nameof(ExportResourcesCommand), nameof(ExtractAllCommand), nameof(UnpackAppleDoubleCommand), nameof(UnpackBasiliskCommand), nameof(ConvertDocumentsCommand),
-        nameof(NewFileCommand), nameof(ImportFileCommand), nameof(NewFolderCommand), nameof(DeleteItemCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SaveResourceAsCommand), nameof(ExportResourcesCommand), nameof(ExtractAllCommand), nameof(UnpackAppleDoubleCommand), nameof(UnpackBasiliskCommand), nameof(ConvertDocumentsCommand))]
     private bool isExporting;
+
+    partial void OnIsExportingChanged(bool value)
+    {
+        VolumeActions.NewFileCommand.NotifyCanExecuteChanged();
+        VolumeActions.ImportFileCommand.NotifyCanExecuteChanged();
+        VolumeActions.NewFolderCommand.NotifyCanExecuteChanged();
+        VolumeActions.DeleteItemCommand.NotifyCanExecuteChanged();
+    }
 
     /// <summary>The last export's task (tests wait for it).</summary>
     internal Task ExportTask { get; private set; } = Task.CompletedTask;
 
-    private DecodeOptions CurrentDecodeOptions => DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager };
+    internal DecodeOptions CurrentDecodeOptions => DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager };
 
     private bool CanSaveResource() => !IsExporting && Selected is ResourceNode;
 
@@ -85,7 +92,7 @@ public sealed partial class MainViewModel
 
         var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(file.Name) + " resources");
         var source = new ExportSource(file.Name, [], file.FinderInfo.Type, file.FinderInfo.Creator, (ushort)file.FinderInfo.Flags);
-        var progress = BeginProgress($"Exporting {file.Name.ToMacRoman()}…", fork.Resources.Count(r => types is null || types.Contains(r.Type)));
+        var progress = StatusLine.BeginProgress($"Exporting {file.Name.ToMacRoman()}…", fork.Resources.Count(r => types is null || types.Contains(r.Type)));
         ExportResult result;
         try
         {
@@ -115,7 +122,7 @@ public sealed partial class MainViewModel
 
         var root = await Whole(node);
         var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " resources");
-        var progress = BeginProgress($"Extracting {NameOf(node)}…", root.Leaves().Count());
+        var progress = StatusLine.BeginProgress($"Extracting {NameOf(node)}…", root.Leaves().Count());
         var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
         var result = await Task.Run(() =>
         {
@@ -154,7 +161,7 @@ public sealed partial class MainViewModel
         var root = await Whole(node);
         var name = HostNames.ToHostName(MacString.FromMacRoman(NameOf(node)));
         var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
-        var progress = BeginProgress($"Converting {NameOf(node)}…", root.Leaves().Count());
+        var progress = StatusLine.BeginProgress($"Converting {NameOf(node)}…", root.Leaves().Count());
         var (target, result) = await Task.Run(() =>
         {
             var forks = new List<ForkToExtract>();
@@ -216,7 +223,7 @@ public sealed partial class MainViewModel
 
         var root = await Whole(node);
         var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " unpacked");
-        var progress = BeginProgress($"Unpacking {NameOf(node)}…", root.Leaves().Count());
+        var progress = StatusLine.BeginProgress($"Unpacking {NameOf(node)}…", root.Leaves().Count());
         var diagnostics = new List<Diagnostic>();
         var result = await Task.Run(() => Unpacker.Unpack(root, target, HostWriteOptions.Default with { Layout = layout }, diagnostics, progress));
         foreach (var d in diagnostics)
@@ -250,7 +257,7 @@ public sealed partial class MainViewModel
             finally
             {
                 IsExporting = false;
-                ProgressText = null;         // ended, failed or not
+                StatusLine.ProgressText = null;         // ended, failed or not
             }
         }
         return ExportTask = Guarded();

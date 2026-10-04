@@ -27,7 +27,8 @@ public sealed class SoundWindowTests : IDisposable
         var path = Path.Combine(folder, "disk.img");
         File.WriteAllBytes(path, disk.Build("Disk"));
         var player = new FakeAudioPlayer();
-        var model = new MainViewModel { AudioPlayer = player };
+        var model = new MainViewModel();
+        model.SoundPlayback.AudioPlayer = player;
         var window = new MainWindow { DataContext = model };
         window.Show();
         Pump(model.OpenAsync(path));
@@ -67,19 +68,19 @@ public sealed class SoundWindowTests : IDisposable
         Dispatcher.UIThread.RunJobs();
         var duration = model.Preview.Sound!.Duration;
         Assert.Equal(duration / 4, player.Played.Single().Start, 3);
-        Assert.True(model.IsPlaying);
+        Assert.True(model.SoundPlayback.IsPlaying);
         Assert.True(Named<Button>(window, "StopButton").IsEffectivelyVisible);
 
         Assert.True(window.IsFollowingPlayhead);                             // the view's timer follows the player
         player.Position = duration / 2;
-        model.RefreshPlayhead();                                             // (what its tick does)
+        model.SoundPlayback.RefreshPlayhead();                                             // (what its tick does)
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(duration / 2, model.Playhead, 3);
+        Assert.Equal(duration / 2, model.SoundPlayback.Playhead, 3);
         Assert.Equal(duration / 2, wave.Playhead, 3);
 
         window.KeyPress(Key.Space, RawInputModifiers.None, PhysicalKey.Space, " ");   // Space stops
         Dispatcher.UIThread.RunJobs();
-        Assert.False(model.IsPlaying);
+        Assert.False(model.SoundPlayback.IsPlaying);
         Assert.False(window.IsFollowingPlayhead);
         window.Close();
         Baselines.Verify(baselines);

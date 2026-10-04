@@ -239,7 +239,7 @@ internal static partial class Tree
 
 public sealed partial class MainViewModel
 {
-    private readonly ISettingsStore settings;
+    internal readonly ISettingsStore settings;
 
     public MainViewModel() : this(new MemorySettingsStore())
     {
@@ -253,7 +253,6 @@ public sealed partial class MainViewModel
         var saved = settings.Load();
         TreeDisplay = new TreeDisplayOptions { GroupNoName = saved.GroupNoName, HideInvisible = saved.HideInvisible, ShowDetails = saved.ShowDetails };
         TreeDisplay.Inputs = () => Roots.OfType<InputNode>();
-        theme = saved.Theme;
         TreeDisplay.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(TreeDisplayOptions.ShowDetails))
@@ -266,20 +265,20 @@ public sealed partial class MainViewModel
             }
         };
         TreeDisplay.LaidOut += UpdateHiddenCount;
-        WatchSummary();
-        TreeDisplay.LaidOut += ReapplySearch;
-        InitRecentFiles(saved.RecentFiles);
-        InitTypeCreatorDatabase(saved.TypeCreatorDatabase);
+        StatusLine.WatchSummary();
+        TreeDisplay.LaidOut += TreeSearch.ReapplySearch;
+        EmptyState.InitRecentFiles(saved.RecentFiles);
+        TypeCreatorActions.InitTypeCreatorDatabase(saved.TypeCreatorDatabase);
     }
 
     // What the app remembers: the display options and the recent files, over what else is stored (the theme).
-    private void SaveSettings() =>
+    internal void SaveSettings() =>
         settings.Save(settings.Load() with
         {
             GroupNoName = TreeDisplay.GroupNoName,
             HideInvisible = TreeDisplay.HideInvisible,
             ShowDetails = TreeDisplay.ShowDetails,
-            RecentFiles = RecentFiles.Select(r => r.Path).ToList(),
+            RecentFiles = EmptyState.RecentFiles.Select(r => r.Path).ToList(),
         });
 
     /// <summary>Which files the tree hides or groups.</summary>
@@ -308,7 +307,7 @@ public sealed partial class MainViewModel
     private void OnShowDetailsChanged()
     {
         SaveSettings();
-        foreach (var row in AllRows())
+        foreach (var row in TreeSearch.AllRows())
         {
             row.OnMetaChanged();
         }

@@ -7,7 +7,7 @@
         xmlns:chrome="using:Avalonia.Controls.Chrome"
         x:Class="ClassicMac.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="{Binding WindowTitle}"
+        Title="{Binding ShellActions.WindowTitle}"
         Width="1200" Height="780" MinWidth="700" MinHeight="450"
         Icon="/Assets/icon/classicmac.ico"
         DragDrop.AllowDrop="True">
@@ -936,7 +936,7 @@
       <Setter Property="Header" Value="{Binding Label}" />
       <Setter Property="ToggleType" Value="Radio" />
       <Setter Property="GroupName" Value="depth" />
-      <Setter Property="Command" Value="{Binding $parent[Window].((vm:MainViewModel)DataContext).SetScreenDepthCommand, FallbackValue={x:Null}}" />
+      <Setter Property="Command" Value="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShellActions.SetScreenDepthCommand, FallbackValue={x:Null}}" />
       <Setter Property="CommandParameter" Value="{Binding Depth}" />
       <Setter Property="IsChecked">
         <MultiBinding Converter="{x:Static views:ShellConverters.AreEqual}">
@@ -959,9 +959,9 @@
       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <!-- The app's icon: the hand-drawn pixel size for the scaling, drawn 1:1 (AppIconView). -->
         <views:AppIconView x:Name="TitleIcon" Slot="16" VerticalAlignment="Center" />
-        <TextBlock Text="{Binding TitleFile}" IsVisible="{Binding TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        <TextBlock Text="•" Classes="unsaved" IsVisible="{Binding TitleUnsaved}" />
-        <TextBlock Text="—" IsVisible="{Binding TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <TextBlock Text="{Binding ShellActions.TitleFile}" IsVisible="{Binding ShellActions.TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <TextBlock Text="•" Classes="unsaved" IsVisible="{Binding ShellActions.TitleUnsaved}" />
+        <TextBlock Text="—" IsVisible="{Binding ShellActions.TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
         <TextBlock Text="ClassicMac" />
       </StackPanel>
     </Border>
@@ -991,10 +991,10 @@
         <MenuItem Header="{Binding RedoTitle}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" HotKey="Ctrl+Y" />
       </MenuItem>
       <MenuItem Header="_View">
-        <MenuItem Header="Zoom _In" Command="{Binding ZoomInCommand}" InputGesture="Ctrl+OemPlus" HotKey="Ctrl+OemPlus" />
-        <MenuItem Header="Zoom _Out" Command="{Binding ZoomOutCommand}" InputGesture="Ctrl+OemMinus" HotKey="Ctrl+OemMinus" />
-        <MenuItem Header="_Actual Size" Command="{Binding ActualSizeCommand}" InputGesture="Ctrl+D0" HotKey="Ctrl+D0" />
-        <MenuItem Header="Screen _Depth" Classes="depths" ItemsSource="{Binding ScreenDepthChoices}" />
+        <MenuItem Header="Zoom _In" Command="{Binding ShellActions.ZoomInCommand}" InputGesture="Ctrl+OemPlus" HotKey="Ctrl+OemPlus" />
+        <MenuItem Header="Zoom _Out" Command="{Binding ShellActions.ZoomOutCommand}" InputGesture="Ctrl+OemMinus" HotKey="Ctrl+OemMinus" />
+        <MenuItem Header="_Actual Size" Command="{Binding ShellActions.ActualSizeCommand}" InputGesture="Ctrl+D0" HotKey="Ctrl+D0" />
+        <MenuItem Header="Screen _Depth" Classes="depths" ItemsSource="{Binding ShellActions.ScreenDepthChoices}" />
         <Separator />
         <MenuItem Header="Show _Diagnostics" ToggleType="CheckBox" IsChecked="{Binding DiagnosticsPanel.IsExpanded, Mode=TwoWay}" InputGesture="Ctrl+Shift+D" />
         <Separator />
@@ -1002,16 +1002,16 @@
         <MenuItem Header="_Hide Invisible Files" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.HideInvisible, Mode=TwoWay}" />
         <MenuItem Header="Show _Details Column" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.ShowDetails, Mode=TwoWay}" />
         <Separator />
-        <MenuItem Header="Type/Creator Data_base…" Command="{Binding ChooseTypeCreatorDatabaseCommand}" />
-        <MenuItem Header="_Forget Type/Creator Database" Command="{Binding ForgetTypeCreatorDatabaseCommand}" />
+        <MenuItem Header="Type/Creator Data_base…" Command="{Binding TypeCreatorActions.ChooseTypeCreatorDatabaseCommand}" />
+        <MenuItem Header="_Forget Type/Creator Database" Command="{Binding TypeCreatorActions.ForgetTypeCreatorDatabaseCommand}" />
         <Separator />
         <MenuItem Header="_Theme">
-          <MenuItem Header="_System" ToggleType="Radio" GroupName="theme" IsChecked="{Binding IsSystemTheme, Mode=OneWay}"
-                    Command="{Binding SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.System}" />
-          <MenuItem Header="_Light" ToggleType="Radio" GroupName="theme" IsChecked="{Binding IsLightTheme, Mode=OneWay}"
-                    Command="{Binding SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.Light}" />
-          <MenuItem Header="_Dark" ToggleType="Radio" GroupName="theme" IsChecked="{Binding IsDarkTheme, Mode=OneWay}"
-                    Command="{Binding SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.Dark}" />
+          <MenuItem Header="_System" ToggleType="Radio" GroupName="theme" IsChecked="{Binding ShellActions.IsSystemTheme, Mode=OneWay}"
+                    Command="{Binding ShellActions.SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.System}" />
+          <MenuItem Header="_Light" ToggleType="Radio" GroupName="theme" IsChecked="{Binding ShellActions.IsLightTheme, Mode=OneWay}"
+                    Command="{Binding ShellActions.SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.Light}" />
+          <MenuItem Header="_Dark" ToggleType="Radio" GroupName="theme" IsChecked="{Binding ShellActions.IsDarkTheme, Mode=OneWay}"
+                    Command="{Binding ShellActions.SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.Dark}" />
         </MenuItem>
       </MenuItem>
       <MenuItem Header="_Resource">
@@ -1022,14 +1022,14 @@
         <MenuItem Header="Get _Info…" Command="{Binding GetInfoCommand}" InputGesture="Ctrl+I" HotKey="Ctrl+I" />
         <MenuItem Header="Edit _Hex…" Command="{Binding EditHexCommand}" InputGesture="Ctrl+H" HotKey="Ctrl+H" />
         <MenuItem Header="_Replace Data from File…" Command="{Binding ReplaceDataCommand}" />
-        <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportCommand}" />
+        <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportActions.ImportCommand}" />
       </MenuItem>
       <MenuItem Header="_Volume">
-        <MenuItem Header="New _File…" Command="{Binding NewFileCommand}" />
-        <MenuItem Header="_Import File…" Command="{Binding ImportFileCommand}" />
-        <MenuItem Header="New F_older…" Command="{Binding NewFolderCommand}" />
+        <MenuItem Header="New _File…" Command="{Binding VolumeActions.NewFileCommand}" />
+        <MenuItem Header="_Import File…" Command="{Binding VolumeActions.ImportFileCommand}" />
+        <MenuItem Header="New F_older…" Command="{Binding VolumeActions.NewFolderCommand}" />
         <Separator />
-        <MenuItem Header="_Delete File or Folder…" Command="{Binding DeleteItemCommand}" />
+        <MenuItem Header="_Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" />
       </MenuItem>
       <MenuItem Header="E_xport">
         <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+E" HotKey="Ctrl+E" />
@@ -1045,17 +1045,17 @@
       <!-- Filled by the window: Minimize, Zoom, then one item per open input. -->
       <MenuItem x:Name="WindowMenu" Header="_Window" />
       <MenuItem Header="_Help">
-        <MenuItem Header="ClassicMac _Help" Command="{Binding OpenHelpCommand}" />
-        <MenuItem Header="_Report a Problem…" Command="{Binding ReportProblemCommand}" />
+        <MenuItem Header="ClassicMac _Help" Command="{Binding ShellActions.OpenHelpCommand}" />
+        <MenuItem Header="_Report a Problem…" Command="{Binding ShellActions.ReportProblemCommand}" />
         <Separator />
-        <MenuItem Header="_About ClassicMac" Command="{Binding AboutCommand}" />
+        <MenuItem Header="_About ClassicMac" Command="{Binding ShellActions.AboutCommand}" />
       </MenuItem>
     </Menu>
 
     <!-- The toolbar (design/boards/main-window.md, S2): each button follows its command's enabled state. -->
     <Border x:Name="Toolbar" DockPanel.Dock="Top" Classes="chrome toolbar">
       <DockPanel>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsEnabled="{Binding IsZoomable}">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsEnabled="{Binding ShellActions.IsZoomable}">
           <TextBlock Text="Zoom" Classes="tool-label" VerticalAlignment="Center" />
           <ListBox x:Name="ZoomChoice" Classes="segmented" ItemsSource="{Binding Zooms}" SelectedItem="{Binding Zoom, Mode=TwoWay}"
                    AutomationProperties.Name="Zoom">
@@ -1066,7 +1066,7 @@
             </ListBox.ItemTemplate>
           </ListBox>
           <TextBlock Text="Depth" Classes="tool-label" VerticalAlignment="Center" Margin="8,0,0,0" />
-          <ComboBox x:Name="DepthChoice" ItemsSource="{Binding ScreenDepthChoices}" SelectedItem="{Binding SelectedDepthChoice, Mode=TwoWay}"
+          <ComboBox x:Name="DepthChoice" ItemsSource="{Binding ShellActions.ScreenDepthChoices}" SelectedItem="{Binding ShellActions.SelectedDepthChoice, Mode=TwoWay}"
                     MinWidth="120" AutomationProperties.Name="Screen depth">
             <ComboBox.ItemTemplate>
               <DataTemplate DataType="vm:ScreenDepthChoice">
@@ -1115,7 +1115,7 @@
             </StackPanel>
           </Button>
           <Border Classes="tool-divider" />
-          <Button Classes="flat tool" Command="{Binding PlaySoundCommand}" ToolTip.Tip="Play the sound" AutomationProperties.Name="Play">
+          <Button Classes="flat tool" Command="{Binding SoundPlayback.PlaySoundCommand}" ToolTip.Tip="Play the sound" AutomationProperties.Name="Play">
             <StackPanel>
               <Path Classes="tool-icon" Data="M5,3 L15,9 L5,15 Z" />
               <TextBlock Text="Play" />
@@ -1129,20 +1129,20 @@
          right, while work runs, what it does, how far and a progress bar, else the status text. -->
     <Border x:Name="StatusBar" DockPanel.Dock="Bottom" Classes="chrome status-bar">
       <DockPanel>
-        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" IsVisible="{Binding Summary, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <TextBlock Classes="summary" Text="{Binding Summary.Text, FallbackValue={x:Null}}" />
-          <TextBlock Classes="summary error" Text="{Binding Summary.ErrorText, StringFormat=' · {0}', FallbackValue={x:Null}}"
-                     IsVisible="{Binding Summary.ErrorText, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
-          <TextBlock Classes="summary warning" Text="{Binding Summary.WarningText, StringFormat=' · {0}', FallbackValue={x:Null}}"
-                     IsVisible="{Binding Summary.WarningText, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
+        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" IsVisible="{Binding StatusLine.Summary, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <TextBlock Classes="summary" Text="{Binding StatusLine.Summary.Text, FallbackValue={x:Null}}" />
+          <TextBlock Classes="summary error" Text="{Binding StatusLine.Summary.ErrorText, StringFormat=' · {0}', FallbackValue={x:Null}}"
+                     IsVisible="{Binding StatusLine.Summary.ErrorText, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
+          <TextBlock Classes="summary warning" Text="{Binding StatusLine.Summary.WarningText, StringFormat=' · {0}', FallbackValue={x:Null}}"
+                     IsVisible="{Binding StatusLine.Summary.WarningText, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
         </StackPanel>
-        <StackPanel x:Name="Progress" DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsWorking}">
-          <TextBlock Text="{Binding ProgressText}" />
-          <TextBlock Text="{Binding ProgressCount}" Classes="muted" IsVisible="{Binding ProgressCount, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          <ProgressBar Classes="status" Minimum="0" Maximum="{Binding ProgressMaximum}" Value="{Binding ProgressValue}"
-                       IsIndeterminate="{Binding IsProgressIndeterminate}" />
+        <StackPanel x:Name="Progress" DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" IsVisible="{Binding StatusLine.IsWorking}">
+          <TextBlock Text="{Binding StatusLine.ProgressText}" />
+          <TextBlock Text="{Binding StatusLine.ProgressCount}" Classes="muted" IsVisible="{Binding StatusLine.ProgressCount, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <ProgressBar Classes="status" Minimum="0" Maximum="{Binding StatusLine.ProgressMaximum}" Value="{Binding StatusLine.ProgressValue}"
+                       IsIndeterminate="{Binding StatusLine.IsProgressIndeterminate}" />
         </StackPanel>
-        <TextBlock Classes="status" Text="{Binding Status}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !IsWorking}" />
+        <TextBlock Classes="status" Text="{Binding Status}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !StatusLine.IsWorking}" />
       </DockPanel>
     </Border>
 
@@ -1164,7 +1164,7 @@
               </Flyout>
             </Button.Flyout>
           </Button>
-          <TextBox x:Name="TreeFilter" Classes="filter" PlaceholderText="Filter tree" Text="{Binding FilterText}" AutomationProperties.Name="Filter tree">
+          <TextBox x:Name="TreeFilter" Classes="filter" PlaceholderText="Filter tree" Text="{Binding TreeSearch.FilterText}" AutomationProperties.Name="Filter tree">
             <TextBox.InnerLeftContent>
               <PathIcon Classes="search" Data="M6.5,1 A5.5,5.5 0 1 1 6.5,12 A5.5,5.5 0 1 1 6.5,1 Z M6.5,3 A3.5,3.5 0 1 0 6.5,10 A3.5,3.5 0 1 0 6.5,3 Z M10.2,11.6 L11.6,10.2 L15,13.6 L13.6,15 Z" />
             </TextBox.InnerLeftContent>
@@ -1172,7 +1172,7 @@
               <TextBlock Classes="mono muted key-hint" Text="Ctrl+F" />
             </TextBox.InnerRightContent>
             <TextBox.KeyBindings>
-              <KeyBinding Gesture="Escape" Command="{Binding ClearFilterCommand}" />
+              <KeyBinding Gesture="Escape" Command="{Binding TreeSearch.ClearFilterCommand}" />
             </TextBox.KeyBindings>
           </TextBox>
           </DockPanel>
@@ -1256,12 +1256,12 @@
               <MenuItem Header="Get _Info…" Command="{Binding GetInfoCommand}" InputGesture="Ctrl+I" />
               <MenuItem Header="Edit _Hex…" Command="{Binding EditHexCommand}" InputGesture="Ctrl+H" />
               <MenuItem Header="_Replace Data from File…" Command="{Binding ReplaceDataCommand}" />
-              <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportCommand}" />
+              <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportActions.ImportCommand}" />
               <Separator />
-              <MenuItem Header="New _File…" Command="{Binding NewFileCommand}" />
-              <MenuItem Header="Import File…" Command="{Binding ImportFileCommand}" />
-              <MenuItem Header="New F_older…" Command="{Binding NewFolderCommand}" />
-              <MenuItem Header="Delete File or Folder…" Command="{Binding DeleteItemCommand}" />
+              <MenuItem Header="New _File…" Command="{Binding VolumeActions.NewFileCommand}" />
+              <MenuItem Header="Import File…" Command="{Binding VolumeActions.ImportFileCommand}" />
+              <MenuItem Header="New F_older…" Command="{Binding VolumeActions.NewFolderCommand}" />
+              <MenuItem Header="Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" />
               <Separator />
               <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+E" />
               <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />
@@ -1274,14 +1274,14 @@
           </ListBox.ContextMenu>
         </views:BrowseTree>
         <!-- The type-ahead pill: what was typed, the matches, F3 and Esc. -->
-        <Border x:Name="TypeAheadPill" Classes="type-ahead" IsVisible="{Binding IsTypeAheadOpen}" VerticalAlignment="Bottom" HorizontalAlignment="Center">
+        <Border x:Name="TypeAheadPill" Classes="type-ahead" IsVisible="{Binding TreeSearch.IsTypeAheadOpen}" VerticalAlignment="Bottom" HorizontalAlignment="Center">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <PathIcon Classes="search" Margin="0" Data="M6.5,1 A5.5,5.5 0 1 1 6.5,12 A5.5,5.5 0 1 1 6.5,1 Z M6.5,3 A3.5,3.5 0 1 0 6.5,10 A3.5,3.5 0 1 0 6.5,3 Z M10.2,11.6 L11.6,10.2 L15,13.6 L13.6,15 Z" />
             <StackPanel Orientation="Horizontal">
-              <TextBlock Classes="mono" Text="{Binding TypeAheadText}" VerticalAlignment="Center" />
+              <TextBlock Classes="mono" Text="{Binding TreeSearch.TypeAheadText}" VerticalAlignment="Center" />
               <TextBlock Classes="mono caret" Text="|" VerticalAlignment="Center" />
             </StackPanel>
-            <TextBlock Classes="muted" Text="{Binding TypeAheadSummary}" VerticalAlignment="Center" />
+            <TextBlock Classes="muted" Text="{Binding TreeSearch.TypeAheadSummary}" VerticalAlignment="Center" />
             <Border Classes="key"><TextBlock Classes="mono muted key-hint" Text="F3" /></Border>
             <Border Classes="key"><TextBlock Classes="mono muted key-hint" Text="Esc" /></Border>
           </StackPanel>
@@ -1874,7 +1874,7 @@
                      view (made in code, MainWindow.Help.cs), else its source or text with why; the status line under it. -->
                 <DockPanel IsVisible="{Binding Preview.IsWebPage}">
                   <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="16,12,16,0">
-                    <ListBox x:Name="HelpMode" Classes="segmented" ItemsSource="{Binding WebModes}" SelectedIndex="{Binding HelpModeIndex, Mode=TwoWay}"
+                    <ListBox x:Name="HelpMode" Classes="segmented" ItemsSource="{Binding HelpPreview.WebModes}" SelectedIndex="{Binding HelpPreview.HelpModeIndex, Mode=TwoWay}"
                              AutomationProperties.Name="Rendered or source" />
                     <Button Content="Back" Command="{Binding Preview.Document.BackCommand, FallbackValue={x:Null}}"
                             IsVisible="{Binding Preview.IsDocument}" />
@@ -1883,12 +1883,12 @@
                               IsVisible="{Binding Preview.Document.HasChapters, FallbackValue=False}" AutomationProperties.Name="Page" />
                   </StackPanel>
                   <TextBlock x:Name="HelpEngineMessage" DockPanel.Dock="Top" Classes="muted" Margin="16,8,16,0" TextWrapping="Wrap"
-                             Text="{Binding WebEngineMessage}" IsVisible="{Binding HasWebEngineMessage}" />
+                             Text="{Binding HelpPreview.WebEngineMessage}" IsVisible="{Binding HelpPreview.HasWebEngineMessage}" />
                   <TextBlock x:Name="HelpStatusText" DockPanel.Dock="Bottom" Classes="muted" Margin="16,4" TextTrimming="CharacterEllipsis"
-                             Text="{Binding HelpStatus}" IsVisible="{Binding HelpStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                             Text="{Binding HelpPreview.HelpStatus}" IsVisible="{Binding HelpPreview.HelpStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
                   <Panel>
-                    <Panel x:Name="HelpHost" Margin="0,8,0,0" IsVisible="{Binding ShowsHelpRendered}" />
-                    <ScrollViewer IsVisible="{Binding ShowsHelpSource}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
+                    <Panel x:Name="HelpHost" Margin="0,8,0,0" IsVisible="{Binding HelpPreview.ShowsHelpRendered}" />
+                    <ScrollViewer IsVisible="{Binding HelpPreview.ShowsHelpSource}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
                       <SelectableTextBlock x:Name="HelpSource" Classes.document="{Binding Preview.IsDocument}" Text="{Binding Preview.Web.Source, FallbackValue={x:Null}}" TextWrapping="Wrap" />
                     </ScrollViewer>
                   </Panel>
@@ -1898,31 +1898,31 @@
                      plays from there, Space plays and stops. -->
                 <ScrollViewer x:Name="SoundPreview" IsVisible="{Binding Preview.IsSound}" Focusable="True">
                   <ScrollViewer.KeyBindings>
-                    <KeyBinding Gesture="Space" Command="{Binding ToggleSoundCommand}" />
+                    <KeyBinding Gesture="Space" Command="{Binding SoundPlayback.ToggleSoundCommand}" />
                   </ScrollViewer.KeyBindings>
                   <StackPanel Margin="16,12" Spacing="12">
                     <DockPanel>
-                      <CheckBox x:Name="RepeatLoopBox" DockPanel.Dock="Right" Content="Repeat the loop" IsChecked="{Binding RepeatLoop}"
-                                IsVisible="{Binding HasSoundLoop}" />
+                      <CheckBox x:Name="RepeatLoopBox" DockPanel.Dock="Right" Content="Repeat the loop" IsChecked="{Binding SoundPlayback.RepeatLoop}"
+                                IsVisible="{Binding SoundPlayback.HasSoundLoop}" />
                       <StackPanel Orientation="Horizontal" Spacing="12">
                         <Panel>
-                          <Button x:Name="PlayButton" Classes="accent transport" Command="{Binding PlaySoundCommand}" IsVisible="{Binding !IsPlaying}"
+                          <Button x:Name="PlayButton" Classes="accent transport" Command="{Binding SoundPlayback.PlaySoundCommand}" IsVisible="{Binding !SoundPlayback.IsPlaying}"
                                   ToolTip.Tip="Play (Space)" AutomationProperties.Name="Play">
                             <PathIcon Data="M5,2 L14,8 L5,14 Z" />
                           </Button>
-                          <Button x:Name="StopButton" Classes="accent transport" Command="{Binding StopSoundCommand}" IsVisible="{Binding IsPlaying}"
+                          <Button x:Name="StopButton" Classes="accent transport" Command="{Binding SoundPlayback.StopSoundCommand}" IsVisible="{Binding SoundPlayback.IsPlaying}"
                                   ToolTip.Tip="Stop (Space)" AutomationProperties.Name="Stop">
                             <PathIcon Data="M3,3 H13 V13 H3 Z" />
                           </Button>
                         </Panel>
                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                          <TextBlock Classes="mono sound-time" Text="{Binding PlayheadText}" />
-                          <TextBlock Classes="mono muted sound-time" Text="{Binding SoundDurationText}" />
+                          <TextBlock Classes="mono sound-time" Text="{Binding SoundPlayback.PlayheadText}" />
+                          <TextBlock Classes="mono muted sound-time" Text="{Binding SoundPlayback.SoundDurationText}" />
                         </StackPanel>
                         <TextBlock Classes="muted" VerticalAlignment="Center" Text="Space plays and stops · stops when the selection changes" />
                       </StackPanel>
                     </DockPanel>
-                    <TextBlock Text="{Binding PlaybackNote}" Classes="muted" IsVisible="{Binding PlaybackNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <TextBlock Text="{Binding SoundPlayback.PlaybackNote}" Classes="muted" IsVisible="{Binding SoundPlayback.PlaybackNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
                     <ItemsControl ItemsSource="{Binding Preview.SoundFacts}">
                       <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
@@ -1940,15 +1940,15 @@
                       <DockPanel>
                         <Border DockPanel.Dock="Top" Classes="wave-header">
                           <DockPanel>
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasSoundLoop}">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" IsVisible="{Binding SoundPlayback.HasSoundLoop}">
                               <Border Classes="loop-swatch" />
                               <TextBlock Classes="muted" Text="Loop" />
                             </StackPanel>
                             <TextBlock Classes="strong" Text="{Binding Preview.SoundLanesTitle}" />
                           </DockPanel>
                         </Border>
-                        <views:WaveformView Sound="{Binding Preview.Sound}" LoopFrames="{Binding Preview.SoundLoopFrames}" Playhead="{Binding Playhead}"
-                                            ShowsPlayhead="{Binding IsPlaying}" SeekCommand="{Binding SeekSoundCommand}" />
+                        <views:WaveformView Sound="{Binding Preview.Sound}" LoopFrames="{Binding Preview.SoundLoopFrames}" Playhead="{Binding SoundPlayback.Playhead}"
+                                            ShowsPlayhead="{Binding SoundPlayback.IsPlaying}" SeekCommand="{Binding SoundPlayback.SeekSoundCommand}" />
                       </DockPanel>
                     </Border>
                   </StackPanel>
@@ -1962,8 +1962,8 @@
                     </StackPanel>
                     <TextBlock Classes="muted" Text="{Binding Preview.ErrorDetail}" TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Content="Show in Hex" Command="{Binding ShowInHexCommand}" />
-                      <Button Content="Save raw data…" Command="{Binding SaveRawDataCommand}" />
+                      <Button Content="Show in Hex" Command="{Binding SoundPlayback.ShowInHexCommand}" />
+                      <Button Content="Save raw data…" Command="{Binding SoundPlayback.SaveRawDataCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -2838,17 +2838,17 @@
               <Border x:Name="HexFindBar" DockPanel.Dock="Top" Classes="hex-find">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="Find" Classes="muted" VerticalAlignment="Center" />
-                  <ListBox x:Name="FindModeChoice" Classes="segmented" ItemsSource="{x:Static vm:MainViewModel.FindModes}"
-                           SelectedIndex="{Binding FindModeIndex, Mode=TwoWay}" AutomationProperties.Name="Find hex or text" />
-                  <TextBox x:Name="FindBox" Classes="go-to find" PlaceholderText="Bytes or text" Text="{Binding FindText}" AutomationProperties.Name="Find">
+                  <ListBox x:Name="FindModeChoice" Classes="segmented" ItemsSource="{x:Static vm:HexFind.FindModes}"
+                           SelectedIndex="{Binding HexFind.FindModeIndex, Mode=TwoWay}" AutomationProperties.Name="Find hex or text" />
+                  <TextBox x:Name="FindBox" Classes="go-to find" PlaceholderText="Bytes or text" Text="{Binding HexFind.FindText}" AutomationProperties.Name="Find">
                     <TextBox.KeyBindings>
-                      <KeyBinding Gesture="Enter" Command="{Binding FindNextCommand}" />
-                      <KeyBinding Gesture="Shift+Enter" Command="{Binding FindPreviousCommand}" />
+                      <KeyBinding Gesture="Enter" Command="{Binding HexFind.FindNextCommand}" />
+                      <KeyBinding Gesture="Shift+Enter" Command="{Binding HexFind.FindPreviousCommand}" />
                     </TextBox.KeyBindings>
                   </TextBox>
-                  <Button Content="Previous" Command="{Binding FindPreviousCommand}" ToolTip.Tip="Shift+F3" />
-                  <Button Content="Next" Command="{Binding FindNextCommand}" ToolTip.Tip="F3" />
-                  <TextBlock x:Name="FindStatusText" Text="{Binding FindStatus}" Classes="muted" Classes.error="{Binding FindFailed}" VerticalAlignment="Center" />
+                  <Button Content="Previous" Command="{Binding HexFind.FindPreviousCommand}" ToolTip.Tip="Shift+F3" />
+                  <Button Content="Next" Command="{Binding HexFind.FindNextCommand}" ToolTip.Tip="F3" />
+                  <TextBlock x:Name="FindStatusText" Text="{Binding HexFind.FindStatus}" Classes="muted" Classes.error="{Binding HexFind.FindFailed}" VerticalAlignment="Center" />
                 </StackPanel>
               </Border>
               <Border x:Name="HexFooter" DockPanel.Dock="Bottom" Classes="host-footer" IsVisible="{Binding IsHexEditing}">
@@ -2954,10 +2954,10 @@
         </DockPanel>
 
         <!-- The empty state (boards/empty-state.md, S5): over the inspector while nothing is open. -->
-        <Border x:Name="EmptyState" Grid.Column="2" Classes="empty-state" IsVisible="{Binding IsEmpty}">
+        <Border x:Name="EmptyState" Grid.Column="2" Classes="empty-state" IsVisible="{Binding EmptyState.IsEmpty}">
           <ScrollViewer>
             <StackPanel Width="640" HorizontalAlignment="Center" Margin="0,40" Spacing="24">
-              <Border x:Name="DropZone" Classes="drop-zone" Classes.active="{Binding IsDropTarget}">
+              <Border x:Name="DropZone" Classes="drop-zone" Classes.active="{Binding EmptyState.IsDropTarget}">
                 <Panel>
                   <Rectangle Classes="dash" />
                   <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="460" Spacing="14">
@@ -2977,16 +2977,16 @@
                   </StackPanel>
                 </Panel>
               </Border>
-              <StackPanel x:Name="RecentList" Spacing="8" IsVisible="{Binding HasRecentFiles}">
+              <StackPanel x:Name="RecentList" Spacing="8" IsVisible="{Binding EmptyState.HasRecentFiles}">
                 <DockPanel>
-                  <Button DockPanel.Dock="Right" Classes="flat link" Content="Clear list" Command="{Binding ClearRecentCommand}" />
+                  <Button DockPanel.Dock="Right" Classes="flat link" Content="Clear list" Command="{Binding EmptyState.ClearRecentCommand}" />
                   <TextBlock Classes="caption" Text="RECENT" VerticalAlignment="Center" />
                 </DockPanel>
                 <Border Classes="recent-list">
-                  <ItemsControl ItemsSource="{Binding RecentFiles}">
+                  <ItemsControl ItemsSource="{Binding EmptyState.RecentFiles}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate DataType="vm:RecentFile">
-                        <Button Classes="flat recent" Command="{Binding #EmptyState.((vm:MainViewModel)DataContext).OpenRecentCommand}" CommandParameter="{Binding}"
+                        <Button Classes="flat recent" Command="{Binding #EmptyState.((vm:MainViewModel)DataContext).EmptyState.OpenRecentCommand}" CommandParameter="{Binding}"
                                 ToolTip.Tip="{Binding Path}">
                           <StackPanel Orientation="Horizontal" Spacing="8">
                             <Image RenderOptions.BitmapInterpolationMode="None" Width="16" Height="16" Source="{Binding IconKind, Converter={x:Static views:TreeIcons.IconConverter}}" />

@@ -17,18 +17,18 @@ internal sealed partial class MainWindow
 
     private void BindSound()
     {
-        playheadTimer.Tick += (_, _) => soundModel?.RefreshPlayhead();
+        playheadTimer.Tick += (_, _) => soundModel?.SoundPlayback.RefreshPlayhead();
         DataContextChanged += (_, _) =>
         {
             if (soundModel is not null)
             {
-                soundModel.PropertyChanged -= OnSoundModelChanged;
+                soundModel.SoundPlayback.PropertyChanged -= OnSoundModelChanged;
             }
 
             soundModel = DataContext as MainViewModel;
             if (soundModel is not null)
             {
-                soundModel.PropertyChanged += OnSoundModelChanged;
+                soundModel.SoundPlayback.PropertyChanged += OnSoundModelChanged;
             }
         };
         Closed += (_, _) => playheadTimer.Stop();
@@ -36,7 +36,7 @@ internal sealed partial class MainWindow
 
     private void OnSoundModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(MainViewModel.IsPlaying) || sender is not MainViewModel model)
+        if (e.PropertyName != nameof(SoundPlayback.IsPlaying) || sender is not SoundPlayback model)
         {
             return;
         }

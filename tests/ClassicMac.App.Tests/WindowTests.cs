@@ -232,7 +232,7 @@ public class WindowTests
             Dispatcher.UIThread.RunJobs();
             Capture(window, "document", baselines);
             // Headless there is no native web view: the chapter list and Back stay, and the text shows with why.
-            Assert.Contains("no native web view", model.WebEngineMessage!, StringComparison.Ordinal);
+            Assert.Contains("no native web view", model.HelpPreview.WebEngineMessage!, StringComparison.Ordinal);
             var chapters = window.GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "DocumentChapters");
             Assert.True(chapters.IsEffectivelyVisible);
             Assert.Equal(1, chapters.SelectedIndex);
@@ -295,7 +295,7 @@ public class WindowTests
         File.WriteAllBytes(path, ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(2, 2, rgba));
         try
         {
-            var image = new MainViewModel().LoadImage(path);
+            var image = new MainViewModel().ImportActions.LoadImage(path);
             Assert.Equal((2, 2), (image.Width, image.Height));
             Assert.Equal(new byte[] { 255, 0, 0, 255 }, image.Pixels[..4]);
             Assert.Equal(new byte[] { 10, 200, 30, 255 }, image.Pixels[12..]);
@@ -660,7 +660,7 @@ public class WindowTests
             Assert.Same(model.EditHexCommand, tools["Edit Hex"].Command);
             Assert.Same(model.ExportResourcesCommand, tools["Export"].Command);
             Assert.Same(model.ExtractAllCommand, tools["Extract All"].Command);
-            Assert.Same(model.PlaySoundCommand, tools["Play"].Command);
+            Assert.Same(model.SoundPlayback.PlaySoundCommand, tools["Play"].Command);
             void EnabledFollowCommands()
             {
                 Dispatcher.UIThread.RunJobs();
@@ -683,7 +683,7 @@ public class WindowTests
             Assert.Equal(8, model.ScreenDepth);
             Pump(model.PreviewTask);
             Capture(window, "shell", baselines);
-            model.SetScreenDepthCommand.Execute(32);
+            model.ShellActions.SetScreenDepthCommand.Execute(32);
             Pump(model.PreviewTask);
             model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "TEXT").Children[0];
             Pump(model.PreviewTask);
@@ -697,9 +697,9 @@ public class WindowTests
             Assert.Equal(["_File", "_Edit", "_View", "_Resource", "_Volume", "E_xport", "_Window", "_Help"], top.Select(m => (string)m.Header!));
             MenuItem Item(MenuItem parent, string header) => parent.Items.OfType<MenuItem>().Single(m => (string?)m.Header == header);
             var view = top[2];
-            Assert.Same(model.ZoomInCommand, Item(view, "Zoom _In").Command);
-            Assert.Same(model.ZoomOutCommand, Item(view, "Zoom _Out").Command);
-            Assert.Same(model.ActualSizeCommand, Item(view, "_Actual Size").Command);
+            Assert.Same(model.ShellActions.ZoomInCommand, Item(view, "Zoom _In").Command);
+            Assert.Same(model.ShellActions.ZoomOutCommand, Item(view, "Zoom _Out").Command);
+            Assert.Same(model.ShellActions.ActualSizeCommand, Item(view, "_Actual Size").Command);
             var dark = Item(Item(view, "_Theme"), "_Dark");
             dark.Command!.Execute(dark.CommandParameter);
             Dispatcher.UIThread.RunJobs();
@@ -735,13 +735,13 @@ public class WindowTests
             Assert.Equal(WindowState.Maximized, window.WindowState);
             windowMenu[1].Command!.Execute(null);
             Assert.Equal(WindowState.Normal, window.WindowState);
-            Assert.Same(model.ShowInputCommand, windowMenu[2].Command);
+            Assert.Same(model.ShellActions.ShowInputCommand, windowMenu[2].Command);
 
             var help = top[7].Items.OfType<MenuItem>().ToList();
-            Assert.Same(model.OpenHelpCommand, help[0].Command);
-            Assert.Same(model.ReportProblemCommand, help[1].Command);
-            Assert.Same(model.AboutCommand, help[2].Command);
-            var about = model.AboutCommand.ExecuteAsync(null);
+            Assert.Same(model.ShellActions.OpenHelpCommand, help[0].Command);
+            Assert.Same(model.ShellActions.ReportProblemCommand, help[1].Command);
+            Assert.Same(model.ShellActions.AboutCommand, help[2].Command);
+            var about = model.ShellActions.AboutCommand.ExecuteAsync(null);
             Dispatcher.UIThread.RunJobs();
             var box = window.About!;
             Assert.Contains(box.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == $"Version {AboutInfo.Current.Version}");
@@ -860,7 +860,7 @@ public class WindowTests
             text.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });
             Dispatcher.UIThread.RunJobs();
             Assert.False(model.IsEditingForm);
-            Assert.False(model.HasDraft);
+            Assert.False(model.Drafts.HasDraft);
 
             // Edit again, change the title, Ctrl+Enter applies one undoable edit.
             model.EditFormCommand.Execute(null);

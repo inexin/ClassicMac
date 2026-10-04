@@ -82,23 +82,23 @@ public class DocumentTests : IDisposable
         Assert.Contains("The game begins here.", html, StringComparison.Ordinal);
         Assert.Contains("<img src=\"data:image/png;base64,", html, StringComparison.Ordinal); // pictures inline
         Assert.DoesNotContain("<link", html, StringComparison.Ordinal); // the stylesheet inline too
-        Assert.StartsWith("data:text/html;charset=utf-8;base64,", model.WebUri, StringComparison.Ordinal);
+        Assert.StartsWith("data:text/html;charset=utf-8;base64,", model.HelpPreview.WebUri, StringComparison.Ordinal);
         // The text, for the Text view and when there is no web view.
         Assert.Contains("Welcome", document.Source, StringComparison.Ordinal);
         Assert.Contains("The game begins here.", document.Source, StringComparison.Ordinal);
-        Assert.Equal(["Rendered", "Text"], model.WebModes);
+        Assert.Equal(["Rendered", "Text"], model.HelpPreview.WebModes);
 
         // A link to another chapter turns its page (the web view's navigation is cancelled), with its anchor.
         var changed = new List<string?>();
-        model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
-        Assert.False(model.FollowHelpLink(ClassicMac.Resources.Decoders.Documents.HelpPages.Origin + "chapter-02.html#p0"));
+        model.HelpPreview.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        Assert.False(model.HelpPreview.FollowHelpLink(ClassicMac.Resources.Decoders.Documents.HelpPages.Origin + "chapter-02.html#p0"));
         Assert.Equal(2, document.ChapterIndex);
         Assert.EndsWith("#p0", document.DataUri, StringComparison.Ordinal);
-        Assert.Contains(nameof(MainViewModel.WebUri), changed);
+        Assert.Contains(nameof(HelpPreview.WebUri), changed);
         Assert.True(document.BackCommand.CanExecute(null));
 
         // A "back" picture (the HTML's history.back()) goes back.
-        Assert.False(model.FollowHelpLink("javascript:history.back()"));
+        Assert.False(model.HelpPreview.FollowHelpLink("javascript:history.back()"));
         Assert.Equal(1, document.ChapterIndex);
         Assert.False(document.BackCommand.CanExecute(null));
 
@@ -108,9 +108,9 @@ public class DocumentTests : IDisposable
         Assert.Contains("chapter-02.html", HtmlOf(document), StringComparison.Ordinal);
 
         // A link to a page the document does not have is not followed.
-        Assert.False(model.FollowHelpLink(ClassicMac.Resources.Decoders.Documents.HelpPages.Origin + "chapter-09.html"));
+        Assert.False(model.HelpPreview.FollowHelpLink(ClassicMac.Resources.Decoders.Documents.HelpPages.Origin + "chapter-09.html"));
         Assert.Equal(0, document.ChapterIndex);
-        Assert.NotNull(model.HelpStatus);
+        Assert.NotNull(model.HelpPreview.HelpStatus);
     }
 
     [Fact]

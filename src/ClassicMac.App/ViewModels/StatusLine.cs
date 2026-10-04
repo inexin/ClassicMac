@@ -28,7 +28,7 @@ public sealed record StatusSummary(string Name, string Format, int Files, int Er
 
 // The status bar: the summary of the selected input on the left; on the right, while work runs, what it does and how
 // far it is, else the status text.
-public sealed partial class MainViewModel
+public sealed partial class StatusLine(MainViewModel main) : ObservableObject
 {
     /// <summary>What runs now ("Extracting Disk…"), or null when nothing does.</summary>
     [ObservableProperty]
@@ -61,32 +61,32 @@ public sealed partial class MainViewModel
     {
         get
         {
-            var input = Selected?.Input ?? Roots.FirstOrDefault();
+            var input = main.Selected?.Input ?? main.Roots.FirstOrDefault();
             if (input is null)
             {
                 return null;
             }
 
-            var (errors, warnings) = DiagnosticsPanel.CountsFor(d => d.Node?.Input == input || d.Node is null && d.Source == input.BaseTitle);
+            var (errors, warnings) = main.DiagnosticsPanel.CountsFor(d => d.Node?.Input == input || d.Node is null && d.Source == input.BaseTitle);
             var format = input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "resource fork";
             return new StatusSummary(input.BaseTitle, format, input.Root.Leaves().Count(), errors, warnings);
         }
     }
 
     // The summary changes with the selection, the open files and the diagnostics.
-    private void WatchSummary()
+    internal void WatchSummary()
     {
-        Roots.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Summary));
-        DiagnosticsPanel.PropertyChanged += (_, e) =>
+        main.Roots.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Summary));
+        main.DiagnosticsPanel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(DiagnosticsPanel.ErrorCount) or nameof(DiagnosticsPanel.WarningCount))
             {
                 OnPropertyChanged(nameof(Summary));
             }
         };
-        PropertyChanged += (_, e) =>
+        main.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(Selected))
+            if (e.PropertyName == nameof(MainViewModel.Selected))
             {
                 OnPropertyChanged(nameof(Summary));
             }
@@ -99,7 +99,7 @@ public sealed partial class MainViewModel
         ProgressValue = 0;
         ProgressMaximum = maximum;
         ProgressText = text;
-        return new WorkProgress(this);
+        return new WorkProgress(main);
     }
 
     /// <summary>
@@ -128,7 +128,7 @@ public sealed partial class MainViewModel
             {
                 if (!finished)
                 {
-                    model.ProgressValue = done;
+                    model.StatusLine.ProgressValue = done;
                 }
             }
         }
@@ -144,7 +144,7 @@ public sealed partial class MainViewModel
                 }
 
                 finished = true;
-                model.ProgressText = null;
+                model.StatusLine.ProgressText = null;
                 if (status is not null)
                 {
                     model.Status = status;

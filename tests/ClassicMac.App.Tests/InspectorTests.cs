@@ -197,12 +197,12 @@ public sealed class InspectorTests : IDisposable
         Assert.True(model.CancelFormCommand.CanExecute(null));
         var form = Assert.IsType<StringListForm>(model.Form);
         form.Strings[0].Text = "uno";
-        Assert.True(model.HasDraft);
+        Assert.True(model.Drafts.HasDraft);
 
         model.CancelFormCommand.Execute(null);
 
         Assert.False(model.IsEditingForm);
-        Assert.False(model.HasDraft);
+        Assert.False(model.Drafts.HasDraft);
         Assert.Equal("one", Assert.IsType<StringListForm>(model.Form).Strings[0].Text);
         Assert.False(input.IsUnsaved);
     }

@@ -38,7 +38,7 @@ public sealed partial class DetailsActions(MainViewModel main) : ObservableObjec
 
     /// <summary>Copy all: the details as plain "Label: value" lines on the clipboard.</summary>
     [RelayCommand(CanExecute = nameof(CanCopyDetails))]
-    private Task CopyDetails() => main.Shell?.CopyTextAsync(main.Details.CopyText) ?? Task.CompletedTask;
+    private Task CopyDetails() => main.ShellActions.Shell?.CopyTextAsync(main.Details.CopyText) ?? Task.CompletedTask;
 
     private bool CanGoToIn() => main.Details.InNode is not null;
 

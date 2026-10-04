@@ -69,7 +69,7 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(IsEditingForm))]
     private void CancelForm()
     {
-        DiscardDraft();
+        Drafts.DiscardDraft();
         IsEditingForm = false;
     }
 

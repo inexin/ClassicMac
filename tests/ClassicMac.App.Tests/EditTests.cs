@@ -185,25 +185,25 @@ public sealed class EditTests : EditTestsBase
             (image.Pixels[i], image.Pixels[i + 3]) = (200, 255);   // red top half
         }
 
-        model.LoadImage = _ => image;
+        model.ImportActions.LoadImage = _ => image;
         picker.Open = Path.Combine(folder, "art.png");
 
         // A picture, at the next free ID, named.
         model.Selected = file;
         dialogs.Import = c => c with { Name = "art" };
-        await model.ImportCommand.ExecuteAsync(null);
+        await model.ImportActions.ImportCommand.ExecuteAsync(null);
         var pict = ((ResourceNode)model.Selected!).Resource;
         Assert.Equal(("PICT", (short)128, "art"), (pict.Type.ToString(), pict.Id, pict.Name?.ToMacRoman()));
-        Assert.Contains(MainViewModel.IconFamily, dialogs.ImportTypes);
+        Assert.Contains(ImportActions.IconFamily, dialogs.ImportTypes);
 
         // An icon family: six resources in one edit; again with the ICN# selected, its data replaced after asking.
-        dialogs.Import = c => c with { Type = MainViewModel.IconFamily, Id = 200 };
-        await model.ImportCommand.ExecuteAsync(null);
+        dialogs.Import = c => c with { Type = ImportActions.IconFamily, Id = 200 };
+        await model.ImportActions.ImportCommand.ExecuteAsync(null);
         var fork = file.Editing!.Session.Fork;
         Assert.All(new[] { "ICN#", "icl4", "icl8", "ics#", "ics4", "ics8" }, t => Assert.NotNull(fork.Find(FourCC.FromString(t), 200)));
         Assert.Equal("_Undo Import art.png", model.UndoTitle);
         dialogs.Confirm = false;
-        await model.ImportCommand.ExecuteAsync(null);
+        await model.ImportActions.ImportCommand.ExecuteAsync(null);
         Assert.Equal("_Undo Import art.png", model.UndoTitle);                          // declined: nothing done
         model.UndoCommand.Execute(null);
         Assert.Null(fork.Find(FourCC.FromString("icl8"), 200));
@@ -213,13 +213,13 @@ public sealed class EditTests : EditTestsBase
         File.WriteAllBytes(picker.Open, [.. "RIFF"u8, 36, 0, 0, 0, .. "WAVEfmt "u8, 16, 0, 0, 0, 1, 0, 1, 0, 0x11, 0x2B, 0, 0, 0x11, 0x2B, 0, 0, 1, 0, 8, 0,
             .. "data"u8, 4, 0, 0, 0, 128, 200, 128, 50]);
         dialogs.Import = c => c;
-        await model.ImportCommand.ExecuteAsync(null);
+        await model.ImportActions.ImportCommand.ExecuteAsync(null);
         Assert.Equal(["snd "], dialogs.ImportTypes);
         var snd = ((ResourceNode)model.Selected!).Resource;
         Assert.Equal("snd ", snd.Type.ToString());
         Assert.Equal(new byte[] { 128, 200, 128, 50 }, snd.GetData()[^4..].ToArray());
         File.WriteAllBytes(picker.Open, [1, 2, 3]);
-        await model.ImportCommand.ExecuteAsync(null);
+        await model.ImportActions.ImportCommand.ExecuteAsync(null);
         Assert.StartsWith("“beep.wav” could not be imported", model.Status);
     }
 
@@ -243,7 +243,7 @@ public sealed class EditTests : EditTestsBase
         File.WriteAllBytes(picker.Open, Wav(128, 200, 128, 50));
         model.Selected = file;
         dialogs.Import = c => c;
-        await model.ImportCommand.ExecuteAsync(null);
+        await model.ImportActions.ImportCommand.ExecuteAsync(null);
         await model.PreviewTask;
         var snd = ((ResourceNode)model.Selected!).Resource;
         Assert.True(model.SoundHeaderActions.IsSoundResource);
@@ -423,27 +423,27 @@ public sealed class EditTests : EditTestsBase
         var (model, file, dialogs, picker, _) = await Open();
         var image = new RgbaBitmap(40, 20);
         Array.Fill(image.Pixels, (byte)255);
-        model.LoadImage = _ => image;
+        model.ImportActions.LoadImage = _ => image;
         picker.Open = Path.Combine(folder, "art.png");
         model.Selected = file;
         dialogs.Import = _ => null;
-        await model.ImportCommand.ExecuteAsync(null);
+        await model.ImportActions.ImportCommand.ExecuteAsync(null);
         var source = dialogs.Source!;
         Assert.Equal("40 × 20 · 24-bit", source.Details);                // opaque
         var pict = Assert.Single(source.Preview("PICT"));
         Assert.Equal((40, 20, "PICT"), (pict.Width, pict.Height, pict.Caption));
         Assert.Equal((32, 32, "ICN#"), Assert.Single(source.Preview("ICN#")) is var icn ? (icn.Width, icn.Height, icn.Caption) : default);
-        Assert.Equal(["ICN#", "icl4", "icl8", "ics#", "ics4", "ics8"], source.Preview(MainViewModel.IconFamily).Select(i => i.Caption));
+        Assert.Equal(["ICN#", "icl4", "icl8", "ics#", "ics4", "ics8"], source.Preview(ImportActions.IconFamily).Select(i => i.Caption));
         Assert.Empty(source.Preview("snd "));                             // not one an image makes
 
         image.Pixels[3] = 0;                                              // a transparent pixel
-        await model.ImportCommand.ExecuteAsync(null);
+        await model.ImportActions.ImportCommand.ExecuteAsync(null);
         Assert.Equal("40 × 20 · 32-bit with alpha", dialogs.Source!.Details);
 
         picker.Open = Path.Combine(folder, "beep.wav");
         File.WriteAllBytes(picker.Open, [.. "RIFF"u8, 36, 0, 0, 0, .. "WAVEfmt "u8, 16, 0, 0, 0, 1, 0, 1, 0, 0x11, 0x2B, 0, 0, 0x11, 0x2B, 0, 0, 1, 0, 8, 0,
             .. "data"u8, 4, 0, 0, 0, 128, 200, 128, 50]);
-        await model.ImportCommand.ExecuteAsync(null);
+        await model.ImportActions.ImportCommand.ExecuteAsync(null);
         Assert.StartsWith("11025 Hz, mono, 8-bit", dialogs.Source!.Details);
         Assert.Empty(dialogs.Source.Preview("snd "));
     }
@@ -546,11 +546,11 @@ public sealed class EditTests : EditTestsBase
     {
         var (model, input, dialogs, picker, path, original) = await OpenVolume();
         model.Selected = input;
-        Assert.True(model.NewFolderCommand.CanExecute(null));
-        Assert.False(model.DeleteItemCommand.CanExecute(null));          // the volume itself
+        Assert.True(model.VolumeActions.NewFolderCommand.CanExecute(null));
+        Assert.False(model.VolumeActions.DeleteItemCommand.CanExecute(null));          // the volume itself
 
         dialogs.FolderName = "Docs";
-        await model.NewFolderCommand.ExecuteAsync(null);
+        await model.VolumeActions.NewFolderCommand.ExecuteAsync(null);
         var docs = Assert.IsType<FolderNode>(model.Selected);
         Assert.Equal("Docs", docs.Title);
         Assert.Contains(docs, input.Children);
@@ -558,7 +558,7 @@ public sealed class EditTests : EditTestsBase
         Assert.EndsWith("•", input.Title);
 
         dialogs.NewFile = c => c with { Name = "Notes", Type = "TEXT", Creator = "ttxt" };
-        await model.NewFileCommand.ExecuteAsync(null);
+        await model.VolumeActions.NewFileCommand.ExecuteAsync(null);
         var notes = Assert.IsType<FileNode>(model.Selected);
         Assert.Same(docs, notes.Parent);
 
@@ -577,13 +577,13 @@ public sealed class EditTests : EditTestsBase
         model.Selected = input.Children.Single(n => n.Title == "Other");     // a file: its folder (the root) gets the new one
         NewFileChoice? offered = null;
         dialogs.NewFile = c => offered = c;
-        await model.ImportFileCommand.ExecuteAsync(null);
+        await model.VolumeActions.ImportFileCommand.ExecuteAsync(null);
         Assert.Equal(new NewFileChoice("Imported", "APPL", "abcd"), offered);
         var imported = Assert.IsType<FileNode>(model.Selected);
         Assert.Same(input, imported.Parent);
 
         model.Selected = input.Children.Single(n => n.Title == "Other");
-        await model.DeleteItemCommand.ExecuteAsync(null);
+        await model.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
         Assert.DoesNotContain(input.Children, n => n.Title == "Other");
 
         Assert.Equal(original, File.ReadAllBytes(path));                 // nothing written until Save As
@@ -606,18 +606,18 @@ public sealed class EditTests : EditTestsBase
 
         dialogs.Confirm = false;                                           // asked first: no
         model.Selected = folderNode;
-        await model.DeleteItemCommand.ExecuteAsync(null);
+        await model.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
         Assert.Contains(folderNode, input.Children);
         Assert.False(model.HasUnsavedChanges);
 
         dialogs.Confirm = true;
-        await model.DeleteItemCommand.ExecuteAsync(null);
+        await model.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
         Assert.DoesNotContain(folderNode, input.Children);
         Assert.Same(input, model.Selected);
 
         // A new file's resources are edited like any other's, and saved into the image with it.
         dialogs.NewFile = c => c with { Name = "Fresh" };
-        await model.NewFileCommand.ExecuteAsync(null);
+        await model.VolumeActions.NewFileCommand.ExecuteAsync(null);
         var fresh = Assert.IsType<FileNode>(model.Selected);
         dialogs.Info = i => i with { Type = "STR ", Id = 300 };
         await model.NewResourceCommand.ExecuteAsync(null);
@@ -649,13 +649,13 @@ public sealed class EditTests : EditTestsBase
         var disk = input.Children.OfType<ContainerFileNode>().Single();
 
         model.Selected = disk;
-        Assert.True(model.NewFolderCommand.CanExecute(null));
+        Assert.True(model.VolumeActions.NewFolderCommand.CanExecute(null));
         dialogs.FolderName = "Docs";
-        await model.NewFolderCommand.ExecuteAsync(null);
+        await model.VolumeActions.NewFolderCommand.ExecuteAsync(null);
         Assert.IsType<FolderNode>(model.Selected);
         model.Selected = disk.Children.Single(n => n.Title == "Read Me");
         dialogs.Confirm = true;
-        await model.DeleteItemCommand.ExecuteAsync(null);
+        await model.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
         Assert.True(model.HasUnsavedChanges);
         Assert.Equal(original, File.ReadAllBytes(path));                 // nothing written until Save As
 
@@ -676,25 +676,25 @@ public sealed class EditTests : EditTestsBase
         var (model, input, dialogs, _, _, _) = await OpenVolume();
         model.Selected = input;
         dialogs.FolderName = "Bad:Name";
-        await model.NewFolderCommand.ExecuteAsync(null);
+        await model.VolumeActions.NewFolderCommand.ExecuteAsync(null);
         Assert.Contains("Could not", model.Status);
         Assert.False(model.HasUnsavedChanges);
 
         dialogs.FolderName = "Folder";                                     // already there
-        await model.NewFolderCommand.ExecuteAsync(null);
+        await model.VolumeActions.NewFolderCommand.ExecuteAsync(null);
         Assert.Contains("Could not", model.Status);
         Assert.False(model.HasUnsavedChanges);
 
         dialogs.NewFile = c => c with { Type = "TOOLONG" };
-        await model.NewFileCommand.ExecuteAsync(null);
+        await model.VolumeActions.NewFileCommand.ExecuteAsync(null);
         Assert.Contains("four Mac OS Roman", model.Status);
 
         // A MacBinary file is no volume.
         var (other, file, _, _, _) = await Open();
         other.Selected = file;
-        Assert.False(other.NewFileCommand.CanExecute(null));
-        Assert.False(other.NewFolderCommand.CanExecute(null));
-        Assert.False(other.DeleteItemCommand.CanExecute(null));
+        Assert.False(other.VolumeActions.NewFileCommand.CanExecute(null));
+        Assert.False(other.VolumeActions.NewFolderCommand.CanExecute(null));
+        Assert.False(other.VolumeActions.DeleteItemCommand.CanExecute(null));
         Assert.False(other.SaveAsCommand.CanExecute(SaveAsFormat.HfsImage));
     }
 

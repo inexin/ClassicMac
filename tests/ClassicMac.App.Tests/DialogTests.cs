@@ -30,7 +30,7 @@ public class DialogTests
     // An image's source: what each choice makes, one 32 × 32 icon per made resource (six for the family).
     private static readonly ImportSource Art = new("32 × 32 · 24-bit", type => type switch
     {
-        _ when type == MainViewModel.IconFamily => ImageImport.IconFamilyTypes.Select(t => new PreviewImage(Icon(t.StartsWith("ics", StringComparison.Ordinal) ? 16 : 32), 32, 32, t)).ToList(),
+        _ when type == ImportActions.IconFamily => ImageImport.IconFamilyTypes.Select(t => new PreviewImage(Icon(t.StartsWith("ics", StringComparison.Ordinal) ? 16 : 32), 32, 32, t)).ToList(),
         "snd " => [],
         _ => [new PreviewImage(Icon(32), 32, 32, type)],
     });
@@ -132,7 +132,7 @@ public class DialogTests
     [Fact]
     public void Import_offers_what_to_make_as_choices() => OnUiThread(() =>
     {
-        IReadOnlyList<string> types = [.. ImageImport.Types, MainViewModel.IconFamily];
+        IReadOnlyList<string> types = [.. ImageImport.Types, ImportActions.IconFamily];
         var dialog = Show(DialogViews.Import("art.png", types, new ImportChoice("icl8", 128, ""), Art));
         AssertFrame(dialog.Window, "Import “art.png”", "Import", "Cancel");
         var options = dialog.Options;
@@ -160,7 +160,7 @@ public class DialogTests
         Assert.Equal(["Icon family"], Rows().Where(r => r.Classes.Contains("chosen")).Select(r => options.Options[Rows().IndexOf(r)].Label));
         Assert.Equal([.. ImageImport.IconFamilyTypes], Captions(strip));
         Footer(dialog.Window, "Import").Command!.Execute(null);
-        Assert.Equal(new ImportChoice(MainViewModel.IconFamily, 128, ""), dialog.Result);
+        Assert.Equal(new ImportChoice(ImportActions.IconFamily, 128, ""), dialog.Result);
     });
 
     private static List<string?> Captions(ItemsControl strip) =>
@@ -201,7 +201,7 @@ public class DialogTests
         Assert.All(sound.Options.Where(o => o.Label != "Sound"), o => Assert.False(o.IsEnabled));
         Assert.Equal("needs an image", sound.Options[0].Note);
 
-        var image = new ImportOptions([.. ImageImport.Types, MainViewModel.IconFamily], "PICT");
+        var image = new ImportOptions([.. ImageImport.Types, ImportActions.IconFamily], "PICT");
         Assert.Equal(("Picture", "PICT"), (image.Selected.Label, image.Type));
         Assert.Equal("PICT", image.Selected.Code);
         Assert.Equal(["ICN#", "icl8", "icl4", "ics#", "ics8", "ics4", "icm#", "icm8", "icm4", "ICON"], image.Kinds);
@@ -284,7 +284,7 @@ public class DialogTests
         var save = Show(DialogViews.SaveChanges("Mac OS 9.hfv", "3 resources in Finder were edited."));
         Baselines.Check(save.Window, "dialog-unsaved", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
         save.Window.Close();
-        var import = Show(DialogViews.Import("art.png", [.. ImageImport.Types, MainViewModel.IconFamily], new ImportChoice("PICT", 128, ""), Art));
+        var import = Show(DialogViews.Import("art.png", [.. ImageImport.Types, ImportActions.IconFamily], new ImportChoice("PICT", 128, ""), Art));
         Baselines.Check(import.Window, "dialog-import", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
         import.Window.Close();
         Baselines.Verify(baselines);

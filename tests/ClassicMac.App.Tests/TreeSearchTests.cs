@@ -47,8 +47,8 @@ public sealed class TreeSearchTests : IDisposable
     {
         var (model, input) = await Open();
         var games = Node(input, "Games");
-        model.FilterText = "READ";
-        await model.FilterTask;
+        model.TreeSearch.FilterText = "READ";
+        await model.TreeSearch.FilterTask;
         Assert.False(input.IsFilteredOut);
         Assert.False(games.IsFilteredOut);
         Assert.True(games.IsExpanded);
@@ -61,8 +61,8 @@ public sealed class TreeSearchTests : IDisposable
         Assert.True(Node(input, "Manual").IsFilteredOut);
         Assert.True(Node(input, "Art").IsFilteredOut);
 
-        model.ClearFilterCommand.Execute(null);
-        Assert.Equal("", model.FilterText);
+        model.TreeSearch.ClearFilterCommand.Execute(null);
+        Assert.Equal("", model.TreeSearch.FilterText);
         Assert.All(All(input).Prepend(input), n => Assert.False(n.IsFilteredOut));
         Assert.Null(readMe.Match);
         Assert.Equal(("Read Me", "", ""), (readMe.NameBefore, readMe.NameMatch, readMe.NameAfter));
@@ -72,8 +72,8 @@ public sealed class TreeSearchTests : IDisposable
     public async Task A_matching_folder_keeps_what_it_holds()
     {
         var (model, input) = await Open();
-        model.FilterText = "game";
-        await model.FilterTask;
+        model.TreeSearch.FilterText = "game";
+        await model.TreeSearch.FilterTask;
         var games = Node(input, "Games");
         Assert.Equal((0, 4), games.Match);
         Assert.All(games.Children, c => Assert.False(c.IsFilteredOut));
@@ -86,8 +86,8 @@ public sealed class TreeSearchTests : IDisposable
         var (model, input) = await Open();
         var wrap = input.Children.OfType<ContainerFileNode>().Single();
         Assert.True(wrap.IsUnread);
-        model.FilterText = "inner";
-        await model.FilterTask;
+        model.TreeSearch.FilterText = "inner";
+        await model.TreeSearch.FilterTask;
         Assert.False(wrap.IsUnread);
         var found = All(wrap).Single(n => n.Name == "Inner Realm");
         Assert.False(found.IsFilteredOut);
@@ -102,21 +102,21 @@ public sealed class TreeSearchTests : IDisposable
         var (model, input) = await Open();
         var art = Node(input, "Art");
         var group = Assert.IsType<NoNameGroupNode>(Assert.Single(art.Children));
-        model.FilterText = "sp";
-        await model.FilterTask;
+        model.TreeSearch.FilterText = "sp";
+        await model.TreeSearch.FilterTask;
         Assert.True(art.IsFilteredOut);
         Assert.All(group.Children, c => Assert.True(c.IsFilteredOut));
 
-        model.FilterText = "no name";
-        await model.FilterTask;
+        model.TreeSearch.FilterText = "no name";
+        await model.TreeSearch.FilterTask;
         Assert.False(group.IsFilteredOut);
         Assert.Equal((0, 7), group.Match);
         Assert.All(group.Children, c => Assert.False(c.IsFilteredOut));   // shown inside the matching group
 
-        model.FilterText = "";
-        await model.FilterTask;
-        model.TypeAhead("sp");
-        Assert.Equal(0, model.MatchCount);
+        model.TreeSearch.FilterText = "";
+        await model.TreeSearch.FilterTask;
+        model.TreeSearch.TypeAhead("sp");
+        Assert.Equal(0, model.TreeSearch.MatchCount);
     }
 
     [Fact]
@@ -127,13 +127,13 @@ public sealed class TreeSearchTests : IDisposable
         var games = Node(input, "Games");
         var readMe = Node(games, "Read Me");
         var realmz = Node(games, "Realmz");
-        Assert.False(model.IsTypeAheadOpen);
+        Assert.False(model.TreeSearch.IsTypeAheadOpen);
 
-        model.TypeAhead("rE");                                               // (one letter would select Wrap.bin, whose preview reads it)
-        model.TypeAhead("a");
-        Assert.Equal("rEa", model.TypeAheadText);
-        Assert.True(model.IsTypeAheadOpen);
-        Assert.Equal((1, 2, "1 of 2 loaded matches"), (model.MatchNumber, model.MatchCount, model.TypeAheadSummary));
+        model.TreeSearch.TypeAhead("rE");                                               // (one letter would select Wrap.bin, whose preview reads it)
+        model.TreeSearch.TypeAhead("a");
+        Assert.Equal("rEa", model.TreeSearch.TypeAheadText);
+        Assert.True(model.TreeSearch.IsTypeAheadOpen);
+        Assert.Equal((1, 2, "1 of 2 loaded matches"), (model.TreeSearch.MatchNumber, model.TreeSearch.MatchCount, model.TreeSearch.TypeAheadSummary));
         Assert.Same(readMe, model.Selected);
         Assert.True(games.IsExpanded);
         Assert.True(readMe.IsCurrentMatch);
@@ -143,32 +143,32 @@ public sealed class TreeSearchTests : IDisposable
         Assert.True(games.IsDimmed);
         Assert.False(readMe.IsDimmed);
 
-        model.NextMatchCommand.Execute(null);                                // F3
+        model.TreeSearch.NextMatchCommand.Execute(null);                                // F3
         Assert.Same(realmz, model.Selected);
-        Assert.Equal("2 of 2 loaded matches", model.TypeAheadSummary);
+        Assert.Equal("2 of 2 loaded matches", model.TreeSearch.TypeAheadSummary);
         Assert.True(realmz.IsCurrentMatch);
         Assert.False(readMe.IsCurrentMatch);
-        model.NextMatchCommand.Execute(null);                                // wraps
+        model.TreeSearch.NextMatchCommand.Execute(null);                                // wraps
         Assert.Same(readMe, model.Selected);
-        model.PreviousMatchCommand.Execute(null);                            // Shift+F3, wraps back
+        model.TreeSearch.PreviousMatchCommand.Execute(null);                            // Shift+F3, wraps back
         Assert.Same(realmz, model.Selected);
 
-        model.TypeAhead("l");                                                // "real": the selection still matches
-        Assert.Equal("1 of 1 loaded match", model.TypeAheadSummary);
+        model.TreeSearch.TypeAhead("l");                                                // "real": the selection still matches
+        Assert.Equal("1 of 1 loaded match", model.TreeSearch.TypeAheadSummary);
         Assert.Same(realmz, model.Selected);
-        model.TypeAheadBackspace();                                          // "rea": from the selection on
-        Assert.Equal("2 of 2 loaded matches", model.TypeAheadSummary);
-        Assert.Same(realmz, model.Selected);
-
-        model.TypeAhead("x");
-        Assert.Equal((0, "No loaded matches"), (model.MatchCount, model.TypeAheadSummary));
-        Assert.Same(realmz, model.Selected);
-        model.NextMatchCommand.Execute(null);                                // nothing to go to
+        model.TreeSearch.TypeAheadBackspace();                                          // "rea": from the selection on
+        Assert.Equal("2 of 2 loaded matches", model.TreeSearch.TypeAheadSummary);
         Assert.Same(realmz, model.Selected);
 
-        model.ClearTypeAheadCommand.Execute(null);                           // Esc
-        Assert.False(model.IsTypeAheadOpen);
-        Assert.Equal("", model.TypeAheadText);
+        model.TreeSearch.TypeAhead("x");
+        Assert.Equal((0, "No loaded matches"), (model.TreeSearch.MatchCount, model.TreeSearch.TypeAheadSummary));
+        Assert.Same(realmz, model.Selected);
+        model.TreeSearch.NextMatchCommand.Execute(null);                                // nothing to go to
+        Assert.Same(realmz, model.Selected);
+
+        model.TreeSearch.ClearTypeAheadCommand.Execute(null);                           // Esc
+        Assert.False(model.TreeSearch.IsTypeAheadOpen);
+        Assert.Equal("", model.TreeSearch.TypeAheadText);
         Assert.All(All(input), n => Assert.False(n.IsDimmed || n.IsCurrentMatch || n.Match is not null));
     }
 
@@ -176,26 +176,26 @@ public sealed class TreeSearchTests : IDisposable
     public async Task Typing_skips_loading_rows_filtered_rows_and_unread_containers()
     {
         var (model, input) = await Open();
-        model.TypeAhead("inner");                                            // inside Wrap.bin, not read: not a loaded match
-        Assert.Equal(0, model.MatchCount);
-        model.TypeAheadBackspace();
-        model.TypeAheadBackspace();
-        model.TypeAheadBackspace();
-        model.TypeAheadBackspace();
-        model.TypeAheadBackspace();
-        Assert.False(model.IsTypeAheadOpen);                                 // all typed away: closed
-        model.TypeAheadBackspace();                                          // nothing to remove
-        Assert.False(model.IsTypeAheadOpen);
+        model.TreeSearch.TypeAhead("inner");                                            // inside Wrap.bin, not read: not a loaded match
+        Assert.Equal(0, model.TreeSearch.MatchCount);
+        model.TreeSearch.TypeAheadBackspace();
+        model.TreeSearch.TypeAheadBackspace();
+        model.TreeSearch.TypeAheadBackspace();
+        model.TreeSearch.TypeAheadBackspace();
+        model.TreeSearch.TypeAheadBackspace();
+        Assert.False(model.TreeSearch.IsTypeAheadOpen);                                 // all typed away: closed
+        model.TreeSearch.TypeAheadBackspace();                                          // nothing to remove
+        Assert.False(model.TreeSearch.IsTypeAheadOpen);
 
-        model.TypeAhead("loading");
-        Assert.Equal(0, model.MatchCount);
-        model.ClearTypeAheadCommand.Execute(null);
+        model.TreeSearch.TypeAhead("loading");
+        Assert.Equal(0, model.TreeSearch.MatchCount);
+        model.TreeSearch.ClearTypeAheadCommand.Execute(null);
 
-        model.FilterText = "manual";
-        await model.FilterTask;
-        model.TypeAhead("rea");                                              // Games is filtered out
-        Assert.Equal(0, model.MatchCount);
-        model.ClearTypeAheadCommand.Execute(null);
+        model.TreeSearch.FilterText = "manual";
+        await model.TreeSearch.FilterTask;
+        model.TreeSearch.TypeAhead("rea");                                              // Games is filtered out
+        Assert.Equal(0, model.TreeSearch.MatchCount);
+        model.TreeSearch.ClearTypeAheadCommand.Execute(null);
         Assert.Equal((0, 6), Node(input, "Manual").Match);                  // the filter's highlight comes back
     }
 
@@ -203,11 +203,11 @@ public sealed class TreeSearchTests : IDisposable
     public async Task The_filter_applies_to_trees_laid_out_again()
     {
         var (model, input) = await Open();
-        model.FilterText = "sp";
-        await model.FilterTask;
+        model.TreeSearch.FilterText = "sp";
+        await model.TreeSearch.FilterTask;
         model.TreeDisplay.GroupNoName = false;                               // the files show as "(no name)" rows
-        model.FilterText = "(no";
-        await model.FilterTask;
+        model.TreeSearch.FilterText = "(no";
+        await model.TreeSearch.FilterTask;
         var art = Node(input, "Art");
         Assert.All(art.Children, c => Assert.Equal((0, 3), c.Match));
         model.TreeDisplay.GroupNoName = true;                                // grouped again: skipped

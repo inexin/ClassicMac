@@ -293,7 +293,7 @@ public sealed class TreePerformanceTests
             many.IsExpanded = true;
             Render(window);
 
-            model.TypeAhead("File 4321");
+            model.TreeSearch.TypeAhead("File 4321");
             Render(window);
             Render(window);
 

@@ -26,15 +26,15 @@ public sealed class RecentFilesTests : IDisposable
     {
         var model = new MainViewModel();
         var changes = new System.Collections.Concurrent.ConcurrentQueue<string?>();  // background preview tasks raise on the thread pool
-        model.PropertyChanged += (_, e) => changes.Enqueue(e.PropertyName);
-        Assert.True(model.IsEmpty);
+        model.EmptyState.PropertyChanged += (_, e) => changes.Enqueue(e.PropertyName);
+        Assert.True(model.EmptyState.IsEmpty);
         var input = (await model.OpenAsync(Fork("A.rsrc")))!;
         await model.PreviewTask;
-        Assert.False(model.IsEmpty);
-        Assert.Contains(nameof(MainViewModel.IsEmpty), changes);
+        Assert.False(model.EmptyState.IsEmpty);
+        Assert.Contains(nameof(EmptyState.IsEmpty), changes);
         model.Selected = input;
         await model.CloseCommand.ExecuteAsync(null);
-        Assert.True(model.IsEmpty);
+        Assert.True(model.EmptyState.IsEmpty);
     }
 
     [Fact]
@@ -42,8 +42,8 @@ public sealed class RecentFilesTests : IDisposable
     {
         var store = new MemorySettingsStore();
         var model = new MainViewModel(store);
-        Assert.Empty(model.RecentFiles);
-        Assert.False(model.HasRecentFiles);
+        Assert.Empty(model.EmptyState.RecentFiles);
+        Assert.False(model.EmptyState.HasRecentFiles);
         var paths = Enumerable.Range(0, 12).Select(i => Fork($"F{i}.rsrc")).ToList();
         foreach (var path in paths)
         {
@@ -52,17 +52,17 @@ public sealed class RecentFilesTests : IDisposable
 
         await model.OpenAsync(paths[5]);                                   // again: moves to the top, no duplicate
 
-        Assert.True(model.HasRecentFiles);
+        Assert.True(model.EmptyState.HasRecentFiles);
         Assert.Equal([paths[5], paths[11], paths[10], paths[9], paths[8], paths[7], paths[6], paths[4], paths[3], paths[2]],
-            model.RecentFiles.Select(r => r.Path));
-        Assert.Equal(model.RecentFiles.Select(r => r.Path), store.Settings.RecentFiles);
-        var first = model.RecentFiles[0];
+            model.EmptyState.RecentFiles.Select(r => r.Path));
+        Assert.Equal(model.EmptyState.RecentFiles.Select(r => r.Path), store.Settings.RecentFiles);
+        var first = model.EmptyState.RecentFiles[0];
         Assert.Equal(("F5.rsrc", folder, true, TreeIconKind.Document), (first.Name, first.Folder, first.Exists, first.IconKind));
 
         // A new session reads the list back.
         var again = new MainViewModel(store);
-        Assert.Equal(model.RecentFiles.Select(r => r.Path), again.RecentFiles.Select(r => r.Path));
-        Assert.True(again.RecentFiles.All(r => r.Exists));
+        Assert.Equal(model.EmptyState.RecentFiles.Select(r => r.Path), again.EmptyState.RecentFiles.Select(r => r.Path));
+        Assert.True(again.EmptyState.RecentFiles.All(r => r.Exists));
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public sealed class RecentFilesTests : IDisposable
     {
         var model = new MainViewModel();
         await model.OpenAsync(Path.Combine(folder, "missing.img"));
-        Assert.Empty(model.RecentFiles);
+        Assert.Empty(model.EmptyState.RecentFiles);
     }
 
     [Fact]
@@ -78,7 +78,7 @@ public sealed class RecentFilesTests : IDisposable
     {
         var path = Fork("A.rsrc");
         var model = new MainViewModel(new MemorySettingsStore(new AppSettings(RecentFiles: [path])));
-        await model.OpenRecentCommand.ExecuteAsync(model.RecentFiles[0]);
+        await model.EmptyState.OpenRecentCommand.ExecuteAsync(model.EmptyState.RecentFiles[0]);
         Assert.Equal(path, Assert.Single(model.Roots).Path);
         Assert.Same(model.Roots[0], model.Selected);
     }
@@ -90,11 +90,11 @@ public sealed class RecentFilesTests : IDisposable
         var gone = Path.Combine(folder, "Gone.img");
         var store = new MemorySettingsStore(new AppSettings(RecentFiles: [gone, kept]));
         var model = new MainViewModel(store);
-        Assert.Equal([false, true], model.RecentFiles.Select(r => r.Exists));
+        Assert.Equal([false, true], model.EmptyState.RecentFiles.Select(r => r.Exists));
 
-        await model.OpenRecentCommand.ExecuteAsync(model.RecentFiles[0]);
+        await model.EmptyState.OpenRecentCommand.ExecuteAsync(model.EmptyState.RecentFiles[0]);
         Assert.Empty(model.Roots);
-        Assert.Equal([kept], model.RecentFiles.Select(r => r.Path));
+        Assert.Equal([kept], model.EmptyState.RecentFiles.Select(r => r.Path));
         Assert.Equal([kept], store.Settings.RecentFiles);
         Assert.Contains("Gone.img", model.Status);
         Assert.Contains("not found", model.Status);
@@ -104,7 +104,7 @@ public sealed class RecentFilesTests : IDisposable
         File.Delete(kept);
         model.Selected = input;
         await model.CloseCommand.ExecuteAsync(null);
-        Assert.False(model.RecentFiles[0].Exists);
+        Assert.False(model.EmptyState.RecentFiles[0].Exists);
     }
 
     [Fact]
@@ -112,9 +112,9 @@ public sealed class RecentFilesTests : IDisposable
     {
         var store = new MemorySettingsStore(new AppSettings(RecentFiles: [Fork("A.rsrc")]));
         var model = new MainViewModel(store);
-        model.ClearRecentCommand.Execute(null);
-        Assert.Empty(model.RecentFiles);
-        Assert.False(model.HasRecentFiles);
+        model.EmptyState.ClearRecentCommand.Execute(null);
+        Assert.Empty(model.EmptyState.RecentFiles);
+        Assert.False(model.EmptyState.HasRecentFiles);
         Assert.Empty(store.Settings.RecentFiles);
     }
 
@@ -167,9 +167,9 @@ public sealed class RecentFilesTests : IDisposable
     public void A_drag_over_the_window_marks_the_drop_zone()
     {
         var model = new MainViewModel();
-        Assert.False(model.IsDropTarget);
-        model.IsDropTarget = true;
-        Assert.True(model.IsDropTarget);
+        Assert.False(model.EmptyState.IsDropTarget);
+        model.EmptyState.IsDropTarget = true;
+        Assert.True(model.EmptyState.IsDropTarget);
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public sealed class RecentFilesTests : IDisposable
     {
         var model = new MainViewModel();
         await model.OpenAsync(Path.Combine(folder, "missing.img"));          // unreadable: reported, nothing opened
-        Assert.True(model.IsEmpty);
+        Assert.True(model.EmptyState.IsEmpty);
         Assert.True(model.DiagnosticsPanel.IsExpanded);
         Assert.Null(model.DiagnosticsPanel.Placeholder);
     }

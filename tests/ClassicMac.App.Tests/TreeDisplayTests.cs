@@ -238,17 +238,17 @@ public sealed class VolumeTreeEditTests : EditTestsBase
 
         // A grouped file is deleted by its own name.
         model.Selected = group.Children.Single(c => c.Name == "tab");
-        Assert.True(model.DeleteItemCommand.CanExecute(null));
-        await model.DeleteItemCommand.ExecuteAsync(null);
+        Assert.True(model.VolumeActions.DeleteItemCommand.CanExecute(null));
+        await model.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
         Assert.Same(realmz, model.Selected);
         Assert.Equal(3, group.Children.Count);
         Assert.DoesNotContain(Files(input), f => PathOf(f) == "Realmz:\t");
 
         // New files go into the folder (from the group row too); one with no name joins the group.
         model.Selected = group;
-        Assert.True(model.NewFileCommand.CanExecute(null));
+        Assert.True(model.VolumeActions.NewFileCommand.CanExecute(null));
         dialogs.NewFile = c => c with { Name = "\r\r" };
-        await model.NewFileCommand.ExecuteAsync(null);
+        await model.VolumeActions.NewFileCommand.ExecuteAsync(null);
         Assert.Contains(Files(input), f => PathOf(f) == "Realmz:\r\r");
         var made = Assert.IsType<FileNode>(model.Selected);
         Assert.Same(realmz.Children.OfType<NoNameGroupNode>().Single(), made.Parent);
@@ -256,7 +256,7 @@ public sealed class VolumeTreeEditTests : EditTestsBase
 
         // Deleting the folder deletes the invisible Icon\r and the grouped files too.
         model.Selected = realmz;
-        await model.DeleteItemCommand.ExecuteAsync(null);
+        await model.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
         Assert.DoesNotContain(input.Children, c => c == realmz);
         Assert.DoesNotContain(Files(input), f => PathOf(f).StartsWith("Realmz", StringComparison.Ordinal));
         Assert.Contains(Files(input), f => PathOf(f) == "Desktop DB");

@@ -35,7 +35,7 @@ public sealed record RecentFile(string Path, bool Exists)
 }
 
 // The empty state (design/boards/empty-state.md, S5): shown while nothing is open, with the files opened last.
-public sealed partial class MainViewModel
+public sealed partial class EmptyState(MainViewModel main) : ObservableObject
 {
     private const int RecentLimit = 10;
 
@@ -49,7 +49,7 @@ public sealed partial class MainViewModel
     public bool HasRecentFiles => RecentFiles.Count > 0;
 
     /// <summary>Whether nothing is open: the inspector shows the drop zone and the Recent list.</summary>
-    public bool IsEmpty => Roots.Count == 0;
+    public bool IsEmpty => main.Roots.Count == 0;
 
     /// <summary>Whether files are being dragged over the window (the drop zone is marked).</summary>
     [ObservableProperty]
@@ -61,11 +61,11 @@ public sealed partial class MainViewModel
     private bool changingPanel;
 
     // Called once from the constructor: the list from the settings, and the empty state following the open inputs.
-    private void InitRecentFiles(IReadOnlyList<string> paths)
+    internal void InitRecentFiles(IReadOnlyList<string> paths)
     {
         ShowRecent(paths);
         RecentFiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecentFiles));
-        Roots.CollectionChanged += (_, _) =>
+        main.Roots.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(IsEmpty));
             if (IsEmpty)
@@ -79,16 +79,16 @@ public sealed partial class MainViewModel
                 LeaveEmptyState();
             }
         };
-        DiagnosticsPanel.PropertyChanged += (_, e) =>
+        main.DiagnosticsPanel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(DiagnosticsPanel.IsExpanded) && !changingPanel)
             {
                 panelCollapsedForEmpty = false;
             }
         };
-        DiagnosticsPanel.Entries.CollectionChanged += (_, _) =>
+        main.DiagnosticsPanel.Entries.CollectionChanged += (_, _) =>
         {
-            if (DiagnosticsPanel.Entries.Count > 0 && DiagnosticsPanel.Placeholder is not null)
+            if (main.DiagnosticsPanel.Entries.Count > 0 && main.DiagnosticsPanel.Placeholder is not null)
             {
                 LeaveEmptyState();
             }
@@ -100,13 +100,13 @@ public sealed partial class MainViewModel
     // collapses to its header, which says "Nothing opened yet".
     private void EnterEmptyState()
     {
-        Status = "Ready";
-        if (DiagnosticsPanel.Entries.Count > 0)
+        main.Status = "Ready";
+        if (main.DiagnosticsPanel.Entries.Count > 0)
         {
             return;
         }
-        DiagnosticsPanel.Placeholder = "Nothing opened yet";
-        if (DiagnosticsPanel.IsExpanded)
+        main.DiagnosticsPanel.Placeholder = "Nothing opened yet";
+        if (main.DiagnosticsPanel.IsExpanded)
         {
             SetPanelExpanded(false);
             panelCollapsedForEmpty = true;
@@ -116,7 +116,7 @@ public sealed partial class MainViewModel
     // Something opened (or reported): the placeholder goes, and a panel the empty state collapsed opens again.
     private void LeaveEmptyState()
     {
-        DiagnosticsPanel.Placeholder = null;
+        main.DiagnosticsPanel.Placeholder = null;
         if (panelCollapsedForEmpty)
         {
             SetPanelExpanded(true);
@@ -129,7 +129,7 @@ public sealed partial class MainViewModel
         changingPanel = true;
         try
         {
-            DiagnosticsPanel.IsExpanded = expanded;
+            main.DiagnosticsPanel.IsExpanded = expanded;
         }
         finally
         {
@@ -148,12 +148,12 @@ public sealed partial class MainViewModel
     }
 
     // A file read: it goes to the top of the list (once), which keeps ten.
-    private void AddRecent(string path)
+    internal void AddRecent(string path)
     {
         var full = Path.GetFullPath(path);
         var paths = RecentFiles.Select(r => r.Path).Where(p => !PathComparer.Equals(p, full)).Prepend(full).ToList();
         ShowRecent(paths);
-        SaveSettings();
+        main.SaveSettings();
     }
 
     /// <summary>Opens a recent file; one no longer there is removed from the list instead.</summary>
@@ -167,17 +167,17 @@ public sealed partial class MainViewModel
         if (!File.Exists(file.Path))
         {
             RecentFiles.Remove(file);
-            SaveSettings();
-            Status = $"{file.Name} was not found; it is removed from the recent files.";
+            main.SaveSettings();
+            main.Status = $"{file.Name} was not found; it is removed from the recent files.";
             return;
         }
-        await OpenAsync(file.Path);
+        await main.OpenAsync(file.Path);
     }
 
     [RelayCommand]
     private void ClearRecent()
     {
         RecentFiles.Clear();
-        SaveSettings();
+        main.SaveSettings();
     }
 }

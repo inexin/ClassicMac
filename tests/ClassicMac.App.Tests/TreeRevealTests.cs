@@ -108,7 +108,7 @@ public sealed class TreeRevealTests : IDisposable
         {
             var (model, window) = Open();
             ToTop(model, window);
-            model.TypeAhead("Delta 0350");
+            model.TreeSearch.TypeAhead("Delta 0350");
             Render(window);
             Assert.Equal("Delta 0350", model.Selected!.Title);
             AssertInView(window, model.Selected);

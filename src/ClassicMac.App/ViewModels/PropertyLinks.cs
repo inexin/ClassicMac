@@ -66,7 +66,7 @@ public sealed partial class PropertyLinks(MainViewModel main) : ObservableObject
 
     /// <summary>A row's right-click Copy as decimal, hex or JSON: <paramref name="text"/> on the clipboard.</summary>
     [RelayCommand(CanExecute = nameof(CanCopyProperty))]
-    private Task CopyProperty(string? text) => text is null ? Task.CompletedTask : main.Shell?.CopyTextAsync(text) ?? Task.CompletedTask;
+    private Task CopyProperty(string? text) => text is null ? Task.CompletedTask : main.ShellActions.Shell?.CopyTextAsync(text) ?? Task.CompletedTask;
 
     private static bool CanCopyProperty(string? text) => text is not null;
 

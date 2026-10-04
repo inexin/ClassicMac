@@ -136,7 +136,7 @@ public sealed class InspectorViewTests
             Assert.Contains(shown, t => t.Text == model.Status);
             Assert.False(window.FindControl<StackPanel>("Progress")!.IsEffectivelyVisible);
 
-            var progress = model.BeginProgress("Extracting Forms…", 10);
+            var progress = model.StatusLine.BeginProgress("Extracting Forms…", 10);
             progress.Apply(4);
             Dispatcher.UIThread.RunJobs();
             Assert.True(window.FindControl<StackPanel>("Progress")!.IsEffectivelyVisible);

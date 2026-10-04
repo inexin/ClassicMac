@@ -40,7 +40,7 @@ public interface IAudioPlayer
 
 // The sound preview's transport (design/boards/sound.md, P3, on A1): Play and Stop (Space), the playhead and its time,
 // a click on the waveform seeking, and Repeat the loop. Playback stops when the preview changes.
-public sealed partial class MainViewModel
+public sealed partial class SoundPlayback(MainViewModel main) : ObservableObject
 {
     private IAudioPlayer? audioPlayer;
 
@@ -76,10 +76,10 @@ public sealed partial class MainViewModel
     public string PlayheadText => Time(Playhead);
 
     /// <summary>The sound's length after the playhead's time: "/ 0:01.48".</summary>
-    public string SoundDurationText => "/ " + Time(Preview.Sound?.Duration ?? 0);
+    public string SoundDurationText => "/ " + Time(main.Preview.Sound?.Duration ?? 0);
 
     /// <summary>Whether the sound has a loop (the "Repeat the loop" box shows).</summary>
-    public bool HasSoundLoop => Preview.SoundLoop is not null;
+    public bool HasSoundLoop => main.Preview.SoundLoop is not null;
 
     private static string Time(double seconds)
     {
@@ -87,7 +87,7 @@ public sealed partial class MainViewModel
         return string.Create(CultureInfo.InvariantCulture, $"{minutes}:{seconds - minutes * 60:00.00}");
     }
 
-    private bool CanPlay() => Preview.Sound is not null && AudioPlayer is { Unavailable: null };
+    private bool CanPlay() => main.Preview.Sound is not null && AudioPlayer is { Unavailable: null };
 
     private bool CanPlaySound() => !IsPlaying && CanPlay();
 
@@ -104,17 +104,17 @@ public sealed partial class MainViewModel
     // Plays the preview's sound from `start` seconds, its loop repeating when Repeat the loop is on.
     private void PlayFrom(double start)
     {
-        if (Preview.Sound is not { } sound || AudioPlayer is not { } player)
+        if (main.Preview.Sound is not { } sound || AudioPlayer is not { } player)
         {
             return;
         }
 
-        var playing = Preview;
+        var playing = main.Preview;
         Playhead = start;
         IsPlaying = true;
-        player.Play(sound, start, RepeatLoop ? Preview.SoundLoop : null, () =>
+        player.Play(sound, start, RepeatLoop ? main.Preview.SoundLoop : null, () =>
         {
-            if (ReferenceEquals(Preview, playing))
+            if (ReferenceEquals(main.Preview, playing))
             {
                 IsPlaying = false;
                 Playhead = 0;
@@ -123,7 +123,7 @@ public sealed partial class MainViewModel
         if (player.Unavailable is { } why)
         {
             IsPlaying = false;
-            Status = why;
+            main.Status = why;
             OnPropertyChanged(nameof(PlaybackNote));
             NotifySoundCommands();
         }
@@ -155,7 +155,7 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanPlay))]
     private void SeekSound(double seconds)
     {
-        if (Preview.Sound is not { } sound)
+        if (main.Preview.Sound is not { } sound)
         {
             return;
         }
@@ -185,11 +185,12 @@ public sealed partial class MainViewModel
     {
         if (IsPlaying)
         {
-            AudioPlayer?.SetLoop(value ? Preview.SoundLoop : null);
+            AudioPlayer?.SetLoop(value ? main.Preview.SoundLoop : null);
         }
     }
 
-    partial void OnPreviewChanging(PreviewViewModel value)
+    // MainViewModel.Preview is about to change: a playing sound stops.
+    internal void OnPreviewChanging()
     {
         if (IsPlaying)
         {
@@ -198,7 +199,7 @@ public sealed partial class MainViewModel
     }
 
     // A new preview: the playhead back at the start, the transport's state for its sound.
-    private void OnSoundPreviewChanged()
+    internal void OnSoundPreviewChanged()
     {
         Playhead = 0;
         OnPropertyChanged(nameof(SoundDurationText));
@@ -210,33 +211,33 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void ShowInHex()
     {
-        if (Selected is not ResourceNode node)
+        if (main.Selected is not ResourceNode node)
         {
             return;
         }
 
-        Hex = HexViewModel.For(node);
-        HexSource = Hex.Sources[0];
-        SelectedTab = 2;
+        main.Hex = HexViewModel.For(node);
+        main.HexSource = main.Hex.Sources[0];
+        main.SelectedTab = 2;
     }
 
     /// <summary>The error state's Save raw data…: the resource's bytes as they are, to a .bin file.</summary>
     [RelayCommand]
     private async Task SaveRawData()
     {
-        if (Selected is not ResourceNode node || FilePicker is null)
+        if (main.Selected is not ResourceNode node || main.FilePicker is null)
         {
             return;
         }
 
         var stem = HostNames.ToHostName(MacString.FromMacRoman($"{node.Resource.Type.ToString().Trim()} {node.Resource.Id}"), 200);
-        var path = await FilePicker.PickSaveFileAsync($"Save raw data of {node.Resource}", stem + ".bin", [".bin"]);
+        var path = await main.FilePicker.PickSaveFileAsync($"Save raw data of {node.Resource}", stem + ".bin", [".bin"]);
         if (path is null)
         {
             return;
         }
 
         await File.WriteAllBytesAsync(path, node.Resource.GetData().ToArray());
-        Status = $"Saved the raw data of {node.Resource} to {path}.";
+        main.Status = $"Saved the raw data of {node.Resource} to {path}.";
     }
 }
