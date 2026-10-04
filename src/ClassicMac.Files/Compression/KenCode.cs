@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ClassicMac.Files.Compression;
 
@@ -218,7 +219,7 @@ internal static class KenCode
     // Bits most significant first, the last byte padded with zeros.
     private sealed class BitWriter
     {
-        private readonly System.IO.MemoryStream bytes = new();
+        private readonly List<byte> bytes = [];
         private int pending, pendingBits;
 
         public long Count { get; private set; }
@@ -230,7 +231,7 @@ internal static class KenCode
                 pending = (pending << 1) | ((value >> bit) & 1);
                 if (++pendingBits == 8)
                 {
-                    bytes.WriteByte((byte)pending);
+                    bytes.Add((byte)pending);
                     pending = pendingBits = 0;
                 }
             }
@@ -242,7 +243,7 @@ internal static class KenCode
         {
             if (pendingBits > 0)
             {
-                bytes.WriteByte((byte)(pending << (8 - pendingBits)));
+                bytes.Add((byte)(pending << (8 - pendingBits)));
                 pending = pendingBits = 0;
             }
 

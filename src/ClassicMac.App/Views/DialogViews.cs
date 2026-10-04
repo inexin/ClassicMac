@@ -143,7 +143,7 @@ internal static class DialogViews
     }
 
     // An alert's body: its icon, the question and the detail.
-    private static Control Alert(AlertIcon icon, string question, string? detail)
+    private static Grid Alert(AlertIcon icon, string question, string? detail)
     {
         // The severity glyph at twice its 14 px.
         var glyph = new LayoutTransformControl
@@ -231,7 +231,7 @@ internal static class DialogViews
     };
 
     // Get Info's subject: the icon on a 48 px checkerboard tile, the name and "Icon family in Finder · 2,240 bytes".
-    private static Control Subject(DialogSubject subject)
+    private static Grid Subject(DialogSubject subject)
     {
         Control icon = subject.IconPng is { } png
             ? new PixelImage { Source = Images.FromPng.Convert(png, typeof(Bitmap), null, CultureInfo.InvariantCulture) as Bitmap, Zoom = 1, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
@@ -385,7 +385,7 @@ internal static class DialogViews
 
     // What the chosen "Make" choice makes, at 2× on a checkerboard with each type under it, and how colours are mapped;
     // hidden when nothing is drawn (a sound, or a choice the file cannot make).
-    private static Control MadeStrip(ImportSource made, ImportOptions options)
+    private static StackPanel MadeStrip(ImportSource made, ImportOptions options)
     {
         var items = new ItemsControl
         {
@@ -444,7 +444,7 @@ internal static class DialogViews
     }
 
     // A "Make" row: the label, its types in mono, why it is not offered, and for one icon kind the kind select.
-    private static Control OptionContent(ImportOption option, ImportOptions options)
+    private static StackPanel OptionContent(ImportOption option, ImportOptions options)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         row.Children.Add(new TextBlock { Text = option.Label, VerticalAlignment = VerticalAlignment.Center });

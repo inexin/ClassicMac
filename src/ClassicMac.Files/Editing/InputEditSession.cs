@@ -570,7 +570,7 @@ public sealed class InputEditSession
 
     // The input's companions written beside destination: the pair written with no data in a temporary folder, its
     // files other than the data file moved into place.
-    private IReadOnlyList<string> WriteCompanion(string destination)
+    private List<string> WriteCompanion(string destination)
     {
         var directory = System.IO.Path.GetDirectoryName(destination)!;
         var staging = System.IO.Path.Combine(directory, $".classicmac-{Guid.NewGuid():N}");

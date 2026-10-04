@@ -14,6 +14,7 @@ using ClassicMac.App.ViewModels;
 
 namespace ClassicMac.App.Views;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "A window is not disposed: the audio player is disposed when it closes.")]
 internal sealed partial class MainWindow : Window, IFilePicker
 {
     // The window's parts: the form host's keys, the playhead's timer, the help page's web view, the shell.

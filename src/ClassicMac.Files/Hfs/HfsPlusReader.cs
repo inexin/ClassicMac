@@ -332,12 +332,12 @@ internal static class HfsPlusReader
                 "The HFS Plus volume encoding bitmap omits an encoding used by a catalog file or folder.");
         }
 
-        if (!folders.ContainsKey(RootFolderId))
+        if (!folders.TryGetValue(RootFolderId, out var root))
         {
             throw new InvalidDataException("The HFS Plus root folder is missing.");
         }
 
-        if (folders[RootFolderId].Parent != RootParentId)
+        if (root.Parent != RootParentId)
         {
             throw new InvalidDataException("The HFS Plus root folder does not use the reserved root parent ID.");
         }
@@ -906,7 +906,7 @@ internal static class HfsPlusReader
         }
     }
 
-    private static IReadOnlyList<string> FolderPath(uint parent,
+    private static List<string> FolderPath(uint parent,
         Dictionary<uint, (uint Parent, string Name, uint Valence, uint FolderCount, ushort Flags)> folders)
     {
         var path = new List<string>();

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Files.Compression;
@@ -226,7 +227,7 @@ public class RomTests
         var compressed = LiteralLzss(image);
         const int offset = 0x1000;
         var script = "<CHRP-BOOT>\r<COMPATIBLE>\riMac,1\r</COMPATIBLE>\r<BOOT-SCRIPT>\r" +
-            $"h# {offsetText ?? offset.ToString("X6")} constant lzss-offset\rh# {compressed.Length:X6} constant lzss-size\r" +
+            $"h# {offsetText ?? offset.ToString("X6", CultureInfo.InvariantCulture)} constant lzss-offset\rh# {compressed.Length:X6} constant lzss-size\r" +
             "</BOOT-SCRIPT>\r</CHRP-BOOT>\r";
         var file = new byte[offset + compressed.Length];
         Encoding.ASCII.GetBytes(script).CopyTo(file, 0);

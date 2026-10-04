@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Globalization;
 using System.Text;
 
 namespace ClassicMac.Core;
@@ -112,6 +113,18 @@ public readonly struct FourCC : IEquatable<FourCC>, IComparable<FourCC>
 
     /// <summary>Inequality.</summary>
     public static bool operator !=(FourCC left, FourCC right) => !left.Equals(right);
+
+    /// <summary>Less than, by <see cref="CompareTo"/>.</summary>
+    public static bool operator <(FourCC left, FourCC right) => left.CompareTo(right) < 0;
+
+    /// <summary>Less than or equal, by <see cref="CompareTo"/>.</summary>
+    public static bool operator <=(FourCC left, FourCC right) => left.CompareTo(right) <= 0;
+
+    /// <summary>Greater than, by <see cref="CompareTo"/>.</summary>
+    public static bool operator >(FourCC left, FourCC right) => left.CompareTo(right) > 0;
+
+    /// <summary>Greater than or equal, by <see cref="CompareTo"/>.</summary>
+    public static bool operator >=(FourCC left, FourCC right) => left.CompareTo(right) >= 0;
 }
 
 // Display text for codes and names: Mac OS Roman, with control characters, DEL and backslash as \xHH so every
@@ -125,7 +138,7 @@ internal static class MacText
         {
             if (b < 0x20 || b == 0x7F || b == '\\')
             {
-                text.Append("\\x").Append(b.ToString("X2"));
+                text.Append("\\x").Append(b.ToString("X2", CultureInfo.InvariantCulture));
             }
             else
             {

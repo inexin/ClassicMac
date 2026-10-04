@@ -439,7 +439,7 @@ public sealed class PreviewViewModel
     private static PreviewViewModel StyledPreview(StyledText styled) => new(PreviewKind.Text, "") { Styled = styled, Text = styled.Text.Replace('\r', '\n') };
 
     // An icon's family: the first image of each member of its ID, as their decoders draw them.
-    private static IReadOnlyList<PreviewImage> Members(Resource resource, ResourceFork fork, DecodeOptions options, ReadOptions readOptions,
+    private static List<PreviewImage> Members(Resource resource, ResourceFork fork, DecodeOptions options, ReadOptions readOptions,
         ICollection<Diagnostic> diagnostics)
     {
         var decoders = ResourceDecoders.Create(options);

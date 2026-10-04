@@ -13,10 +13,7 @@ internal static class LhaLh2Decoder
 
     public static byte[] Decode(ReadOnlySpan<byte> packed, int expandedSize)
     {
-        if (expandedSize < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(expandedSize));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(expandedSize);
 
         var bits = new LhaBitReader(packed);
         var literalAndMatchTree = new LhaAdaptiveHuffmanTree(LiteralAndMatchSymbolCount);
@@ -85,10 +82,7 @@ internal static class LhaLh2Decoder
 
         public GrowingHuffmanTree(int maximumSymbols)
         {
-            if (maximumSymbols < 1)
-            {
-                throw new ArgumentOutOfRangeException(nameof(maximumSymbols));
-            }
+            ArgumentOutOfRangeException.ThrowIfLessThan(maximumSymbols, 1);
 
             _maximumSymbols = maximumSymbols;
             int capacity = maximumSymbols * 2 - 1;

@@ -351,7 +351,7 @@ public sealed class FatReader : IContainerReader
 
         // A cluster chain as a fork, cut to length (or whole clusters when no length is given); loops, free or bad
         // clusters and references outside the volume end it, reported.
-        private ForkData? ReadChain(uint first, string what, long? length = null)
+        private ExtentForkData? ReadChain(uint first, string what, long? length = null)
         {
             var ranges = new List<(long Offset, long Length)>();
             var seen = new HashSet<uint>();

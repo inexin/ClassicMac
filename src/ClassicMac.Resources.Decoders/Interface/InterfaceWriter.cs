@@ -128,9 +128,10 @@ public static class InterfaceWriter
             ? bytes
             : throw new ArgumentException($"“{text}” has characters Mac OS Roman cannot hold.");
 
+    // A BigEndianWriter whose writes chain.
     private sealed class Writer
     {
-        private readonly MemoryStream output = new();
+        private readonly BigEndianWriter output = new();
 
         public Writer U8(byte v)
         {
@@ -138,15 +139,27 @@ public static class InterfaceWriter
             return this;
         }
 
-        public Writer I16(short v) => U8((byte)(v >> 8)).U8((byte)v);
+        public Writer I16(short v)
+        {
+            output.WriteInt16(v);
+            return this;
+        }
 
-        public Writer I32(int v) => I16((short)(v >> 16)).I16((short)v);
+        public Writer I32(int v)
+        {
+            output.WriteInt32(v);
+            return this;
+        }
 
-        public Writer Rect(MacRect r) => I16(r.Top).I16(r.Left).I16(r.Bottom).I16(r.Right);
+        public Writer Rect(MacRect r)
+        {
+            output.WriteMacRect(r);
+            return this;
+        }
 
         public Writer Bytes(ReadOnlySpan<byte> bytes)
         {
-            output.Write(bytes);
+            output.WriteBytes(bytes);
             return this;
         }
 

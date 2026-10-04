@@ -17,15 +17,9 @@ public sealed class RgbaBitmap
     /// <summary>Wraps an existing RGBA buffer of exactly <paramref name="width"/> × <paramref name="height"/> × 4 bytes.</summary>
     public RgbaBitmap(int width, int height, byte[] pixels)
     {
-        if (width <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(width));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
 
-        if (height <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(height));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
 
         ArgumentNullException.ThrowIfNull(pixels);
         if (pixels.Length != width * height * 4)

@@ -88,7 +88,7 @@ internal sealed class DialogView : PixelControl
     }
 
     // An item's rectangle in the control, from its bounds in the window's content.
-    private Rect ItemRect(DialogPreview dialog, int index, double scale)
+    private static Rect ItemRect(DialogPreview dialog, int index, double scale)
     {
         var b = dialog.Drawing.Items[index].Item.Bounds;
         return new Rect((Gutter + dialog.ContentLeft + b.Left) * scale, (Gutter + dialog.ContentTop + b.Top) * scale,

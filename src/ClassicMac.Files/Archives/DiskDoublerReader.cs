@@ -465,7 +465,7 @@ public sealed class DiskDoublerReader : IContainerReader
         }
     }
 
-    private static IReadOnlyList<MacFile> ReadLegacy(byte[] archive, BigEndianReader reader,
+    private static List<MacFile> ReadLegacy(byte[] archive, BigEndianReader reader,
         ContainerContext context)
     {
         const int archiveHeaderLength = 78;

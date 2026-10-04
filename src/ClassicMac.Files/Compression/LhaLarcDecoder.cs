@@ -12,10 +12,7 @@ internal static class LhaLarcDecoder
 
     public static byte[] DecodeLzs(ReadOnlySpan<byte> packed, int expandedSize)
     {
-        if (expandedSize < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(expandedSize));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(expandedSize);
 
         byte[] window = new byte[LzsWindowSize];
         window.AsSpan().Fill((byte)' ');
@@ -56,10 +53,7 @@ internal static class LhaLarcDecoder
 
     public static byte[] DecodeLz5(ReadOnlySpan<byte> packed, int expandedSize)
     {
-        if (expandedSize < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(expandedSize));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(expandedSize);
 
         byte[] window = CreateInitialWindow();
         byte[] output = new byte[expandedSize];

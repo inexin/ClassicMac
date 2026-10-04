@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using ClassicMac.Core;
@@ -161,12 +162,12 @@ public sealed record AliasResolution(AliasRecord Alias, AliasVolume? Volume, Mac
         var text = new System.Text.StringBuilder("The original is on the network volume");
         if (network.Volume is { } volume)
         {
-            text.Append($" “{volume}”");
+            text.Append(CultureInfo.InvariantCulture, $" “{volume}”");
         }
 
         if (network.Server is { } server)
         {
-            text.Append($" on the server “{server}”");
+            text.Append(CultureInfo.InvariantCulture, $" on the server “{server}”");
         }
 
         var details = new List<string>();

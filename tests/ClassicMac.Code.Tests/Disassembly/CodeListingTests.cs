@@ -1,3 +1,4 @@
+using System.Globalization;
 using ClassicMac.Code.Disassembly;
 using ClassicMac.Code.M68k;
 using ClassicMac.Code.Ppc;
@@ -347,7 +348,7 @@ public class CodeListingTests
             "; \"Test\": PowerPC fragment ('pwpc'), 3 sections",
             "; Section 0: Code, 0x50 bytes",
             "; Section 1: UnpackedData, 0x1C bytes",
-            "; Section 2: Loader, 0x" + pef.Sections[2].ContainerLength.ToString("X") + " bytes",
+            "; Section 2: Loader, 0x" + pef.Sections[2].ContainerLength.ToString("X", CultureInfo.InvariantCulture) + " bytes",
             "; Main: 1:0x0 -> 0:0x0",
             "; TOC base: 1:0x8",
             "; Imports: 1 from 1 library",

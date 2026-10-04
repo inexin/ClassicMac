@@ -199,7 +199,7 @@ public sealed class CodeWarriorData
     // A list: a count, then per entry 1xxxxxxx (a signed 7-bit delta, doubled), 01xxxxxx xxxxxxxx (a signed 14-bit
     // delta, doubled) or 00xxxxxx and 3 bytes (a signed 30-bit offset, doubled: absolute). The startup loops while the
     // count is above 0, signed (TST.L; BGT): a count with its top bit set reads no entries.
-    private static IReadOnlyList<int> ReadRelocations(BigEndianReader reader, ICollection<Diagnostic> diagnostics)
+    private static List<int> ReadRelocations(BigEndianReader reader, ICollection<Diagnostic> diagnostics)
     {
         int at = reader.Position;
         int count = reader.ReadInt32();

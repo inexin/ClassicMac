@@ -16,10 +16,7 @@ internal static class LhaLegacyStaticDecoder
 
     public static byte[] DecodeLh3(ReadOnlySpan<byte> packed, int expandedSize)
     {
-        if (expandedSize < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(expandedSize));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(expandedSize);
 
         var bits = new BitReader(packed);
         byte[] window = new byte[WindowSize];

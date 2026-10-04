@@ -183,7 +183,7 @@ public sealed partial class TreeSearch(MainViewModel main) : ObservableObject
 
     // Shows a row when it, a row above it or a row below it matches, opening the rows that hold a match; true when
     // it or a row below it matches.
-    private bool FilterRows(NodeViewModel node, string text, bool aboveMatches)
+    private static bool FilterRows(NodeViewModel node, string text, bool aboveMatches)
     {
         var index = Searchable(node) ? IndexIn(node.Name, text) : -1;
         var below = false;

@@ -534,7 +534,7 @@ public sealed class FinderIconResolver
         return DefaultIconIds;
     }
 
-    private IReadOnlyList<RgbColor> ReadLabelColors()
+    private RgbColor[] ReadLabelColors()
     {
         var colours = IconSuite.DefaultLabelColors.ToArray();
         for (int label = 1; label < colours.Length; label++)

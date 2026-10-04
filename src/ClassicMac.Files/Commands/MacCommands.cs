@@ -256,7 +256,7 @@ public static class MacCommands
             case MacPathKind.Folder:
                 return info with { Created = entry.Folder?.Created?.ToDateTime(), Modified = entry.Folder?.Modified?.ToDateTime() };
             case MacPathKind.ResourceFork:
-                return info with { Count = entry.Resources!.Types.Count(), DataSize = entry.File?.ResourceFork.Length };
+                return info with { Count = entry.Resources!.Types.Count, DataSize = entry.File?.ResourceFork.Length };
             case MacPathKind.ResourceType:
                 return info with { ResourceType = entry.ResourceType.ToString(), Count = entry.Resources!.OfType(entry.ResourceType!.Value).Count() };
             case MacPathKind.Resource when entry.Resource is { } resource:

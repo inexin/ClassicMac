@@ -607,7 +607,7 @@ public sealed class MacPathTree : IDisposable
 
         var contents = holder.Contents!;
         IReadOnlyList<MacFolder> folders = [];
-        if (contents.Children.FirstOrDefault()?.Format == HfsReader.Instance.FormatName || contents.Children.Count == 0 && holder.Format == HfsReader.Instance.FormatName)
+        if (contents.Children.Count > 0 && contents.Children[0].Format == HfsReader.Instance.FormatName || contents.Children.Count == 0 && holder.Format == HfsReader.Instance.FormatName)
         {
             try
             {
@@ -686,7 +686,7 @@ public sealed class MacPathTree : IDisposable
     private static bool IsContainer(ContainerNode node) => node.Children.Count > 0 || node.UnreadFormat is not null || node.Volume is not null;
 
     // The format of what a container node holds.
-    private static string? ContentFormat(ContainerNode node) => node.UnreadFormat ?? node.Children.FirstOrDefault()?.Format
+    private static string? ContentFormat(ContainerNode node) => node.UnreadFormat ?? (node.Children.Count > 0 ? node.Children[0].Format : null)
         ?? (node.Volume is { } volume ? volume.Format == "MFS" ? MfsReader.Instance.FormatName : HfsReader.Instance.FormatName : null);
 
     private static string NameOf(MacFile file) => file.UnicodeName ?? file.Name.ToMacRoman();

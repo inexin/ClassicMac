@@ -72,7 +72,7 @@ public class BinHexTests
     public void Without_a_header_the_input_is_unusable()
     {
         var text = BinHex("Odd", [1, 2, 3], []);
-        var start = text.IndexOf(':', text.IndexOf("BinHex 4.0)")) + 5;
+        var start = text.IndexOf(':', text.IndexOf("BinHex 4.0)", StringComparison.Ordinal)) + 5;
         Assert.Throws<InvalidDataException>(() => Read(text[..start] + "~" + text[start..]));
     }
 

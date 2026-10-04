@@ -51,6 +51,18 @@ csharp_style_prefer_readonly_struct = true:suggestion
 csharp_style_prefer_switch_expression = true:suggestion
 csharp_using_directive_placement = outside_namespace:suggestion
 
+# .NET analyzers (AnalysisMode Recommended, Directory.Build.props): the rules turned off, and why.
+# Names: Apple's and the 68k's own names stay (FinderFlags, ResourceMapFlags; the operand sizes Long, Single, Double;
+# QuickDraw's BitMap beside an RGBA Bitmap), and Visual Basic's keywords are no concern of a C# library.
+dotnet_diagnostic.CA1708.severity = none
+dotnet_diagnostic.CA1711.severity = none
+dotnet_diagnostic.CA1716.severity = none
+dotnet_diagnostic.CA1720.severity = none
+# Members that could be static: only private and internal ones are changed; a public member stays as its API was made.
+dotnet_code_quality.CA1822.api_surface = private, internal
+# First, FirstOrDefault and Last on a list: LINQ already indexes a list (TryGetFirst), so the shorter call stays.
+dotnet_diagnostic.CA1826.severity = none
+
 # C# formatting
 csharp_new_line_before_open_brace = all
 csharp_new_line_before_catch = true
@@ -64,3 +76,27 @@ csharp_indent_case_contents = true
 csharp_indent_switch_labels = true
 csharp_space_around_binary_operators = before_and_after
 
+# Tests: names are sentences with underscores; fixtures favour plain code over the analyzers' performance and design
+# advice; the formats' own checksums and ciphers (MD5, SHA-1, DES) are computed on purpose; a fault test throws the
+# runtime's exceptions on purpose. Culture and comparison rules (CA1305, CA1310) stay on.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1001.severity = none
+dotnet_diagnostic.CA1051.severity = none
+dotnet_diagnostic.CA1512.severity = none
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1816.severity = none
+dotnet_diagnostic.CA1822.severity = none
+dotnet_diagnostic.CA1826.severity = none
+dotnet_diagnostic.CA1829.severity = none
+dotnet_diagnostic.CA1832.severity = none
+dotnet_diagnostic.CA1859.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1865.severity = none
+dotnet_diagnostic.CA1869.severity = none
+dotnet_diagnostic.CA2201.severity = none
+dotnet_diagnostic.CA5350.severity = none
+dotnet_diagnostic.CA5351.severity = none
+
+# Tools: one-shot generators, where a constant array argument costs nothing.
+[tools/**/*.cs]
+dotnet_diagnostic.CA1861.severity = none

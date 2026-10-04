@@ -94,10 +94,7 @@ internal sealed class LhaAdaptiveHuffmanTree
 
     public LhaAdaptiveHuffmanTree(int symbolCount)
     {
-        if (symbolCount < 2)
-        {
-            throw new ArgumentOutOfRangeException(nameof(symbolCount));
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(symbolCount, 2);
 
         _symbolCount = symbolCount;
         _nodeCount = symbolCount * 2 - 1;

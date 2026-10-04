@@ -459,7 +459,7 @@ public static class ForkSaver
         }
     }
 
-    private static IReadOnlyList<string> Compare(MacFile expected, MacFile actual, ResourceFork fork, bool inData, bool name)
+    private static List<string> Compare(MacFile expected, MacFile actual, ResourceFork fork, bool inData, bool name)
     {
         var differences = new List<string>();
         if (name && expected.Name != actual.Name)

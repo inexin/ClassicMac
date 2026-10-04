@@ -356,7 +356,10 @@ public sealed class PackItReader : IContainerReader
         byte[] decoded = new byte[blockLength];
         try
         {
+            // PackIt's encryption is DES: reading the format needs it, weak or not.
+#pragma warning disable CA5350
             using TripleDES des = TripleDES.Create();
+#pragma warning restore CA5350
             des.Mode = CipherMode.ECB;
             des.Padding = PaddingMode.None;
             // [Fitted] XADMaster decodes PMa6 blocks with DES_encrypt. Use an equivalent three-key DES schedule so

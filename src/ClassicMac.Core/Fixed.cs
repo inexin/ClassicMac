@@ -57,6 +57,18 @@ public readonly record struct Fixed(int Raw) : IComparable<Fixed>
     /// <inheritdoc/>
     public int CompareTo(Fixed other) => Raw.CompareTo(other.Raw);
 
+    /// <summary>Less than, by <see cref="CompareTo"/>.</summary>
+    public static bool operator <(Fixed left, Fixed right) => left.CompareTo(right) < 0;
+
+    /// <summary>Less than or equal, by <see cref="CompareTo"/>.</summary>
+    public static bool operator <=(Fixed left, Fixed right) => left.CompareTo(right) <= 0;
+
+    /// <summary>Greater than, by <see cref="CompareTo"/>.</summary>
+    public static bool operator >(Fixed left, Fixed right) => left.CompareTo(right) > 0;
+
+    /// <summary>Greater than or equal, by <see cref="CompareTo"/>.</summary>
+    public static bool operator >=(Fixed left, Fixed right) => left.CompareTo(right) >= 0;
+
     /// <inheritdoc/>
     public override string ToString() => ToDouble().ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture);
 }
@@ -114,6 +126,18 @@ public readonly record struct UnsignedFixed(uint Raw) : IComparable<UnsignedFixe
 
     /// <inheritdoc/>
     public int CompareTo(UnsignedFixed other) => Raw.CompareTo(other.Raw);
+
+    /// <summary>Less than, by <see cref="CompareTo"/>.</summary>
+    public static bool operator <(UnsignedFixed left, UnsignedFixed right) => left.CompareTo(right) < 0;
+
+    /// <summary>Less than or equal, by <see cref="CompareTo"/>.</summary>
+    public static bool operator <=(UnsignedFixed left, UnsignedFixed right) => left.CompareTo(right) <= 0;
+
+    /// <summary>Greater than, by <see cref="CompareTo"/>.</summary>
+    public static bool operator >(UnsignedFixed left, UnsignedFixed right) => left.CompareTo(right) > 0;
+
+    /// <summary>Greater than or equal, by <see cref="CompareTo"/>.</summary>
+    public static bool operator >=(UnsignedFixed left, UnsignedFixed right) => left.CompareTo(right) >= 0;
 
     /// <inheritdoc/>
     public override string ToString() => ToDouble().ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture);

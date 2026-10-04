@@ -148,7 +148,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
         return new ImportSource(details, type => Made(type, image));
     }
 
-    private IReadOnlyList<PreviewImage> Made(string type, RgbaBitmap image)
+    private List<PreviewImage> Made(string type, RgbaBitmap image)
     {
         IReadOnlyList<(string Type, byte[] Data)> made;
         try

@@ -305,7 +305,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         command.SetAction(result =>
         {
             var chosen = result.GetValue(types) is { Length: > 0 } list
-                ? list.Select(t => { FourCC.TryParse(t, out var type); return type; }).ToHashSet()
+                ? list.Select(FourCC.FromString).ToHashSet()                  // the validator above refused any other
                 : null;
             var decodeOptions = DecodeOptionsFrom(result, screenDepth);
             var decode = !result.GetValue(raw);

@@ -73,7 +73,7 @@ public sealed class HelpPagePreview : IWebPreview
     }
 
     // A folder's path from its volume's root: the names of the folders down to it.
-    private static IReadOnlyList<string> PathOf(NodeViewModel? folder)
+    private static List<string> PathOf(NodeViewModel? folder)
     {
         var names = new List<string>();
         for (var at = folder; at is FolderNode; at = TreeLayout.FolderOf(at))

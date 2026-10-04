@@ -14,10 +14,7 @@ internal static class DiskDoublerMethod10Decoder
 
     public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
     {
-        if (outputLength < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(outputLength));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
 
         byte[] output = new byte[outputLength];
         int inputOffset = 0;

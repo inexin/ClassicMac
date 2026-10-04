@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Code quality: the build runs the .NET analyzers' recommended rules as errors (`AnalysisMode`; `.editorconfig` lists
+  the few turned off and why). `Fixed`, `UnsignedFixed` and `FourCC` gain `<`, `<=`, `>` and `>=`; `MacDate.ToString`
+  and a code's `\xHH` escapes no longer follow the user's locale; `ExceptionFilters` (Core) names the recurring catch
+  filters.
 - The CLI package is `ClassicMac.Cli` (was `ClassicMac.Resources.Cli`); the command is still `classicmac`.
 - HFS: map nodes the writer adds to a growing B-tree now go at the tree's old end with a backward link of 0, as Mac OS 9
   writes them (they linked back to the previous map node, which ClassicMac's own readers flagged); the writer's checks no

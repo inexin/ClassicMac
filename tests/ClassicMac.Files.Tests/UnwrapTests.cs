@@ -97,7 +97,7 @@ public class UnwrapTests
     [InlineData("Note.uu")]
     public void A_volume_whose_first_file_is_text_encoded_is_read_as_a_volume(string name)
     {
-        var text = name.EndsWith(".hqx")
+        var text = name.EndsWith(".hqx", StringComparison.Ordinal)
             ? Encoding.ASCII.GetBytes(BinHex("Note", "note"u8.ToArray(), []))
             : "From: someone\r\n\r\nbegin 644 Note\r\n#86)C\r\n`\r\nend\r\n"u8.ToArray();
         var builder = new HfsBuilder();
@@ -110,7 +110,7 @@ public class UnwrapTests
         Assert.Empty(diagnostics);
         Assert.All(root.Children, c => Assert.Equal("HFS volume", c.Format));
         Assert.Equal([name, "Plain"], root.Children.Select(c => c.File.Name.ToMacRoman()).Order());
-        Assert.Equal(name.EndsWith(".hqx") ? "BinHex 4.0" : "uuencode", Assert.Single(Named(root, name).Children).Format);
+        Assert.Equal(name.EndsWith(".hqx", StringComparison.Ordinal) ? "BinHex 4.0" : "uuencode", Assert.Single(Named(root, name).Children).Format);
     }
 
     private static ContainerNode Named(ContainerNode node, string name) =>
@@ -484,7 +484,7 @@ public class HostFilesTests : IDisposable
         foreach (var path in CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories))
         {
             var folderName = Path.GetFileName(Path.GetDirectoryName(path));
-            if (folderName is ".rsrc" or ".finf" || Path.GetFileName(path).StartsWith("._"))
+            if (folderName is ".rsrc" or ".finf" || Path.GetFileName(path).StartsWith("._", StringComparison.Ordinal))
             {
                 continue;
             }

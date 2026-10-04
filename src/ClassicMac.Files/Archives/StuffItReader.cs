@@ -280,7 +280,7 @@ public sealed class StuffItReader : IContainerReader
         return files;
     }
 
-    private static IReadOnlyList<MacFile> ReadLegacyV2(byte[] archive, ContainerContext context)
+    private static List<MacFile> ReadLegacyV2(byte[] archive, ContainerContext context)
     {
         const int headerLength = 22;
         if (archive.Length < headerLength)
@@ -434,7 +434,7 @@ public sealed class StuffItReader : IContainerReader
         return files;
     }
 
-    private static IReadOnlyList<MacFile> ReadLegacyV1(byte[] archive, ContainerContext context)
+    private static List<MacFile> ReadLegacyV1(byte[] archive, ContainerContext context)
     {
         const int archiveHeaderLength = 22;
         const int memberHeaderLength = 112;

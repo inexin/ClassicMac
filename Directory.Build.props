@@ -5,6 +5,9 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- The .NET analyzers' recommended rules, as errors (TreatWarningsAsErrors); .editorconfig turns off the few that
+         clash with deliberate choices, each with its reason. -->
+    <AnalysisMode>Recommended</AnalysisMode>
     <Deterministic>true</Deterministic>
 
     <Version>0.1.0</Version>

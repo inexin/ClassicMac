@@ -512,7 +512,7 @@ public static class QuickDrawResources
         return data;
     }
 
-    private static Exception Truncated(string type) => new EndOfStreamException($"The '{type}' resource data is truncated.");
+    private static EndOfStreamException Truncated(string type) => new EndOfStreamException($"The '{type}' resource data is truncated.");
 
     private static int U16(byte[] d, int o) => new ClassicMac.Core.BigEndianReader(d).ReadUInt16At(o);
     private static short I16(byte[] d, int o) => new ClassicMac.Core.BigEndianReader(d).ReadInt16At(o);

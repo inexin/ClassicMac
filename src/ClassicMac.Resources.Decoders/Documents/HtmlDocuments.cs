@@ -48,7 +48,7 @@ public static class HtmlDocuments
         private readonly HashSet<(int Chapter, int Paragraph)> targets = []; // paragraphs that links go to
         private int nextTarget; // the first paragraph of the chapter whose link anchor is not written yet
 
-        public IReadOnlyList<DocumentFile> Files()
+        public List<DocumentFile> Files()
         {
             CollectTargets();
             var pages = new List<DocumentFile>();
@@ -150,7 +150,7 @@ public static class HtmlDocuments
             return "<nav>" + string.Join("", links) + "</nav>\n";
         }
 
-        private StringBuilder Head(string title, Rgb? background)
+        private static StringBuilder Head(string title, Rgb? background)
         {
             var html = new StringBuilder("<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n");
             html.Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
@@ -200,7 +200,7 @@ public static class HtmlDocuments
         private void Paragraph(StringBuilder html, DocumentChapter chapter, int start, int end)
         {
             var runs = chapter.Text.Runs;
-            var first = runs.FirstOrDefault(r => r.Start <= start && start < r.Start + r.Length) ?? runs.LastOrDefault();
+            var first = runs.FirstOrDefault(r => r.Start <= start && start < r.Start + r.Length) ?? (runs.Count > 0 ? runs[^1] : null);
             html.Append("<p").Append(first is null ? "" : $" class=\"{Style(first)}\"").Append(ParagraphStyle(chapter, start)).Append('>');
             var line = chapter.Text.Text.AsSpan(start, end - start);
             if (!line.ContainsAnyExceptInRange('\0', '\u001F') && !line.Contains('\t'))

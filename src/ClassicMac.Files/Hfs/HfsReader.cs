@@ -289,7 +289,7 @@ public sealed class HfsReader : IContainerReader, IVolumeReader
         private byte[] CatalogRecord { get; }
 
         // The volume's files; its folders go to folderList when one is given.
-        public IReadOnlyList<MacFile> Files(List<MacFolder>? folderList)
+        public List<MacFile> Files(List<MacFolder>? folderList)
         {
             if (blockSize == 0 || blockSize % 512 != 0)
             {

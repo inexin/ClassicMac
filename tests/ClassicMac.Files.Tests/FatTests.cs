@@ -411,14 +411,14 @@ public class FatTests
                 var file = files.SingleOrDefault(f => string.Join(':', [.. f.FolderPath.Select(p => p.ToMacRoman()), f.Name.ToMacRoman()]).Split('\0')[0] == path)
                     ?? throw new Xunit.Sdk.XunitException($"{Path.GetFileName(image)}: \"{path}\" is not among {string.Join(", ", files.Select(f => $"\"{f.MacPath}\""))}.");
                 var what = $"{Path.GetFileName(image)}: \"{path}\"";
-                Assert.True(ulong.Parse(m.Groups["data"].Value) == (ulong)file.DataFork.Length, what);
+                Assert.True(ulong.Parse(m.Groups["data"].Value, CultureInfo.InvariantCulture) == (ulong)file.DataFork.Length, what);
                 compared++;
                 if (path == "Desktop")
                 {
                     continue; // changed by the Finder after the listing
                 }
 
-                Assert.True(ulong.Parse(m.Groups["rsrc"].Value) == (ulong)file.ResourceFork.Length, what);
+                Assert.True(ulong.Parse(m.Groups["rsrc"].Value, CultureInfo.InvariantCulture) == (ulong)file.ResourceFork.Length, what);
                 Assert.Equal((m.Groups["type"].Value, m.Groups["creator"].Value), (file.FinderInfo.Type.ToString(), file.FinderInfo.Creator.ToString()));
                 Assert.Equal(Convert.ToUInt16(m.Groups["flags"].Value, 16), (ushort)file.FinderInfo.Flags);
                 Assert.Equal(Convert.ToUInt32(m.Groups["cr"].Value, 16), file.Created?.Seconds ?? 0);

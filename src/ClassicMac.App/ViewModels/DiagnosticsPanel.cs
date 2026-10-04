@@ -348,7 +348,7 @@ public sealed partial class DiagnosticsPanel : ObservableObject
     };
 
     // After the last entry that ranks with or before it (arrival order among equals).
-    private int SortedIndex(IReadOnlyList<DiagnosticEntry> list, DiagnosticEntry entry)
+    private int SortedIndex(List<DiagnosticEntry> list, DiagnosticEntry entry)
     {
         if (Sort == SeveritySort.None)
         {

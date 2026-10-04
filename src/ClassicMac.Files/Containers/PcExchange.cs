@@ -56,10 +56,7 @@ public static class PcExchange
     public static IReadOnlyList<PcExchangeRecord> ReadFinderData(byte[] data, int clusterSize)
     {
         ArgumentNullException.ThrowIfNull(data);
-        if (clusterSize < RecordLength)
-        {
-            throw new ArgumentOutOfRangeException(nameof(clusterSize));
-        }
+        ArgumentOutOfRangeException.ThrowIfLessThan(clusterSize, RecordLength);
 
         var records = new List<PcExchangeRecord>();
         foreach (var offset in Offsets(data.Length, clusterSize))

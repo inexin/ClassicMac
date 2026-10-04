@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Buffers.Binary;
 using System.Text;
 using ClassicMac.Core;
@@ -100,7 +101,7 @@ public class PcExchangeTests : IDisposable
     [InlineData("2078-01-01 00:00:00", "1950-01-01 00:00:00")]
     public void DOS_times_read_as_File_Exchange_reads_them(string dos, string mac)
     {
-        Assert.Equal(DateTime.Parse(mac), DosTime.FromLocal(DateTime.Parse(dos))!.Value.ToDateTime());
+        Assert.Equal(DateTime.Parse(mac, CultureInfo.InvariantCulture), DosTime.FromLocal(DateTime.Parse(dos, CultureInfo.InvariantCulture))!.Value.ToDateTime());
     }
 
     [Fact]

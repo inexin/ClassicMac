@@ -177,7 +177,7 @@ internal static class TreeLayout
     }
 
     // Makes a collection hold the nodes wanted, in order, moving the ones it has rather than re-adding them.
-    private static void Sync(ObservableCollection<NodeViewModel> target, IReadOnlyList<NodeViewModel> wanted)
+    private static void Sync(ObservableCollection<NodeViewModel> target, List<NodeViewModel> wanted)
     {
         for (var i = 0; i < wanted.Count; i++)
         {

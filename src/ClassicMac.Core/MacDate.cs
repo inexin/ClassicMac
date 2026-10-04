@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace ClassicMac.Core;
 
@@ -27,5 +28,5 @@ public readonly record struct MacDate(uint Seconds)
     }
 
     /// <inheritdoc/>
-    public override string ToString() => ToDateTime().ToString("yyyy-MM-dd HH:mm:ss");
+    public override string ToString() => ToDateTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 }

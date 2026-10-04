@@ -14,10 +14,7 @@ internal static class CompactProLzhDecoder
 
     public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
     {
-        if (outputLength < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(outputLength));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
 
         var output = new RleOutput(outputLength);
         if (outputLength == 0)

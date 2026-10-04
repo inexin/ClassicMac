@@ -1,3 +1,4 @@
+using System.Globalization;
 using ClassicMac.App.ViewModels;
 using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Templates;
@@ -217,7 +218,7 @@ public sealed class HexEditTests : IDisposable
     [Fact]
     public void The_column_header_names_the_sixteen_columns()
     {
-        Assert.Equal(Enumerable.Range(0, 16).Select(i => i.ToString("X2")), HexLines.HeaderCells.Select(c => c.Hex));
+        Assert.Equal(Enumerable.Range(0, 16).Select(i => i.ToString("X2", CultureInfo.InvariantCulture)), HexLines.HeaderCells.Select(c => c.Hex));
         Assert.True(HexLines.HeaderCells[7].IsGroupEnd);
         Assert.All(HexLines.HeaderCells, c => Assert.False(c.IsCursor || c.IsChanged || c.IsZero));
     }

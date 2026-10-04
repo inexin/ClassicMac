@@ -66,6 +66,7 @@ public interface IFilePicker
 }
 
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "The preview's CancellationTokenSource holds no timer or wait handle; it is cancelled, not disposed, when the next preview starts.")]
 public sealed partial class MainViewModel : ObservableObject
 {
     private EditActions? editActions;

@@ -168,5 +168,9 @@ checks subtract-first (`offset > length - size`), as the Mac OS code does.
   and then the hand-written part is still one file; generated tables go in classes of their own.
 - Every `if`/`else`/loop body has braces, one statement per line (`.editorconfig`); the build enforces the style
   (`EnforceCodeStyleInBuild`, warnings are errors). `dotnet format style --diagnostics IDE0011` fixes braces.
+- The build also runs the .NET analyzers' recommended rules (`AnalysisMode` in `Directory.Build.props`) as errors;
+  `.editorconfig` lists the rules turned off, each with its reason. Text the user sees or a test compares is formatted
+  and parsed with `CultureInfo.InvariantCulture` and compared with a `StringComparison`. A recurring catch filter uses
+  `ExceptionFilters` (Core).
 - A change to how a format is read or written updates its document in `docs/formats/<category>/` in the same commit;
   the authoring rules are in `docs/formats/CLAUDE.md`.

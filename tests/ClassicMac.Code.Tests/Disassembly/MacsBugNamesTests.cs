@@ -1,3 +1,4 @@
+using System.Globalization;
 using ClassicMac.Code.Disassembly;
 using static ClassicMac.Code.Tests.Disassembly.M68kDisassemblerTests;
 
@@ -160,7 +161,7 @@ public class MacsBugNamesTests
     public void Name_characters(string text)
     {
         string pad = (text.Length & 1) == 0 ? "00 0000" : "0000";
-        var code = Code("4E75 " + (0x80 | text.Length).ToString("X2"), text, pad);
+        var code = Code("4E75 " + (0x80 | text.Length).ToString("X2", CultureInfo.InvariantCulture), text, pad);
         Assert.Equal(text, Assert.Single(MacsBugNames.Find(code)).Name);
     }
 

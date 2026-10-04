@@ -32,10 +32,7 @@ internal static class StuffItMethod13Decoder
 
     public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
     {
-        if (outputLength < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(outputLength));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
 
         if (outputLength == 0)
         {

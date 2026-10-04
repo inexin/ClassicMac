@@ -97,7 +97,7 @@ public sealed class IsoReader : IContainerReader
 
                 var v = input.Slice(sector * Sector, Sector).ToArray();
                 var id = System.Text.Encoding.ASCII.GetString(v, 1, 5).ToUpperInvariant();
-                var highSierra = System.Text.Encoding.ASCII.GetString(v, 9, 5).ToUpperInvariant() == "CDROM";
+                var highSierra = string.Equals(System.Text.Encoding.ASCII.GetString(v, 9, 5), "CDROM", StringComparison.OrdinalIgnoreCase);
                 // A terminator ends the search: ISO's at byte 0, High Sierra's at byte 8.
                 if ((v[0] == 0xFF && id == "CD001") || (v[8] == 0xFF && highSierra))
                 {
@@ -494,7 +494,7 @@ public sealed class IsoReader : IContainerReader
 
         // A fork's bytes: from (extent + extended attribute blocks), in interleaved units with gaps when the record
         // says so (multi-extent files are not joined: each extent is its own entry).
-        private ForkData Fork(Record record, MacString name)
+        private ExtentForkData Fork(Record record, MacString name)
         {
             var blockSize = descriptor.BlockSize;
             var offset = ((long)record.Extent + record.AttributeBlocks) * blockSize;

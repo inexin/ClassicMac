@@ -164,7 +164,7 @@ public static class DialogDrawings
 
     private static int Height(MacRect r) => Math.Clamp(r.Bottom - r.Top, 1, 4096);
 
-    private static IReadOnlyList<DialogDrawingItem> Items(short id, ResourceFork fork, DecodeOptions options, ReadOptions readOptions,
+    private static List<DialogDrawingItem> Items(short id, ResourceFork fork, DecodeOptions options, ReadOptions readOptions,
         ICollection<Diagnostic> diagnostics, IReadOnlyList<ResourceFork> systemForks) =>
         fork.Find(Ditl, id) is { } list
             ? Build(InterfaceResources.ReadDialogItems(Data(list, fork, readOptions, diagnostics), options, diagnostics, list.ToString()),

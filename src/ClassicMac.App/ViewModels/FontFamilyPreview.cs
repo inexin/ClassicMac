@@ -145,8 +145,7 @@ public sealed partial class FontFamilyPreview : ObservableObject
         styles = MakeStyles();
         chosenStyle = styles[0];
         Flags = [.. FlagNames()];
-        StyleExtras = [.. new[] { "Plain", "Bold", "Italic", "Underline", "Outline", "Shadow", "Condense", "Extend" }
-            .Select((label, i) => Extra(label, i < family.StyleExtras.Count ? family.StyleExtras[i] : 0))];
+        StyleExtras = [.. ExtraLabels.Select((label, i) => Extra(label, i < family.StyleExtras.Count ? family.StyleExtras[i] : 0))];
         WidthTables = family.WidthTables.Count == 0 ? "None"
             : $"{Count(family.WidthTables.Count, "table")}: {string.Join(", ", family.WidthTables.Select(t => FaceName(t.Style & 0xFF)))}";
         StyleNames = MakeStyleNames();
@@ -489,10 +488,16 @@ public sealed partial class FontFamilyPreview : ObservableObject
         })];
     }
 
-    private IEnumerable<int> ColumnFaces() =>
-        new[] { 0, 1, 2, 3 }.Concat(family.Fonts.Where(f => f.Size >= 0).Select(f => f.Face).Where(f => f > 3).Distinct().Order());
+    // The style extras' labels, in the FOND's order.
+    private static readonly string[] ExtraLabels = ["Plain", "Bold", "Italic", "Underline", "Outline", "Shadow", "Condense", "Extend"];
 
-    private IReadOnlyList<FontAssociationRow> MakeRows()
+    // Plain, bold, italic and bold italic: the faces every family has a column or name for.
+    private static readonly int[] BasicFaces = [0, 1, 2, 3];
+
+    private IEnumerable<int> ColumnFaces() =>
+        BasicFaces.Concat(family.Fonts.Where(f => f.Size >= 0).Select(f => f.Face).Where(f => f > 3).Distinct().Order());
+
+    private List<FontAssociationRow> MakeRows()
     {
         var faces = ColumnFaces().ToList();
         var rows = new List<FontAssociationRow>();
@@ -584,7 +589,7 @@ public sealed partial class FontFamilyPreview : ObservableObject
                 .Select(c => (int)c is var i && i >= 1 && i <= mapping.Names.Count ? mapping.Names[i - 1] : ""));
         }
 
-        return [.. new[] { 0, 1, 2, 3 }.Select(s => new FontStyleName(FaceName(s), Derived(s)))];
+        return [.. BasicFaces.Select(s => new FontStyleName(FaceName(s), Derived(s)))];
     }
 
     private static FontStyleExtra Extra(string label, double em) =>

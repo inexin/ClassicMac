@@ -551,7 +551,7 @@ internal sealed class MacShell(IShellConsole console, PathSession session, Conta
     }
 
     // The longest start the names share (in the first name's case), or null when no longer than what was typed.
-    private static string? Common(IReadOnlyList<string> names, string typed)
+    private static string? Common(List<string> names, string typed)
     {
         if (names.Count == 0)
         {

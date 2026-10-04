@@ -237,10 +237,10 @@ public class IsoTests
             var path = (m.Groups["folder"].Value.Length > 0 ? m.Groups["folder"].Value + ":" : "") + m.Groups["name"].Value;
             Assert.Equal(path, string.Join(':', [.. file.FolderPath.Select(p => p.ToMacRoman()), file.Name.ToMacRoman()]));
             Assert.Equal(
-                (m.Groups["type"].Value, m.Groups["creator"].Value, m.Groups["flags"].Value, short.Parse(m.Groups["v"].Value), short.Parse(m.Groups["h"].Value)),
-                (file.FinderInfo.Type.ToString(), file.FinderInfo.Creator.ToString(), ((ushort)file.FinderInfo.Flags).ToString("X4"), file.FinderInfo.Location.V, file.FinderInfo.Location.H));
+                (m.Groups["type"].Value, m.Groups["creator"].Value, m.Groups["flags"].Value, short.Parse(m.Groups["v"].Value, CultureInfo.InvariantCulture), short.Parse(m.Groups["h"].Value, CultureInfo.InvariantCulture)),
+                (file.FinderInfo.Type.ToString(), file.FinderInfo.Creator.ToString(), ((ushort)file.FinderInfo.Flags).ToString("X4", CultureInfo.InvariantCulture), file.FinderInfo.Location.V, file.FinderInfo.Location.H));
             Assert.Equal((Convert.ToUInt32(m.Groups["cr"].Value, 16), Convert.ToUInt32(m.Groups["md"].Value, 16)), (file.Created!.Value.Seconds, file.Modified!.Value.Seconds));
-            Assert.Equal((long.Parse(m.Groups["data"].Value), long.Parse(m.Groups["rsrc"].Value)), (file.DataFork.Length, file.ResourceFork.Length));
+            Assert.Equal((long.Parse(m.Groups["data"].Value, CultureInfo.InvariantCulture), long.Parse(m.Groups["rsrc"].Value, CultureInfo.InvariantCulture)), (file.DataFork.Length, file.ResourceFork.Length));
         }
 
         // Fork contents: "F data|rsrc =VOL:NAME err 0 eof N [tail] HEX" (the last 32 bytes, or all of a short fork).
@@ -250,7 +250,7 @@ public class IsoTests
             var file = files.First(f => f.Name.ToMacRoman() == m.Groups["name"].Value && f.FolderPath.Count == 0);
             var bytes = (m.Groups["fork"].Value == "data" ? file.DataFork : file.ResourceFork).ToArray();
             var expected = Convert.FromHexString(m.Groups["hex"].Value);
-            Assert.Equal(long.Parse(m.Groups["eof"].Value), bytes.Length);
+            Assert.Equal(long.Parse(m.Groups["eof"].Value, CultureInfo.InvariantCulture), bytes.Length);
             Assert.Equal(expected, bytes[^expected.Length..]);
         }
     }

@@ -31,7 +31,7 @@ public interface IWebPreview
 public sealed partial class DocumentWebPreview : ObservableObject, IWebPreview
 {
     private readonly Dictionary<string, ReadOnlyMemory<byte>> files;
-    private readonly IReadOnlyList<string> pages;
+    private readonly List<string> pages;
     private readonly DecodeOptions options;
     private readonly Stack<int> history = new();
     private string? fragment;
