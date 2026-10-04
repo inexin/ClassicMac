@@ -213,7 +213,7 @@ public sealed partial class MainViewModel
         if (node is ResourceNode r && FileOwner(r) is { } owner)
         {
             typed = ResourceForm.For(r.Resource, r.Fork, ReadOptions);
-            template = TemplateFormFor(r, owner);
+            template = TemplateFinder.TemplateFormFor(r, owner);
         }
         HasTemplateChoice = typed is not null && template is not null;
         var form = UseTemplate ? template ?? typed : typed ?? template;

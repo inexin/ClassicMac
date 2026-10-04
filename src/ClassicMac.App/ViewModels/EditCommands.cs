@@ -483,7 +483,7 @@ public sealed partial class MainViewModel
 
         // Reads what is around the byte; a meaning needs the whole resource (the hex view shows resources only).
         var data = source.Data.Length <= ReadOptions.MaxResourceSize ? source.Data.ToArray() : null;
-        var meanings = data is not null && Selected is ResourceNode node ? MeaningsFor(node) : null;
+        var meanings = data is not null && Selected is ResourceNode node ? TemplateFinder.MeaningsFor(node) : null;
         readInspection = data is not null
             ? HexInspection.At(data, (int)offset, meanings)
             : HexInspection.At(source.Data.Slice(offset, Math.Min(4, source.Data.Length - offset)).ToArray(), 0, null) with
@@ -568,7 +568,7 @@ public sealed partial class MainViewModel
         }
 
         hexEditTarget = (node.Resource, owner);
-        HexEdit = new HexEditor(node.Resource.GetData(), MeaningsFor(node));
+        HexEdit = new HexEditor(node.Resource.GetData(), TemplateFinder.MeaningsFor(node));
         GoToError = null;
         HexEdit.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
         HexLines = HexEdit.Lines;

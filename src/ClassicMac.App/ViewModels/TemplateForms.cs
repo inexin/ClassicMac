@@ -374,14 +374,14 @@ internal static class TemplateRows
     }
 }
 
-public sealed partial class MainViewModel
+public sealed class TemplateFinder(MainViewModel main)
 {
     // The TMPL for a type, as ResEdit finds one: in the resource's own file, then in the other open files whose
     // resources are loaded; else ClassicMac's built-in template for the type; null when there is none.
     private (ResourceTemplate Template, string Source, string ShownThrough)? FindTemplate(FourCC type, ResourceFork own, NodeViewModel? ownFile)
     {
         var forks = new List<(ResourceFork Fork, string Name)> { (own, ownFile?.BaseTitle ?? "this file") };
-        foreach (var root in Roots)
+        foreach (var root in main.Roots)
         {
             foreach (var node in Loaded(root))
             {
@@ -401,7 +401,7 @@ public sealed partial class MainViewModel
 
             try
             {
-                var data = ResourceDecompression.Default.GetData(tmpl, fork, ReadOptions, []);
+                var data = ResourceDecompression.Default.GetData(tmpl, fork, main.ReadOptions, []);
                 return (ResourceTemplate.Parse(data.Span), $"Template: TMPL {tmpl.Id} “{type}” in {name}", $"'TMPL' {tmpl.Id} “{type}” in {name}");
             }
             catch (InvalidDataException)
@@ -437,19 +437,19 @@ public sealed partial class MainViewModel
 
         var type = node.Resource.Type;
         var id = node.Resource.Id;
-        var template = type.ToString() is "STR " or "STR#" or "CODE" ? null : FindTemplate(type, node.Fork, FileOwner(node))?.Template;
+        var template = type.ToString() is "STR " or "STR#" or "CODE" ? null : FindTemplate(type, node.Fork, MainViewModel.FileOwner(node))?.Template;
         return (data, offset) => ClassicMac.Resources.Decoders.Templates.ByteMeanings.MeaningAt(type, id, data, offset, template);
     }
 
     // A template form for a resource without a typed form, when a template for its type is at hand.
-    private TemplateForm? TemplateFormFor(ResourceNode node, NodeViewModel owner)
+    internal TemplateForm? TemplateFormFor(ResourceNode node, NodeViewModel owner)
     {
         if (FindTemplate(node.Resource.Type, node.Fork, owner) is not { } found)
         {
             return null;
         }
 
-        var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, ReadOptions, []);
+        var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, main.ReadOptions, []);
         return new TemplateForm(node.Resource, found.Template, found.Source, data.Span) { ShownThrough = found.ShownThrough };
     }
 

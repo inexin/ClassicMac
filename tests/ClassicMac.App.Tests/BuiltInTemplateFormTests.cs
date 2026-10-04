@@ -51,7 +51,7 @@ public sealed class BuiltInTemplateFormTests : IDisposable
         ((TemplateScalarRow)list.Items[1].Fields[0]).Text = "130";
         model.ApplyFormCommand.Execute(null);
         Assert.Equal(new byte[] { 0, 2, 0, 128, 0, 130 }, FindNode(model).Resource.GetData().ToArray());
-        Assert.Equal(new ByteMeaning("Menu ID of item 2", 4, 2, "130"), model.MeaningAt(FindNode(model), 5));   // byte meanings use it too
+        Assert.Equal(new ByteMeaning("Menu ID of item 2", 4, 2, "130"), model.TemplateFinder.MeaningAt(FindNode(model), 5));   // byte meanings use it too
     }
 
     private static ResourceNode FindNode(MainViewModel model) =>

@@ -34,11 +34,11 @@ public sealed class ByteMeaningTests : IDisposable
         fork.Add(new Resource(FourCC.FromString("STR "), 128, new byte[] { 1, (byte)'x' }));
         fork.Add(new Resource(FourCC.FromString("STR "), 129, new byte[] { 1, (byte)'y' }) { Attributes = ResourceAttributes.Compressed });
         var (model, input) = await Open("Strings.rsrc", fork);
-        Assert.Equal(new ByteMeaning("Character 2 of string 1, “hi”", 3, 2, "i"), model.MeaningAt(Node(input, "STR#"), 4));
-        Assert.Equal(new ByteMeaning("Length of the string", 0, 1, "1"), model.MeaningAt(Node(input, "STR "), 0));
-        Assert.Null(model.MeaningAt(Node(input, "STR "), 2));                 // past the end
+        Assert.Equal(new ByteMeaning("Character 2 of string 1, “hi”", 3, 2, "i"), model.TemplateFinder.MeaningAt(Node(input, "STR#"), 4));
+        Assert.Equal(new ByteMeaning("Length of the string", 0, 1, "1"), model.TemplateFinder.MeaningAt(Node(input, "STR "), 0));
+        Assert.Null(model.TemplateFinder.MeaningAt(Node(input, "STR "), 2));                 // past the end
         var compressed = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "STR ").Children.OfType<ResourceNode>().Single(r => r.Resource.Id == 129);
-        Assert.Null(model.MeaningAt(compressed, 0));                         // the hex view shows its compressed bytes
+        Assert.Null(model.TemplateFinder.MeaningAt(compressed, 0));                         // the hex view shows its compressed bytes
     }
 
     // 'CODE' by its ID: 'CODE' 0's jump table, another segment's header and code (code-segments.md).
@@ -50,9 +50,9 @@ public sealed class ByteMeaningTests : IDisposable
         fork.Add(new Resource(FourCC.FromString("CODE"), 1, new byte[] { 0, 0, 0, 1, 0x4E, 0x75 }));
         var (model, input) = await Open("App.rsrc", fork);
         var segments = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "CODE").Children.OfType<ResourceNode>().ToList();
-        Assert.Equal(new ByteMeaning("Entry 0: segment", 20, 2, "1"), model.MeaningAt(segments.Single(r => r.Resource.Id == 0), 21));
-        Assert.Equal(new ByteMeaning("Number of jump-table entries", 2, 2, "1"), model.MeaningAt(segments.Single(r => r.Resource.Id == 1), 3));
-        Assert.Equal(new ByteMeaning("Code, at +$0000", 4, 2, null), model.MeaningAt(segments.Single(r => r.Resource.Id == 1), 4));
+        Assert.Equal(new ByteMeaning("Entry 0: segment", 20, 2, "1"), model.TemplateFinder.MeaningAt(segments.Single(r => r.Resource.Id == 0), 21));
+        Assert.Equal(new ByteMeaning("Number of jump-table entries", 2, 2, "1"), model.TemplateFinder.MeaningAt(segments.Single(r => r.Resource.Id == 1), 3));
+        Assert.Equal(new ByteMeaning("Code, at +$0000", 4, 2, null), model.TemplateFinder.MeaningAt(segments.Single(r => r.Resource.Id == 1), 4));
     }
 
     [Fact]
@@ -62,13 +62,13 @@ public sealed class ByteMeaningTests : IDisposable
         data.Add(new Resource(FourCC.FromString("Rsrc"), 128, new byte[] { 0, 7 }));
         var (model, input) = await Open("Data.rsrc", data);
         var node = Node(input, "Rsrc");
-        Assert.Null(model.MeaningAt(node, 0));                                 // no template open
+        Assert.Null(model.TemplateFinder.MeaningAt(node, 0));                                 // no template open
 
         var templates = new ResourceFork();
         templates.Add(new Resource(FourCC.FromString("TMPL"), 1000, EditTests.Tmpl(("ID", "DWRD"))) { Name = MacString.FromMacRoman("Rsrc") });
         await Open("Templates.rsrc", templates, model);
-        Assert.Equal(new ByteMeaning("ID", 0, 2, "7"), model.MeaningAt(node, 1));
-        Assert.Null(model.MeaningAt(node, 2));
-        Assert.Null(model.MeaningAt(node, -1));
+        Assert.Equal(new ByteMeaning("ID", 0, 2, "7"), model.TemplateFinder.MeaningAt(node, 1));
+        Assert.Null(model.TemplateFinder.MeaningAt(node, 2));
+        Assert.Null(model.TemplateFinder.MeaningAt(node, -1));
     }
 }
