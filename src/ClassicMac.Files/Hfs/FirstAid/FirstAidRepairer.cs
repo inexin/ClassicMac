@@ -38,6 +38,12 @@ internal static class FirstAidRepairer
                 changes.Add(new PlannedChange("repair", "", "alternate master directory block written from the primary"));
             }
 
+            if (run.Plus && (run.Repairs & FirstAidRepairs.Journal) != 0 && PlusJournal.Replay(working, run.VolumeOffset) is { Damage: null } replay)
+            {
+                changes.Add(new PlannedChange("repair", "",
+                    $"journal replayed ({replay.Transactions} transaction{(replay.Transactions == 1 ? "" : "s")}, {replay.Blocks} block{(replay.Blocks == 1 ? "" : "s")}) and emptied"));
+            }
+
             if (run.Plus ? PlusRepair.Trees(run, working, changes) : Trees(run, working, changes))
             {
                 (run, after) = HfsFirstAid.Check(working);

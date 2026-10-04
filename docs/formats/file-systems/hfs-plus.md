@@ -479,7 +479,16 @@ Everything else is reported and the volume read (§6):
 numbers and words where they mean the same. The rules are TN1150's; where Disk First Aid's own HFS Plus checks are not
 traced, the choices are ClassicMac's [ClassicMac]. HFSX is "not checked".
 
-1. **"Checking disk volume."**: the volume is the image (`'H+'` at 1024) or a wrapper's `drEmbedExtent`.
+1. **"Checking disk volume."**: the volume is the image (`'H+'` at 1024) or a wrapper's `drEmbedExtent`. A journaled
+   volume's journal (§1.6) is replayed first, on a copy, as TN1150's "Replaying the Journal" describes: the journal
+   info block, the journal header (its magic, the byte order its endian field gives, sizes and checksum over the
+   header sector), then each block list from `start` to `end`, wrapping from the journal's end to just after its
+   header, its checksum over the first 32 bytes checked and its blocks copied to `bnum × jhdr_size` in the volume
+   (`bnum` all ones skipped). TN1150 gives a block list's data blocks both as `binfo[1]` to `binfo[num_blocks]` and
+   as `num_blocks − 1`; the field's description, which counts `binfo[0]`, is followed [Doc: TN1150]. The stage line
+   is "Replaying the journal (n transactions)."; a journal with transactions is `firstaid.journal-pending` (repaired:
+   the transactions written and the journal emptied, `start` = `end`), and one that cannot be replayed is
+   `firstaid.journal-damaged` (not repaired; the volume is checked as it is on disk).
 2. **"Checking "Mac OS Extended" volume structures."**: the volume header at 1024 is used when sound (`'H+'`, version 4,
    a power-of-two block size of at least 512, a block count that fits, and the extents and catalog files' own
    extents consistent with their block counts); else a sound alternate at the volume's last 1,024 bytes is used

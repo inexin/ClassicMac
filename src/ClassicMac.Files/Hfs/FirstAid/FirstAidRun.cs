@@ -67,6 +67,9 @@ public enum FirstAidRepairs
 
     /// <summary>An HFS Plus indirect file's or folder's link count is set to its links.</summary>
     LinkCounts = 1 << 17,
+
+    /// <summary>An HFS Plus journal's transactions are written to the volume and the journal emptied.</summary>
+    Journal = 1 << 18,
 }
 
 // The state of one First Aid verify: the volume, the MDBs it reads, the stage lines shown, the problems found, the

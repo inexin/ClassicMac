@@ -34,4 +34,25 @@ public sealed class HfsPlusOriginalImageTests
             Convert.ToHexString(SHA1.HashData(second.DataFork.ToArray())));
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
     }
+
+    // First Aid on the journaled Mac OS X image: its journal is replayed and the volume checks out, or repair leaves it
+    // so; the image itself is never written.
+    [Fact]
+    public void FirstAidChecksAndRepairsTheJournaledMacOsImage()
+    {
+        string? imagePath = Environment.GetEnvironmentVariable("CLASSICMAC_HFSPLUS_REFERENCE_IMAGE");
+        if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
+        {
+            Assert.Skip("Set CLASSICMAC_HFSPLUS_REFERENCE_IMAGE to Digital Corpora's nps-2009-hfsjtest1/image.gen1.dmg.");
+        }
+
+        var image = ClassicMac.Files.ForkData.FromFile(imagePath);
+        var report = ClassicMac.Files.Hfs.HfsFirstAid.Verify(image);
+        TestContext.Current.SendDiagnosticMessage($"{report.Summary} {string.Join("; ", report.Problems)} [{string.Join(" / ", report.Stages)}]");
+        Assert.True(report.Verdict is ClassicMac.Files.Hfs.FirstAidVerdict.AppearsOk or ClassicMac.Files.Hfs.FirstAidVerdict.NeedsRepair,
+            string.Join("; ", report.Problems));
+
+        var result = ClassicMac.Files.Hfs.HfsFirstAid.Repair(image);
+        Assert.Equal(ClassicMac.Files.Hfs.FirstAidVerdict.AppearsOk, result.After.Verdict);
+    }
 }

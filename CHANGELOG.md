@@ -5,7 +5,8 @@
 - First Aid on HFS Plus (hfs-plus.md §5.4): `check`, `repair` and Volume ▸ First Aid… check and repair HFS Plus
   volumes, bare or in their HFS wrapper (HFSX is not checked): the volume header (a sound alternate stands in for a
   damaged one), the special files, the B-trees with HFS Plus's keys, the catalog's records, threads and forks, the
-  hierarchy, the allocation file and the header's counts; repairs written by a new HFS Plus B-tree writer.
+  hierarchy, the allocation file and the header's counts, hard-link counts; a journal is replayed (TN1150) before the
+  check and written by repair; repairs written by a new HFS Plus B-tree writer.
 - First Aid (hfs.md §5.6): `check` checks each HFS volume and partition as Disk First Aid 8.5.5 does, in its stages,
   naming each problem by its number and words (`first aid: Problem:  Invalid PEOF, 18, 2`) and ending with its verdict
   (appears to be OK, needs to be repaired, cannot be repaired, not an HFS disk); JSON gains `firstAid`.

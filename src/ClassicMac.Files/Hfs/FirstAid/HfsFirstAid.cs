@@ -30,10 +30,32 @@ public static class HfsFirstAid
 
     internal static (FirstAidRun Run, FirstAidReport Report) Check(HfsVolume volume)
     {
+        // An HFS Plus volume's journal is replayed on a copy first, and the volume checked as it leaves it.
+        var (plus, hfsx, offset, length) = PlusVolumeCheck.Find(volume);
+        PlusJournal.Result? journal = null;
+        if (plus)
+        {
+            var copy = volume.Fork();
+            journal = PlusJournal.Replay(copy, offset);
+            volume = journal is { Damage: null } ? copy : volume;
+        }
+
         var run = new FirstAidRun(volume);
         try
         {
-            var (plus, hfsx, offset, length) = PlusVolumeCheck.Find(volume);
+            if (journal is { } replay)
+            {
+                run.Stage($"Replaying the journal ({replay.Transactions} transaction{(replay.Transactions == 1 ? "" : "s")}).");
+                if (replay.Damage is { } damage)
+                {
+                    run.Problem($"The journal cannot be replayed: {damage}", "firstaid.journal-damaged", FirstAidRepairs.None);
+                }
+                else
+                {
+                    run.Problem("The journal holds transactions not yet written to the volume", "firstaid.journal-pending", FirstAidRepairs.Journal);
+                }
+            }
+
             if (hfsx)
             {
                 run.Stage(FirstAidMessages.CheckingDiskVolume);
