@@ -43,6 +43,15 @@ public sealed class RepairCommandTests : IDisposable
     // The alternate MDB's signature cleared: Disk First Aid says the disk is not HFS.
     private static void NoAlternate(byte[] image) => image.AsSpan(image.Length - 1024, 2).Clear();
 
+    // The catalog header node's node size made 768 (#61): Disk First Aid cannot repair it.
+    private static void BadCatalogNodeSize(byte[] image)
+    {
+        int blockSize = BinaryPrimitives.ReadInt32BigEndian(image.AsSpan(Mdb + 0x14));
+        int header = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(Mdb + 0x1C)) * 512
+            + BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(Mdb + 0x96)) * blockSize;
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(header + 14 + 18), 768);
+    }
+
     [Fact]
     public void A_volume_that_needs_repair_is_repaired_into_a_new_file()
     {
@@ -100,12 +109,23 @@ public sealed class RepairCommandTests : IDisposable
     [Fact]
     public void A_volume_First_Aid_cannot_repair_is_not_written_and_fails()
     {
-        var (code, output, _) = Run("repair", Volume("alt.img", NoAlternate), "-o", Out);
+        var (code, output, _) = Run("repair", Volume("node.img", BadCatalogNodeSize), "-o", Out);
 
         Assert.Equal(ExitCodes.Damaged, code);
-        Assert.Contains("first aid: This is not an HFS disk.", output);
+        Assert.Contains("first aid: Test done. Problems were found, but Disk First Aid cannot repair them.\n", output);
         Assert.Contains("Nothing written.\n", output);
         Assert.False(File.Exists(Out));
+    }
+
+    // Disk First Aid calls a disk without its alternate MDB not HFS; ClassicMac writes it from the primary.
+    [Fact]
+    public void A_missing_alternate_MDB_is_written_from_the_primary()
+    {
+        var (code, output, _) = Run("repair", Volume("alt.img", NoAlternate), "-o", Out);
+
+        Assert.Equal(ExitCodes.Success, code);
+        Assert.Contains("repair (alternate master directory block written from the primary)\n", output);
+        Assert.Contains("first aid: The volume “First Aid” was repaired successfully.\n", output);
     }
 
     [Fact]

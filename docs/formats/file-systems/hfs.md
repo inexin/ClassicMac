@@ -899,8 +899,9 @@ appear to be OK].
 
 #### Repair
 
-`HfsFirstAid.Repair` (the CLI's `repair`) verifies, and repairs only a volume that needs repair; one Disk First Aid
-cannot repair, or that is not HFS, is left as it is. The repairs run in Disk First Aid's order, then the volume is
+`HfsFirstAid.Repair` (the CLI's `repair`) verifies, and repairs a volume that needs repair or has ClassicMac's
+repairable problems (below); one Disk First Aid cannot repair, or that is not HFS, is left as it is unless the
+alternate MDB is the cause. The repairs run in Disk First Aid's order, then the volume is
 verified again, at most three passes in all:
 
 1. **The B-trees written again** from their leaf records, when a B-tree stage flagged the tree (#5, #13, #15, #16,
@@ -923,6 +924,22 @@ verified again, at most three passes in all:
 Overlapping extents (#12) are not repaired yet: Disk First Aid copies the blocks for each file. Each fix is a
 `PlannedChange` (`repair`, detail `catalog, CNID n: …`, `extents, file n: …`, `catalog B-tree written again (n
 records)`, `volume bitmap …`, `master directory block …`).
+
+#### ClassicMac's checks
+
+ClassicMac adds checks Disk First Aid lacks. Each is a problem of origin ClassicMac (number 0, printed `Problem:
+<text>.`, an Info diagnostic) with its own repair (`FirstAidReport.Extras`); none changes Disk First Aid's verdict, so
+a volume can appear to be OK and still have them. They are ClassicMac's rules, not Disk First Aid's or Mac OS's:
+
+| Code | Found | Repair |
+| --- | --- | --- |
+| `firstaid.alternate-mdb-missing` | the alternate MDB is not `BD` while the primary is an HFS one (Disk First Aid: not an HFS disk) | the primary MDB copied to sector S − 2, first, then verified again |
+| `firstaid.alternate-mdb-stale` | the alternate's `drVBMSt`, `drNmAlBlks`, `drAlBlkSiz`, `drAlBlSt` or B-tree files' sizes and extents differ from the primary's (Mac OS mounts by the primary) | as above |
+| `firstaid.extent-start` | an overflow extents record after a fork's first has a start block (`xkrFABN`) other than the fork's blocks before it | renumbered from the first record's, and the extents tree written again |
+| `firstaid.orphaned-extents` | overflow extents records of a file (ID 16 and up) not in the catalog | the records deleted (repair step 1), their blocks freed |
+| `firstaid.short-peof` | a fork's physical length short of its blocks (Disk First Aid: MountCheck's minor errors only) | set to its blocks |
+| `firstaid.mdb-counts` | `drNmFls` other than the root's files, or `drFreeBks` other than the bitmap's clear bits | the MDB written (repair step 3) |
+| `firstaid.extent-past-end` | an extent running past `drNmAlBlks` (Disk First Aid checks only its start and count) | none: reported |
 
 ## 6. Diagnostics
 

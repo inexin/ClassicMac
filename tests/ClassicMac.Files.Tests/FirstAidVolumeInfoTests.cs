@@ -49,8 +49,9 @@ public class FirstAidVolumeInfoTests
 
         var report = Verify(image);
 
-        var problem = Assert.Single(report.Problems);
+        var problem = Assert.Single(DiskFirstAid(report));
         Assert.Equal(number, problem.Number);
+        Assert.Contains(report.Problems, p => p.Code == "firstaid.alternate-mdb-stale");     // ClassicMac's, besides
         Assert.False(problem.Repairable);
         Assert.Equal(FirstAidVerdict.CannotRepair, report.Verdict);
         Assert.Equal("Test done. Problems were found, but Disk First Aid cannot repair them.", report.Summary);
@@ -63,7 +64,7 @@ public class FirstAidVolumeInfoTests
         var image = HfsWriter.Format(64L * 1024 * 1024, "Big");
         Put32(image, Alternate(image) + 0x14, 512);
 
-        Assert.Equal(7, Assert.Single(Verify(image).Problems).Number);
+        Assert.Equal(7, Assert.Single(DiskFirstAid(Verify(image))).Number);
     }
 
     [Fact]

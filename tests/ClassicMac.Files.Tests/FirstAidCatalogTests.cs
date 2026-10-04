@@ -10,7 +10,7 @@ public class FirstAidCatalogTests
 {
     private static FirstAidProblem Single(byte[] image, int number) => Assert.Single(Verify(image).Problems, p => p.Number == number);
 
-    private static string[] Lines(byte[] image) => [.. Verify(image).Problems.Select(p => p.ToString())];
+    private static string[] Lines(byte[] image) => [.. DiskFirstAid(Verify(image)).Select(p => p.ToString())];
 
     [Fact]
     public void Reserved_fields_in_a_file_record_are_repaired_and_the_scan_goes_on()

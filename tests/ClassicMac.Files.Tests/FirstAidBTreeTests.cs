@@ -7,7 +7,7 @@ namespace ClassicMac.Files.Tests;
 // header, walk, map and header compare.
 public class FirstAidBTreeTests
 {
-    private static FirstAidProblem Only(byte[] image) => Assert.Single(Verify(image).Problems);
+    private static FirstAidProblem Only(byte[] image) => Assert.Single(DiskFirstAid(Verify(image)));
 
     [Fact]
     public void A_catalog_PEOF_other_than_its_extents_cannot_be_repaired()

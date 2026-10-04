@@ -28,13 +28,40 @@ internal static class VolumeInfoCheck
             return run.End(FirstAidVerdict.NotChecked);                       // HFS Plus, bare or in its HFS wrapper
         }
 
+        var primary = new BigEndianReader(run.Primary);
+        bool primaryHfs = primary.ReadUInt16At(0) == Hfs && primary.ReadUInt16At(0x7C) != HfsPlus;
         if (signature != Hfs)
         {
+            if (primaryHfs)
+            {
+                run.Extra("The alternate MDB is missing; the primary MDB is an HFS one", "firstaid.alternate-mdb-missing", FirstAidRepairs.AlternateMdb);
+            }
+
             return run.End(FirstAidVerdict.NotHfs);
+        }
+
+        // ClassicMac's: the alternate's layout and B-tree files against the primary's, which Mac OS mounts by.
+        if (primaryHfs && Stale(run.Primary, run.Alternate))
+        {
+            run.Extra("The alternate MDB differs from the primary in the volume's layout or B-tree files", "firstaid.alternate-mdb-stale", FirstAidRepairs.AlternateMdb);
         }
 
         run.Stage(FirstAidMessages.CheckingStandardVolume);
         return Geometry(run, alternate);
+    }
+
+    // drVBMSt, drNmAlBlks, drAlBlkSiz, drAlBlSt and the B-tree files' sizes and extents.
+    private static bool Stale(byte[] primary, byte[] alternate)
+    {
+        foreach (var (at, length) in new[] { (0x0E, 2), (0x12, 6), (0x1C, 2), (0x82, 0x20) })
+        {
+            if (!System.MemoryExtensions.SequenceEqual(System.MemoryExtensions.AsSpan(primary, at, length), System.MemoryExtensions.AsSpan(alternate, at, length)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // The alternate MDB's geometry, with V = S − 2 sectors, A = drAlBlkSiz and N = drNmAlBlks.

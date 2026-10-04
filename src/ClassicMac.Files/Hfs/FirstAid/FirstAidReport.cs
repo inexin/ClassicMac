@@ -12,6 +12,7 @@ public sealed class FirstAidReport
         Stages = [.. run.Stages];
         Problems = [.. run.Problems];
         Repairs = run.Repairs;
+        Extras = run.Extras;
         VolumeName = run.VolumeName;
         Verdict = run.Ended ?? (run.Repairs != FirstAidRepairs.None ? FirstAidVerdict.NeedsRepair : FirstAidVerdict.AppearsOk);
     }
@@ -24,6 +25,9 @@ public sealed class FirstAidReport
 
     /// <summary>The repairs the problems need.</summary>
     public FirstAidRepairs Repairs { get; }
+
+    /// <summary>The repairs ClassicMac's own checks found needed (problems of origin ClassicMac); not part of the verdict.</summary>
+    public FirstAidRepairs Extras { get; }
 
     /// <summary>The volume's name (from its MDB).</summary>
     public string VolumeName { get; }

@@ -6,7 +6,10 @@
   naming each problem by its number and words (`first aid: Problem:  Invalid PEOF, 18, 2`) and ending with its verdict
   (appears to be OK, needs to be repaired, cannot be repaired, not an HFS disk); JSON gains `firstAid`.
   `HfsFirstAid.Verify` is the API. `repair` (cli.md §3.2; `HfsFirstAid.Repair`, `InputEditSession.Repair`) repairs a
-  volume in Disk First Aid's order (B-trees with its repair list, bitmap, MDB) and verifies it again. The test builder's volumes now carry their forks' physical lengths and a clump size.
+  volume in Disk First Aid's order (B-trees with its repair list, bitmap, MDB) and verifies it again. ClassicMac's own
+  checks (origin `classicMac`, outside Disk First Aid's verdict) find and repair a missing or stale alternate MDB,
+  overflow records' start blocks, orphaned overflow extents, short physical lengths and wrong `drNmFls`/`drFreeBks`,
+  and report extents past the last block. The test builder's volumes now carry their forks' physical lengths and a clump size.
 - Code quality: the build runs the .NET analyzers' recommended rules as errors (`AnalysisMode`; `.editorconfig` lists
   the few turned off and why). `Fixed`, `UnsignedFixed` and `FourCC` gain `<`, `<=`, `>` and `>=`; `MacDate.ToString`
   and a code's `\xHH` escapes no longer follow the user's locale; `ExceptionFilters` (Core) names the recurring catch

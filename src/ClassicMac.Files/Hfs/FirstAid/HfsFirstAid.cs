@@ -42,7 +42,8 @@ public static class HfsFirstAid
                 && CatalogScan.Run(run)
                 && HierarchyCheck.Run(run)
                 && BitmapCheck.Run(run)
-                && MdbCompare.Run(run);
+                && MdbCompare.Run(run)
+                && ClassicMacChecks.Run(run);
         }
         catch (EndOfStreamException)
         {

@@ -55,6 +55,15 @@ public enum FirstAidRepairs
 
     /// <summary>MountCheck's minor findings: MountCheck runs again and the MDB is written.</summary>
     MountCheck = 1 << 13,
+
+    /// <summary>ClassicMac's: the alternate MDB is written from the primary.</summary>
+    AlternateMdb = 1 << 14,
+
+    /// <summary>ClassicMac's: overflow extents records' start blocks (<c>xkrFABN</c>) are renumbered.</summary>
+    ExtentStarts = 1 << 15,
+
+    /// <summary>ClassicMac's: a fork's physical length short of its blocks is set to them.</summary>
+    ForkLengths = 1 << 16,
 }
 
 // The state of one First Aid verify: the volume, the MDBs it reads, the stage lines shown, the problems found, the
@@ -124,6 +133,9 @@ internal sealed class FirstAidRun(HfsVolume volume)
 
     public FirstAidRepairs Repairs { get; set; }
 
+    /// <summary>The repairs ClassicMac's own checks found needed; they never change Disk First Aid's verdict.</summary>
+    public FirstAidRepairs Extras { get; set; }
+
     /// <summary>How the check ended early, or null while it runs or when every stage passed.</summary>
     public FirstAidVerdict? Ended { get; set; }
 
@@ -190,6 +202,19 @@ internal sealed class FirstAidRun(HfsVolume volume)
     {
         Problems.Add(new FirstAidProblem(0, message, 0, 0, stage, Repairable: true, code));
         Repairs |= repairs;
+    }
+
+    /// <summary>
+    /// Records one of ClassicMac's problems (once per code), with the repair it needs, or none when it is only reported.
+    /// </summary>
+    public void Extra(string message, string code, FirstAidRepairs repairs = FirstAidRepairs.None)
+    {
+        if (!Problems.Exists(p => p.Code == code))
+        {
+            Problems.Add(new FirstAidProblem(0, message, 0, 0, stage, repairs != FirstAidRepairs.None, code, FirstAidOrigin.ClassicMac));
+        }
+
+        Extras |= repairs;
     }
 
     /// <summary>Records a problem that needs no repair: the volume can still appear to be OK.</summary>

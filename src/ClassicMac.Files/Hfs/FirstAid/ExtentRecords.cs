@@ -78,7 +78,17 @@ internal static class ExtentRecords
                 return null;
             }
 
-            extents.AddRange(Of(records[at].Data));
+            // ClassicMac's: each record's start block is the fork's blocks before it.
+            if ((records[at].Key[6] << 8 | records[at].Key[7]) != blocks)
+            {
+                run.Extra("An overflow extents record's start block is not the fork's blocks before it", "firstaid.extent-start", FirstAidRepairs.ExtentStarts);
+            }
+
+            foreach (var extent in Of(records[at].Data))
+            {
+                extents.Add(extent);
+                blocks += extent.Count;
+            }
         }
 
         return extents;

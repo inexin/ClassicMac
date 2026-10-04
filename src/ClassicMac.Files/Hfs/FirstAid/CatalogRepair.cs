@@ -18,17 +18,19 @@ internal sealed class CatalogRepair
     private static readonly byte[] IconName = [(byte)'I', (byte)'c', (byte)'o', (byte)'n', 0x0D];
     private readonly List<(byte[] Key, byte[] Data)> records;
     private readonly List<PlannedChange> changes;
+    private readonly Dictionary<(uint FileId, byte Fork), long> allocated;
 
-    private CatalogRepair(IEnumerable<(byte[] Key, byte[] Data, uint Node)> records, List<PlannedChange> changes)
+    private CatalogRepair(FirstAidRun run, List<PlannedChange> changes)
     {
-        this.records = records.Select(r => (r.Key.ToArray(), r.Data.ToArray())).ToList();
+        records = run.Catalog!.Records.Select(r => (r.Key.ToArray(), r.Data.ToArray())).ToList();
         this.changes = changes;
+        allocated = ClassicMacChecks.Allocated(run);
     }
 
     /// <summary>The catalog's records with the repairs made, in key order; the changes are added to <paramref name="changes"/>.</summary>
-    public static List<(byte[] Key, byte[] Data)> Repair(FirstAidTree catalog, List<PlannedChange> changes)
+    public static List<(byte[] Key, byte[] Data)> Repair(FirstAidRun run, List<PlannedChange> changes)
     {
-        var repair = new CatalogRepair(catalog.Records, changes);
+        var repair = new CatalogRepair(run, changes);
         repair.Fields();
         repair.Threads();
         repair.MissingThreads();
@@ -62,6 +64,8 @@ internal sealed class CatalogRepair
                         Add(reader.ReadUInt32At(0x14), "a file record's reserved fields cleared");
                     }
 
+                    ForkLength(data, 0x1E, 0x00, "data");
+                    ForkLength(data, 0x28, 0xFF, "resource");
                     break;
             }
         }
@@ -90,6 +94,20 @@ internal sealed class CatalogRepair
         }
 
         writer.WriteUInt16At(0x1E, flags);
+    }
+
+    // ClassicMac's: a fork's physical length short of its blocks set to them (Disk First Aid's MountCheck finds it, as
+    // minor, and leaves it).
+    private void ForkLength(byte[] data, int at, byte fork, string name)
+    {
+        var reader = new BigEndianReader(data);
+        uint id = reader.ReadUInt32At(0x14), peof = reader.ReadUInt32At(at);
+        long blocks = allocated.GetValueOrDefault((id, fork));
+        if (peof < blocks)
+        {
+            new BigEndianWriter(data).WriteUInt32At(at, blocks);
+            Add(id, $"the {name} fork's physical length set from {peof} to {blocks}, its blocks");
+        }
     }
 
     // A file thread: deleted when its file is missing, its file's thread flag set otherwise; a folder thread whose

@@ -37,6 +37,9 @@ internal static class FirstAidImages
 
     public static FirstAidReport Verify(byte[] image) => HfsFirstAid.Verify(ForkData.FromBytes(image));
 
+    /// <summary>Disk First Aid's own problems, without ClassicMac's.</summary>
+    public static List<FirstAidProblem> DiskFirstAid(FirstAidReport report) => [.. report.Problems.Where(p => p.Origin == FirstAidOrigin.DiskFirstAid)];
+
     // The catalog's node n, by the MDB's first catalog extent (the test volumes' catalogs are in one piece).
     public static int CatalogNode(byte[] image, uint node)
     {
@@ -88,6 +91,25 @@ internal static class FirstAidImages
 
         Put16(image, node + 10, count - 1);
         Put32(image, header + 14 + 6, U32(image, header + 14 + 6) - 1);
+    }
+
+    /// <summary>The offsets of the extents tree's leaf records' keys, in key order (the tree in one piece).</summary>
+    public static List<int> ExtentsKeys(byte[] image)
+    {
+        int blockSize = (int)U32(image, Primary + 0x14);
+        int tree = U16(image, Primary + 0x1C) * Sector + U16(image, Primary + 0x86) * blockSize;
+        int nodeSize = U16(image, tree + 14 + 18);
+        var keys = new List<int>();
+        for (uint node = U32(image, tree + 14 + 10); node != 0; node = U32(image, tree + (int)node * nodeSize))
+        {
+            int at = tree + (int)node * nodeSize;
+            for (var i = 0; i < U16(image, at + 10); i++)
+            {
+                keys.Add(at + U16(image, at + nodeSize - 2 * (i + 1)));
+            }
+        }
+
+        return keys;
     }
 
     public const uint D1 = 16, D2 = 17, T1 = 18, W6Plain = 19, T2 = 20;
