@@ -4,13 +4,18 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsPlusReader;
+using static ClassicMac.Files.Hfs.HfsPlusJournal;
+using static ClassicMac.Files.Hfs.HfsPlusAllocation;
+using static ClassicMac.Files.Hfs.HfsPlusAttributes;
+using static ClassicMac.Files.Hfs.HfsPlusLinks;
 
 namespace ClassicMac.Files.Hfs;
 
-// HFS Plus reading: the B-trees: walking a tree's leaves, checking its header, index graph and node map, and the key orders.
-internal static partial class HfsPlusReader
+// HFS Plus reading, for HfsPlusReader: the B-trees: walking a tree's leaves, checking its header, index graph and node map, and the key orders.
+internal static class HfsPlusBTree
 {
-    private static IEnumerable<(byte[] Key, byte[] Data)> LeafRecords(byte[] tree, string name,
+    internal static IEnumerable<(byte[] Key, byte[] Data)> LeafRecords(byte[] tree, string name,
         bool isHfsX = false, ContainerContext? context = null)
     {
         if (tree.Length < 512 || tree[8] != 1)
@@ -267,7 +272,7 @@ internal static partial class HfsPlusReader
         ValidateNodeMap(tree, nodeSize, totalNodes, indexedNodes, name);
     }
 
-    private static void ValidateHeaderNodeRecordLayout(BigEndianReader headerNode, int nodeSize, string name)
+    internal static void ValidateHeaderNodeRecordLayout(BigEndianReader headerNode, int nodeSize, string name)
     {
         int freeSpaceOffset = nodeSize - 8;
         if (U16(headerNode, nodeSize - 2) != 14 ||
@@ -279,7 +284,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static void RequireFirstRecordStartsAtNodeDescriptorEnd(BigEndianReader tree, int nodeStart,
+    internal static void RequireFirstRecordStartsAtNodeDescriptorEnd(BigEndianReader tree, int nodeStart,
         int nodeSize, string name)
     {
         if (U16(tree, nodeStart + 10) != 0 && U16(tree, nodeStart + nodeSize - 2) != 14)
@@ -288,7 +293,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static (HashSet<uint> Leaves, HashSet<uint> Nodes) ValidateIndexGraph(byte[] tree, string name,
+    internal static (HashSet<uint> Leaves, HashSet<uint> Nodes) ValidateIndexGraph(byte[] tree, string name,
         int nodeSize, int maxKeyLength, uint totalNodes, uint root, ushort depth, bool caseSensitiveCatalog,
         bool caseFoldingCatalog, bool isHfsX)
     {
@@ -499,7 +504,7 @@ internal static partial class HfsPlusReader
         return (leafNodes, visitedNodes);
     }
 
-    private static (byte[] First, byte[] Last)? LeafKeyRange(BigEndianReader tree, int nodeStart, int nodeSize,
+    internal static (byte[] First, byte[] Last)? LeafKeyRange(BigEndianReader tree, int nodeStart, int nodeSize,
         int maxKeyLength, string name)
     {
         int count = U16(tree, nodeStart + 10);
@@ -537,7 +542,7 @@ internal static partial class HfsPlusReader
         return (ReadKey(0), ReadKey(count - 1));
     }
 
-    private static int CompareTreeKeys(string name, bool caseSensitiveCatalog, bool caseFoldingCatalog,
+    internal static int CompareTreeKeys(string name, bool caseSensitiveCatalog, bool caseFoldingCatalog,
         byte[] left, byte[] right) => name switch
         {
             "catalog" when caseSensitiveCatalog => CompareHfsXCatalogKeys(left, right),
@@ -547,7 +552,7 @@ internal static partial class HfsPlusReader
             _ => throw new InvalidOperationException($"No key comparator is defined for the {name} B-tree.")
         };
 
-    private static void ValidateNodeMap(byte[] tree, int nodeSize, uint totalNodes,
+    internal static void ValidateNodeMap(byte[] tree, int nodeSize, uint totalNodes,
         HashSet<uint> referencedNodes, string name)
     {
         const int MapOffset = 14 + 106 + 128;
@@ -686,7 +691,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static void RequireZeroMapPadding(ReadOnlySpan<byte> mapRecord, int usedBytes)
+    internal static void RequireZeroMapPadding(ReadOnlySpan<byte> mapRecord, int usedBytes)
     {
         for (int index = usedBytes; index < mapRecord.Length; index++)
         {
@@ -697,7 +702,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static int CompareExtentKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
+    internal static int CompareExtentKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
     {
         var leftReader = new BigEndianReader(left);
         var rightReader = new BigEndianReader(right);
@@ -711,7 +716,7 @@ internal static partial class HfsPlusReader
         return comparison != 0 ? comparison : U32(leftReader, 8).CompareTo(U32(rightReader, 8));
     }
 
-    private static int CompareHfsXCatalogKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
+    internal static int CompareHfsXCatalogKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
     {
         var leftReader = new BigEndianReader(left);
         var rightReader = new BigEndianReader(right);
@@ -734,7 +739,7 @@ internal static partial class HfsPlusReader
         return leftLength.CompareTo(rightLength);
     }
 
-    private static int CompareCatalogKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right, bool caseFolding)
+    internal static int CompareCatalogKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right, bool caseFolding)
     {
         var leftReader = new BigEndianReader(left);
         var rightReader = new BigEndianReader(right);
@@ -763,7 +768,7 @@ internal static partial class HfsPlusReader
             right.Slice(8, rightLength * 2));
     }
 
-    private sealed class ByteArrayEqualityComparer : IEqualityComparer<byte[]>
+    internal sealed class ByteArrayEqualityComparer : IEqualityComparer<byte[]>
     {
         public static ByteArrayEqualityComparer Instance { get; } = new();
 

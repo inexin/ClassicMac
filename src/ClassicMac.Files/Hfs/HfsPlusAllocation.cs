@@ -4,13 +4,18 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsPlusReader;
+using static ClassicMac.Files.Hfs.HfsPlusJournal;
+using static ClassicMac.Files.Hfs.HfsPlusAttributes;
+using static ClassicMac.Files.Hfs.HfsPlusLinks;
+using static ClassicMac.Files.Hfs.HfsPlusBTree;
 
 namespace ClassicMac.Files.Hfs;
 
-// HFS Plus reading: extents, forks read through them, and the allocation bitmap checked against them.
-internal static partial class HfsPlusReader
+// HFS Plus reading, for HfsPlusReader: extents, forks read through them, and the allocation bitmap checked against them.
+internal static class HfsPlusAllocation
 {
-    private static void ValidateAllocationExtents(List<(uint Start, uint End)> extents,
+    internal static void ValidateAllocationExtents(List<(uint Start, uint End)> extents,
         List<(uint Start, uint End)> ordinaryForkExtents, uint blockSize, uint totalBlocks)
     {
         // TN1150's allocation-file consistency check assigns allocation blocks to fork extents. A block cannot
@@ -36,7 +41,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static ExtentRecordInfo AddExtentRecord(ReadOnlyMemory<byte> extents, uint totalBlocks,
+    internal static ExtentRecordInfo AddExtentRecord(ReadOnlyMemory<byte> extents, uint totalBlocks,
         List<(uint Start, uint End)> allocationExtents, string outOfRangeMessage,
         List<(uint Start, uint End)>? ordinaryForkExtents = null)
     {
@@ -61,7 +66,7 @@ internal static partial class HfsPlusReader
         return new ExtentRecordInfo(covered, extentCount);
     }
 
-    private static bool HasExtentDescriptor(BigEndianReader extents)
+    internal static bool HasExtentDescriptor(BigEndianReader extents)
     {
         for (int index = 0; index < 8; index++)
         {
@@ -74,7 +79,7 @@ internal static partial class HfsPlusReader
         return false;
     }
 
-    private static void ValidateExtentDescriptorSequence(BigEndianReader extents)
+    internal static void ValidateExtentDescriptorSequence(BigEndianReader extents)
     {
         bool unusedDescriptorSeen = false;
         for (int index = 0; index < 8; index++)
@@ -97,7 +102,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static void AddAllocationExtent(uint start, uint count, uint totalBlocks,
+    internal static void AddAllocationExtent(uint start, uint count, uint totalBlocks,
         List<(uint Start, uint End)> allocationExtents, string outOfRangeMessage,
         List<(uint Start, uint End)>? ordinaryForkExtents = null)
     {
@@ -111,7 +116,7 @@ internal static partial class HfsPlusReader
         ordinaryForkExtents?.Add(extent);
     }
 
-    private static void ValidateAllocationBitmap(byte[] bitmap, uint totalBlocks, uint blockSize,
+    internal static void ValidateAllocationBitmap(byte[] bitmap, uint totalBlocks, uint blockSize,
         List<(uint Start, uint End)> extents)
     {
         ulong requiredBytes = ((ulong)totalBlocks + 7) / 8;
@@ -151,7 +156,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static void RequireAllocationRange(byte[] bitmap, uint start, uint end)
+    internal static void RequireAllocationRange(byte[] bitmap, uint start, uint end)
     {
         uint block = start;
         while (block < end)
@@ -170,7 +175,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static uint CountFreeAllocationBlocks(byte[] bitmap, uint totalBlocks)
+    internal static uint CountFreeAllocationBlocks(byte[] bitmap, uint totalBlocks)
     {
         int wholeBytes = checked((int)(totalBlocks / 8));
         uint allocated = 0;
@@ -189,7 +194,7 @@ internal static partial class HfsPlusReader
         return totalBlocks - allocated;
     }
 
-    private static ForkData ReadFork(ForkData image, ReadOnlyMemory<byte> fork, uint blockSize, uint totalBlocks,
+    internal static ForkData ReadFork(ForkData image, ReadOnlyMemory<byte> fork, uint blockSize, uint totalBlocks,
         Dictionary<(byte Fork, uint File), List<(uint Start, byte[] Extents)>>? overflow = null,
         byte forkType = 0, uint fileId = 0, List<(uint Start, uint End)>? allocationExtents = null,
         List<(uint Start, uint End)>? ordinaryForkExtents = null)
@@ -329,5 +334,5 @@ internal static partial class HfsPlusReader
         return new ExtentForkData(image, ranges, checked((long)logical));
     }
 
-    private readonly record struct ExtentRecordInfo(ulong BlockCount, int ExtentCount);
+    internal readonly record struct ExtentRecordInfo(ulong BlockCount, int ExtentCount);
 }

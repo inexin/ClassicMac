@@ -4,21 +4,26 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsPlusJournal;
+using static ClassicMac.Files.Hfs.HfsPlusAllocation;
+using static ClassicMac.Files.Hfs.HfsPlusAttributes;
+using static ClassicMac.Files.Hfs.HfsPlusLinks;
+using static ClassicMac.Files.Hfs.HfsPlusBTree;
 
 namespace ClassicMac.Files.Hfs;
 
 // HFS Plus structures and offsets follow Apple Technical Note TN1150.
-internal static partial class HfsPlusReader
+internal static class HfsPlusReader
 {
     private const int HeaderOffset = 1024;
     private const int HeaderLength = 512;
     private const uint RootParentId = 1;
-    private const uint RootFolderId = 2;
+    internal const uint RootFolderId = 2;
     private const uint BadBlockFileId = 5;
     private const ushort HasAttributesMask = 0x0004;
     private const ushort HasSecurityMask = 0x0008;
     private const ushort HasLinkChainMask = 0x0020;
-    private const ushort HasChildLinkMask = 0x0040;
+    internal const ushort HasChildLinkMask = 0x0040;
 
     // The volume's files; its folders (but the private hard-link folders) go to folderList when one is given.
     public static IReadOnlyList<MacFile> Read(ForkData image, ContainerContext context, List<MacFolder>? folderList = null)
@@ -852,7 +857,7 @@ internal static partial class HfsPlusReader
             .Normalize(NormalizationForm.FormC);
     }
 
-    private static void ValidateCatalogKey(BigEndianReader key, bool isHfsX)
+    internal static void ValidateCatalogKey(BigEndianReader key, bool isHfsX)
     {
         int nameLength = U16(key, 6);
         if (nameLength > 255 || key.Source.Length != 8 + nameLength * 2)
@@ -966,7 +971,7 @@ internal static partial class HfsPlusReader
 
     private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
 
-    private readonly record struct CatalogFileData(uint FileId, string Name, uint Parent, uint Special,
+    internal readonly record struct CatalogFileData(uint FileId, string Name, uint Parent, uint Special,
         uint PreviousLinkId, uint NextLinkId, ushort RecordFlags, ushort Mode,
         FinderInfo FinderInfo, MacDate? Created, MacDate? Modified, ForkData DataFork, ForkData ResourceFork);
     private readonly record struct CatalogNode(uint Parent, string Name, bool IsFolder);
@@ -978,10 +983,10 @@ internal static partial class HfsPlusReader
         catch (ArgumentException) { return MacString.FromMacRoman("?"); }
     }
     // An offset outside the data throws ArgumentOutOfRangeException.
-    private static ushort U16(BigEndianReader data, int offset) =>
+    internal static ushort U16(BigEndianReader data, int offset) =>
         data.TryReadUInt16At(offset, out ushort value) ? value : throw new ArgumentOutOfRangeException(nameof(offset));
-    private static uint U32(BigEndianReader data, int offset) =>
+    internal static uint U32(BigEndianReader data, int offset) =>
         data.TryReadUInt32At(offset, out uint value) ? value : throw new ArgumentOutOfRangeException(nameof(offset));
-    private static ulong U64(BigEndianReader data, int offset) =>
+    internal static ulong U64(BigEndianReader data, int offset) =>
         data.TryReadUInt64At(offset, out ulong value) ? value : throw new ArgumentOutOfRangeException(nameof(offset));
 }

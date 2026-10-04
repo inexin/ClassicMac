@@ -4,13 +4,18 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsPlusReader;
+using static ClassicMac.Files.Hfs.HfsPlusJournal;
+using static ClassicMac.Files.Hfs.HfsPlusAllocation;
+using static ClassicMac.Files.Hfs.HfsPlusAttributes;
+using static ClassicMac.Files.Hfs.HfsPlusBTree;
 
 namespace ClassicMac.Files.Hfs;
 
-// HFS Plus reading: file and directory hard links and symbolic links.
-internal static partial class HfsPlusReader
+// HFS Plus reading, for HfsPlusReader: file and directory hard links and symbolic links.
+internal static class HfsPlusLinks
 {
-    private static void ValidateDirectoryHardLinkChains(
+    internal static void ValidateDirectoryHardLinkChains(
         HashSet<uint> directoryInodeFolderIds,
         Dictionary<uint, List<DirectoryHardLinkAlias>> directoryAliasesByInode,
         HashSet<uint> directoryAliasFileIds,
@@ -94,7 +99,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static bool TryParseDirectoryFirstLinkId(byte[] value, out uint linkId)
+    internal static bool TryParseDirectoryFirstLinkId(byte[] value, out uint linkId)
     {
         linkId = 0;
         if (value.Length < 2 || value[^1] != 0)
@@ -115,7 +120,7 @@ internal static partial class HfsPlusReader
         return true;
     }
 
-    private static string? ReadSymbolicLinkTarget(ushort fileMode, FinderInfo finderInfo,
+    internal static string? ReadSymbolicLinkTarget(ushort fileMode, FinderInfo finderInfo,
         ForkData dataFork, ForkData resourceFork, long maxExpandedBytes)
     {
         const ushort fileTypeMask = 0xF000;
@@ -151,21 +156,21 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static bool IsHardLinkFile(FinderInfo finderInfo) =>
+    internal static bool IsHardLinkFile(FinderInfo finderInfo) =>
         finderInfo.Type == FourCC.FromString("hlnk") && finderInfo.Creator == FourCC.FromString("hfs+");
 
-    private static bool IsDirectoryHardLinkAliasCandidate(CatalogFileData file) =>
+    internal static bool IsDirectoryHardLinkAliasCandidate(CatalogFileData file) =>
         (file.RecordFlags & 0x0020) != 0 &&
         (file.FinderInfo.Type == FourCC.FromString("alis") || file.FinderInfo.Creator == FourCC.FromString("MACS"));
 
-    private static bool HasValidDirectoryHardLinkAliasSignature(CatalogFileData file) =>
+    internal static bool HasValidDirectoryHardLinkAliasSignature(CatalogFileData file) =>
         file.FinderInfo.Type == FourCC.FromString("alis") && file.FinderInfo.Creator == FourCC.FromString("MACS") &&
         (file.FinderInfo.Flags & FinderFlags.IsAlias) != 0;
 
-    private static bool HasHardLinkMarker(FinderInfo finderInfo) =>
+    internal static bool HasHardLinkMarker(FinderInfo finderInfo) =>
         finderInfo.Type == FourCC.FromString("hlnk") || finderInfo.Creator == FourCC.FromString("hfs+");
 
-    private static bool TryParseHardLinkReference(string name, out uint reference)
+    internal static bool TryParseHardLinkReference(string name, out uint reference)
     {
         reference = 0;
         if (!name.StartsWith("iNode", StringComparison.Ordinal) ||
@@ -179,7 +184,7 @@ internal static partial class HfsPlusReader
         return name.AsSpan(5).SequenceEqual(canonicalReference.AsSpan());
     }
 
-    private static bool TryParseDirectoryInodeName(string name, out uint inodeId)
+    internal static bool TryParseDirectoryInodeName(string name, out uint inodeId)
     {
         inodeId = 0;
         if (!name.StartsWith("dir_", StringComparison.Ordinal) ||
@@ -192,5 +197,5 @@ internal static partial class HfsPlusReader
         return name.AsSpan(4).SequenceEqual(inodeId.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
-    private readonly record struct DirectoryHardLinkAlias(uint FileId, string Name, uint Parent);
+    internal readonly record struct DirectoryHardLinkAlias(uint FileId, string Name, uint Parent);
 }

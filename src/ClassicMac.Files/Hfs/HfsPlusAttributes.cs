@@ -4,13 +4,18 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsPlusReader;
+using static ClassicMac.Files.Hfs.HfsPlusJournal;
+using static ClassicMac.Files.Hfs.HfsPlusAllocation;
+using static ClassicMac.Files.Hfs.HfsPlusLinks;
+using static ClassicMac.Files.Hfs.HfsPlusBTree;
 
 namespace ClassicMac.Files.Hfs;
 
-// HFS Plus reading: the attributes B-tree: fork records, security attributes and attribute keys.
-internal static partial class HfsPlusReader
+// HFS Plus reading, for HfsPlusReader: the attributes B-tree: fork records, security attributes and attribute keys.
+internal static class HfsPlusAttributes
 {
-    private static void CollectAttributeForkRecord(BigEndianReader key, byte[] data, uint totalBlocks,
+    internal static void CollectAttributeForkRecord(BigEndianReader key, byte[] data, uint totalBlocks,
         List<(uint Start, uint End)> allocationExtents, List<(uint Start, uint End)> ordinaryForkExtents,
         Dictionary<(uint FileId, string Name), AttributeForkState> attributeForks,
         Dictionary<uint, byte[]> directoryFirstLinkIds, HashSet<uint> attributeFileIds)
@@ -102,7 +107,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static void ValidateSecurityAttribute(ReadOnlyMemory<byte> record, ContainerContext context)
+    internal static void ValidateSecurityAttribute(ReadOnlyMemory<byte> record, ContainerContext context)
     {
         const uint inlineDataRecord = 0x10;
         const uint fileSecurityMagic = 0x012CC16D;
@@ -159,7 +164,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static void ValidateAttributeForks(
+    internal static void ValidateAttributeForks(
         Dictionary<(uint FileId, string Name), AttributeForkState> attributeForks, uint blockSize)
     {
         foreach (AttributeForkState fork in attributeForks.Values)
@@ -203,7 +208,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static void ValidateAttributeKey(ReadOnlyMemory<byte> key)
+    internal static void ValidateAttributeKey(ReadOnlyMemory<byte> key)
     {
         var reader = new BigEndianReader(key);
         if (key.Length < 14 || U16(reader, 0) != key.Length - 2 || U16(reader, 2) != 0)
@@ -220,7 +225,7 @@ internal static partial class HfsPlusReader
 
     // Apple’s HFS comparator orders attribute keys by file ID, name length, binary UTF-16 name,
     // then start block (hfs_attrkeycompare in Apple’s HFS source).
-    private static int CompareAttributeKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
+    internal static int CompareAttributeKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
     {
         var leftReader = new BigEndianReader(left);
         var rightReader = new BigEndianReader(right);
@@ -250,7 +255,7 @@ internal static partial class HfsPlusReader
         return U32(leftReader, 8).CompareTo(U32(rightReader, 8));
     }
 
-    private sealed class AttributeForkState
+    internal sealed class AttributeForkState
     {
         public ulong LogicalSize { get; set; }
         public uint TotalBlocks { get; set; }

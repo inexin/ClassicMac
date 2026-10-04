@@ -4,13 +4,18 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsPlusReader;
+using static ClassicMac.Files.Hfs.HfsPlusAllocation;
+using static ClassicMac.Files.Hfs.HfsPlusAttributes;
+using static ClassicMac.Files.Hfs.HfsPlusLinks;
+using static ClassicMac.Files.Hfs.HfsPlusBTree;
 
 namespace ClassicMac.Files.Hfs;
 
-// HFS Plus reading: the journal info block, the journal header and the catalog files the journal names (TN1150 "Journal").
-internal static partial class HfsPlusReader
+// HFS Plus reading, for HfsPlusReader: the journal info block, the journal header and the catalog files the journal names (TN1150 "Journal").
+internal static class HfsPlusJournal
 {
-    private static JournalInfo? ReportJournalInfoBlockProblem(ForkData image, BigEndianReader volumeHeader,
+    internal static JournalInfo? ReportJournalInfoBlockProblem(ForkData image, BigEndianReader volumeHeader,
         uint blockSize, uint totalBlocks, byte[] allocationBitmap, ContainerContext context)
     {
         const uint journalInVolumeFlag = 0x00000001;
@@ -57,7 +62,7 @@ internal static partial class HfsPlusReader
         return new JournalInfo(journalOffset, journalSize, (flags & journalNeedsInitializationFlag) != 0);
     }
 
-    private static void ValidateJournalCatalogFiles(JournalInfo? journalInfo,
+    internal static void ValidateJournalCatalogFiles(JournalInfo? journalInfo,
         IReadOnlyDictionary<string, JournalCatalogFile> journalFiles, uint journalInfoBlock, uint blockSize,
         ContainerContext context)
     {
@@ -91,7 +96,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static void ValidateJournalHeader(ForkData image, JournalInfo journalInfo, ContainerContext context)
+    internal static void ValidateJournalHeader(ForkData image, JournalInfo journalInfo, ContainerContext context)
     {
         const int journalHeaderLength = 44;
         const uint journalHeaderMagic = 0x4A4E4C78;
@@ -129,7 +134,7 @@ internal static partial class HfsPlusReader
         }
     }
 
-    private static uint CalculateJournalHeaderChecksum(ForkData image, ulong journalOffset, uint headerSize)
+    internal static uint CalculateJournalHeaderChecksum(ForkData image, ulong journalOffset, uint headerSize)
     {
         uint checksum = 0;
         byte[] buffer = new byte[8192];
@@ -152,11 +157,11 @@ internal static partial class HfsPlusReader
         return ~checksum;
     }
 
-    private static void ReportInvalidJournalHeader(ContainerContext context) =>
+    internal static void ReportInvalidJournalHeader(ContainerContext context) =>
         context.Report(DiagnosticSeverity.Warning, "hfs.plus-journal-info-invalid",
             "The HFS Plus journal header has invalid fields, offsets, size, or checksum.");
 
-    private static JournalCatalogFile ReadJournalCatalogFile(BigEndianReader fork)
+    internal static JournalCatalogFile ReadJournalCatalogFile(BigEndianReader fork)
     {
         ulong logicalSize = U64(fork, 0);
         uint totalBlocks = U32(fork, 12);
@@ -174,8 +179,8 @@ internal static partial class HfsPlusReader
         return new JournalCatalogFile(logicalSize, totalBlocks, extentStart, singleExtent);
     }
 
-    private readonly record struct JournalInfo(ulong Offset, ulong Size, bool NeedsInitialization);
+    internal readonly record struct JournalInfo(ulong Offset, ulong Size, bool NeedsInitialization);
 
-    private readonly record struct JournalCatalogFile(ulong LogicalSize, uint TotalBlocks, uint ExtentStart,
+    internal readonly record struct JournalCatalogFile(ulong LogicalSize, uint TotalBlocks, uint ExtentStart,
         bool IsSingleExtent);
 }
