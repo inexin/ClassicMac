@@ -179,6 +179,106 @@ public sealed class IconFamily
         members[member.Type] = payload.ToArray();
     }
 
+    /// <summary>
+    /// Sets a member as SetIconFamilyData does: 32-bit data of the member's raw size is taken as ARGB, any other size
+    /// as compressed (§1.4; <c>it32</c> after its 4-byte format word); every other member must be its raw size.
+    /// </summary>
+    /// <exception cref="ArgumentException">Not a member type, or a 1-, 4- or 8-bit member or mask of another size.</exception>
+    public void SetMember(string type, ReadOnlyMemory<byte> data)
+    {
+        if (MemberType(type) is not { } member)
+        {
+            throw new ArgumentException($"'{type}' is not an icon family member.", nameof(type));
+        }
+
+        if (member.Depth != 32 && data.Length != member.RawSize)
+        {
+            throw new ArgumentException($"A '{type}' member is {member.RawSize} bytes, not {data.Length}.", nameof(data));
+        }
+
+        Set(member, data, null);
+    }
+
+    /// <summary>
+    /// The family as an <c>'icns'</c>, as MakeIconFamilyHandle writes it: the header, then each member in table order
+    /// (<see cref="MemberTypes"/>) as its type, its length with the 8-byte header, and its data, without padding; the
+    /// 32-bit members always compressed (<c>it32</c> after a format word of 0). Variants are not written.
+    /// </summary>
+    public byte[] ToIcns()
+    {
+        var w = new BigEndianWriter();
+        w.WriteFourCC(FourCC.FromString("icns"));
+        w.WriteUInt32(0);
+        foreach (var member in MemberTypes)
+        {
+            if (!members.TryGetValue(member.Type, out var data))
+            {
+                continue;
+            }
+
+            byte[] payload = member.Depth != 32 ? data
+                : member.Type == "it32" ? [0, 0, 0, 0, .. Compress(data, member.Width * member.Height)]
+                : Compress(data, member.Width * member.Height);
+            w.WriteFourCC(FourCC.FromString(member.Type));
+            w.WriteUInt32(payload.Length + 8);
+            w.WriteBytes(payload);
+        }
+
+        w.WriteUInt32At(4, w.WrittenSpan.Length);
+        return w.ToArray();
+    }
+
+    // AppendCompressedData and RepeatingPixel: the red, green and blue planes in turn (alpha dropped), each as runs of
+    // 3 to 130 equal bytes (control: count + $7D, then the byte) and literals of up to 128 (control: count − 1, then
+    // the bytes); shorter repeats stay literal, pending literals are written before a run. Never stored raw.
+    internal static byte[] Compress(ReadOnlySpan<byte> argb, int pixels)
+    {
+        var output = new List<byte>(pixels * 3);
+        var literal = new List<byte>(128);
+        void Flush()
+        {
+            if (literal.Count > 0)
+            {
+                output.Add((byte)(literal.Count - 1));
+                output.AddRange(literal);
+                literal.Clear();
+            }
+        }
+
+        for (int plane = 1; plane <= 3; plane++)
+        {
+            for (int i = 0; i < pixels;)
+            {
+                byte value = argb[4 * i + plane];
+                int run = 1;
+                while (i + run < pixels && run < 130 && argb[4 * (i + run) + plane] == value)
+                {
+                    run++;
+                }
+
+                if (run >= 3)
+                {
+                    Flush();
+                    output.Add((byte)(run + 0x7D));
+                    output.Add(value);
+                    i += run;
+                    continue;
+                }
+
+                literal.Add(value);
+                i++;
+                if (literal.Count == 128)
+                {
+                    Flush();
+                }
+            }
+
+            Flush();
+        }
+
+        return [.. output];
+    }
+
     // SetCompressedData: three planes (red, green, blue), each pixels bytes, into bytes 1-3 of each ARGB long (alpha
     // stays 0). A control byte under $80 copies that many plus one literal bytes; $80 and over repeats the next byte
     // (control - 125) times. Counts stop at the plane's end (the excess is skipped); short data leaves zeros.

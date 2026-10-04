@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `IconFamily.ToIcns` writes an `'icns'` as Mac OS 9.0's Icon Services does (icon-families.md §3): members in table
+  order, 32-bit ones compressed plane by plane (runs from three bytes, literals up to 128); `SetMember` sets one as
+  SetIconFamilyData does.
 - AIFF and AIFF-C sound files (documents/aiff.md): `AiffFile` reads the chunks into the same sampled sound a `'snd '`
   resource gives, so MACE, IMA 4:1, µ-law, float and integer samples decode with the same codecs; `convert` and the
   app's Convert Documents write `sound.wav` and `sound.json`, and the app previews them as sounds.

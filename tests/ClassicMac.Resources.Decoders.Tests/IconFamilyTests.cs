@@ -148,4 +148,80 @@ public class IconFamilyTests
         Assert.Equal(255, icl8[4, 4].A);
         Assert.Equal(0, icl8[3, 4].A);
     }
+
+    // Writing (icon-families.md §3): MakeIconFamilyHandle and AppendCompressedData, as Mac OS 9.0's Icon Services do them.
+    private static byte[] Argb(int pixels, Func<int, (byte R, byte G, byte B)> colour)
+    {
+        var argb = new byte[pixels * 4];
+        for (var i = 0; i < pixels; i++)
+        {
+            (argb[4 * i + 1], argb[4 * i + 2], argb[4 * i + 3]) = colour(i);
+        }
+
+        return argb;
+    }
+
+    [Fact]
+    public void A_32_bit_member_is_written_compressed_plane_by_plane()
+    {
+        var family = new IconFamily();
+        family.SetMember("il32", Argb(1024, _ => (0xFF, 0, 0)));
+
+        var icns = family.ToIcns();
+
+        // Each plane: seven runs of 130 and one of 114 (control $EF).
+        byte[] Plane(byte value) => [.. Enumerable.Range(0, 7).SelectMany(_ => new byte[] { 0xFF, value }), 0xEF, value];
+        Assert.Equal([.. "icns"u8, 0, 0, 0, 0x40, .. "il32"u8, 0, 0, 0, 0x38, .. Plane(0xFF), .. Plane(0), .. Plane(0)], icns);
+    }
+
+    [Fact]
+    public void Runs_start_at_three_and_literals_stop_at_128()
+    {
+        // Two equal bytes stay literal; three make a run; 200 distinct bytes split into 128 and 72 literals.
+        byte[] red = [5, 5, 7, 7, 7, .. Enumerable.Range(0, 200).Select(i => (byte)(i % 2 == 0 ? i / 2 : 255 - i / 2)), .. new byte[51]];
+        var compressed = IconFamily.Compress(Argb(256, i => (red[i], 9, 9)), 256);
+
+        Assert.Equal([1, 5, 5, 0x80, 7, 127], compressed[..6]);
+        Assert.Equal(71, compressed[5 + 1 + 128]);
+        Assert.Equal(Argb(256, i => (red[i], 9, 9)), IconFamily.Decompress(compressed, 256));
+    }
+
+    [Fact]
+    public void Members_are_written_in_table_order_and_read_back()
+    {
+        var random = new Random(7);
+        var family = new IconFamily();
+        var it32 = Argb(128 * 128, _ => ((byte)random.Next(4), (byte)random.Next(256), 0));
+        family.SetMember("it32", it32);
+        family.SetMember("ICN#", new byte[256]);
+        family.SetMember("s8mk", Enumerable.Repeat((byte)0xFF, 256).ToArray());
+        family.SetMember("ics#", new byte[64]);
+
+        var icns = family.ToIcns();
+
+        var types = new List<string>();
+        for (var at = 8; at < icns.Length; at += BinaryPrimitives.ReadInt32BigEndian(icns.AsSpan(at + 4)))
+        {
+            types.Add(Encoding.ASCII.GetString(icns, at, 4));
+        }
+
+        Assert.Equal(["ics#", "s8mk", "ICN#", "it32"], types);
+        var it32At = icns.AsSpan().IndexOf("it32"u8);
+        Assert.Equal([0, 0, 0, 0], icns[(it32At + 8)..(it32At + 12)]);                   // it32's compression format
+        var read = IconFamily.ReadIcns(icns);
+        Assert.Equal(it32, read.Members["it32"]);
+        Assert.Equal(family.Members.Keys.Order(StringComparer.Ordinal), read.Members.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Setting_a_member_takes_raw_or_compressed_32_bit_data_and_exact_sizes()
+    {
+        var family = new IconFamily();
+        var argb = Argb(256, i => ((byte)i, 0, 0));
+        family.SetMember("is32", IconFamily.Compress(argb, 256));
+        Assert.Equal(argb, family.Members["is32"]);
+
+        Assert.Throws<ArgumentException>(() => family.SetMember("ICN#", new byte[128]));
+        Assert.Throws<ArgumentException>(() => family.SetMember("icns", new byte[8]));
+    }
 }

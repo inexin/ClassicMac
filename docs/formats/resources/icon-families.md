@@ -214,11 +214,22 @@ PlotIconRefFast [Code]:
 
 ## 3. Writing
 
-- **What Mac OS 9 writes**: the known members only, in table order (`icm#` … `t8mk`), 32-bit ones always compressed;
-  an `it32`'s compression-format word 0 [Code].
+- **SetIconFamilyData** stores a 32-bit member of exactly its raw size as it is and decodes any other size as
+  compressed (§1.4); the family keeps 32-bit members uncompressed [Code: Mac OS 9.0 Icon Services].
+- **MakeIconFamilyHandle** writes the 8-byte header (`'icns'`, the total length), then each member present, in table
+  order (`icm#` … `t8mk`), as its type, its length with the 8-byte element header, and its data; nothing is padded
+  and variants are not written [Code: Mac OS 9.0 Icon Services].
+- **AppendCompressedData** compresses every 32-bit member; none is stored raw [Code: Mac OS 9.0 Icon Services]:
+  1. `it32` starts with the compression-format word 0.
+  2. The red, green and blue planes follow in that order, each compressed on its own; alpha is dropped.
+  3. At each byte, count it and the equal bytes after it, up to 130 (RepeatingPixel). Three or more: write any
+     pending literals, then the control byte count + $7D ($80–$FF) and the byte. Fewer: the byte joins the pending
+     literals, written as the control byte n − 1 and the n bytes when they reach 128 and at the plane's end.
+
+  So an `il32` of 1,024 red pixels is `'icns'` $40, `'il32'` $38, and each plane `FF v` seven times then `EF v`.
 - **What ClassicMac writes** [ClassicMac]: an icon family as the classic resources `ICN#`, `icl4`, `icl8`, `ics#`,
   `ics4` and `ics8` of one ID, the small ones from the image scaled to 16 × 16 (or from a second image given for them),
-  each by [icons.md §3](icons.md#3-writing). ClassicMac does not write `'icns'`.
+  each by [icons.md §3](icons.md#3-writing); `IconFamily.ToIcns` writes an `'icns'` as MakeIconFamilyHandle does.
 
 ## 4. Variants
 
@@ -265,6 +276,8 @@ An `'icns'` may nest variant families (`'tile'`, `'over'`, `'drop'`, `'open'`, `
 - Labels 8–15, where GetLabel fails and the colour is undefined, draw as no label. [ClassicMac]
 - An 8-bit mask without a colour member (undefined on the Mac) is ignored: the 1-bit path. [ClassicMac]
 - CopyMask's single stretch of data and mask is taken to sample both alike. [ClassicMac]
+- `IconFamily.SetMember` sets a member as SetIconFamilyData does (§3) and refuses another size for a 1-, 4- or 8-bit
+  member or mask; `IconFamily.ToIcns` writes the family as §3. [ClassicMac]
 - `IconFamily.ReadIcns` reads as §2.2 and `IconFamily.FromResources` as §2.3. Data under 8 bytes or of another type
   gives an empty family (`icon.family-header`); a wrong length, an empty one (`icon.family-length`); ignored element
   types and dropped members are reported (`icon.family-ignored`, `icon.member-size`); the failures of §2.2 are
@@ -297,6 +310,8 @@ An `'icns'` may nest variant families (`'tile'`, `'over'`, `'drop'`, `'open'`, `
   the blend, nearest-pixel stretching, Darken and Brighten.
 - `tests/ClassicMac.Resources.Decoders.Tests/IconFamilyTests.cs`: families read as Mac OS 9 reads them, runs and
   literals stopping at a plane's end, bad families empty or failing, a family made from the classic resources.
+  Writing: the 1,024-pixel `il32` example of §3 byte for byte (the encoder re-implemented from the code, not a live
+  dump), runs from three and literals up to 128, table order and `it32`'s format word, a family read back.
 - `tests/ClassicMac.Resources.Decoders.Tests/ImportTests.cs`, `Standard_table_icons_use_the_nearest_colour`: the six
   family members written, the small ones at 16 × 16.
 - Golden fixture `icns` 128 (`ICN#`, a raw `il32`, a compressed `is32`, an `s8mk`; `GoldenFixtures`, hashes in
@@ -307,9 +322,9 @@ An `'icns'` may nest variant families (`'tile'`, `'over'`, `'drop'`, `'open'`, `
 - Several screens (DeviceLoop), a grey-scale device's label rule, and the ROM's endless pattern loop are not
   reproduced by `IconSuite`.
 - The export decoders take one resource at a time and do not draw suites; `IconSuite.Plot` does.
-- `'icns'` variants are read but not exported; standalone 32-bit, 48 × 48 and 8-bit mask resources are not decoded
-  (Icon Services never reads them outside an `'icns'`).
-- Writing `'icns'`.
+- `'icns'` variants are read but not exported or written; standalone 32-bit, 48 × 48 and 8-bit mask resources are not
+  decoded (Icon Services never reads them outside an `'icns'`).
+- Importing an image as an `'icns'`: the import makes the classic resources (§3).
 - A Mac OS 9.2.2 mode (§4.3).
 
 ## 9. References
