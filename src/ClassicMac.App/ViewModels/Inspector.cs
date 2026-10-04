@@ -236,7 +236,7 @@ public sealed partial class MainViewModel
         get
         {
             var header = InspectorHeader.For(Selected, IsEditingForm ? Form?.DraftLength : null);
-            if (header is not null && SelectedAlias is { } alias && ReferenceEquals(alias.Alias, Selected))
+            if (header is not null && AliasActions.SelectedAlias is { } alias && ReferenceEquals(alias.Alias, Selected))
             {
                 header = header with { Kind = InspectorHeader.AliasKind(alias), Original = alias.Path };
             }
@@ -287,7 +287,7 @@ public sealed partial class MainViewModel
         HeaderIconTask = LoadHeaderIconAsync(Selected);
         OnPropertyChanged(nameof(Header));
         OnPropertyChanged(nameof(HeaderExportCommand));
-        OnSelectionChangedForSoundHeader();
+        SoundHeaderActions.OnSelectionChangedForSoundHeader();
         EditFormCommand.NotifyCanExecuteChanged();
     }
 }

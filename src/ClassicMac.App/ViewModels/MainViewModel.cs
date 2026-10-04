@@ -67,6 +67,21 @@ public interface IFilePicker
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    private DragOut? dragOut;
+
+    /// <summary>Drag and drop out of the tree, through a temporary folder.</summary>
+    public DragOut DragOut => dragOut ??= new(this);
+
+    private AliasActions? aliasActions;
+
+    /// <summary>The selected alias: its original, Show Original and the not-found card.</summary>
+    public AliasActions AliasActions => aliasActions ??= new(this);
+
+    private SoundHeaderActions? soundHeaderActions;
+
+    /// <summary>A sound resource's Save as WAV and Replace from WAV.</summary>
+    public SoundHeaderActions SoundHeaderActions => soundHeaderActions ??= new(this);
+
     private ImageGrid? imageGrid;
 
     /// <summary>The image grid of an image resource's preview: its items, masks, Finder states and layout.</summary>
@@ -332,14 +347,14 @@ public sealed partial class MainViewModel : ObservableObject
     private void OnSelectedChanged(NodeViewModel? value)
     {
         TakeHexEdit();                       // unchanged bytes (changed ones were applied or discarded before the move)
-        SelectedAlias = Aliases.Of(value, Roots);
-        Details = DetailsViewModel.For(value, DetailsActions.ProblemsIn(value), SelectedAlias);
+        AliasActions.SelectedAlias = Aliases.Of(value, Roots);
+        Details = DetailsViewModel.For(value, DetailsActions.ProblemsIn(value), AliasActions.SelectedAlias);
         OnSelectionChangedForInspector();
         // The hex view comes once the preview is known: only a resource without one shows its bytes.
         Hex = HexViewModel.Empty;
         HexSource = null;
         // An alias previews its original (with a strip above); one whose original is not found shows a card instead.
-        PreviewTask = MakePreviewAsync(SelectedAlias is { } alias ? alias.Target : value);
+        PreviewTask = MakePreviewAsync(AliasActions.SelectedAlias is { } alias ? alias.Target : value);
     }
 
     partial void OnScreenDepthChanged(int value) => PreviewTask = MakePreviewAsync(Selected);

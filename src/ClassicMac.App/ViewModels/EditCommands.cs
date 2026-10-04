@@ -132,7 +132,7 @@ public sealed partial class MainViewModel
     public bool HasUnsavedChanges => Roots.Any(r => r.HasVolumeChanges) || Roots.SelectMany(EditedFiles).Any(e => e.State.Session.IsDirty);
 
     // The file node (a FileNode, or an input read as a fork) that the node belongs to, when its resources are loaded.
-    private static NodeViewModel? FileOwner(NodeViewModel? node)
+    internal static NodeViewModel? FileOwner(NodeViewModel? node)
     {
         for (var at = node; at is not null; at = at.Parent)
         {
@@ -253,7 +253,7 @@ public sealed partial class MainViewModel
     }
 
     // Makes an edit in the selection's file and selects the resource it concerns.
-    private void Execute(NodeViewModel owner, IResourceEdit edit, Func<Resource?> select)
+    internal void Execute(NodeViewModel owner, IResourceEdit edit, Func<Resource?> select)
     {
         var state = StateFor(owner);
         state.Session.Execute(edit);

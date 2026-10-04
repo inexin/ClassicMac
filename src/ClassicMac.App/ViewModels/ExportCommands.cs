@@ -233,7 +233,7 @@ public sealed partial class MainViewModel
     });
 
     // One export at a time; failures to write are reported, not thrown.
-    private Task Run(Func<Task> export)
+    internal Task Run(Func<Task> export)
     {
         async Task Guarded()
         {
@@ -268,7 +268,7 @@ public sealed partial class MainViewModel
         };
 
     // The decoded files for a resource, and its data as applications see it.
-    private (IReadOnlyList<DecodedFile> Outputs, ReadOnlyMemory<byte> Raw) Decode(ResourceNode node, List<Diagnostic> diagnostics)
+    internal (IReadOnlyList<DecodedFile> Outputs, ReadOnlyMemory<byte> Raw) Decode(ResourceNode node, List<Diagnostic> diagnostics)
     {
         var raw = ResourceDecompression.Default.GetData(node.Resource, node.Fork, ReadOptions, diagnostics);
         var decoder = ResourceDecoders.Create(CurrentDecodeOptions).FirstOrDefault(d => d.CanDecode(node.Resource.Type));
@@ -283,7 +283,7 @@ public sealed partial class MainViewModel
         return (offered, raw);
     }
 
-    private static MacString Stem(Resource resource)
+    internal static MacString Stem(Resource resource)
     {
         var id = Encoding.ASCII.GetBytes(resource.Id.ToString(CultureInfo.InvariantCulture));
         return resource.Name is { } name && name.Bytes.Length > 0 ? new MacString([.. id, (byte)' ', .. name.Bytes]) : new MacString(id);

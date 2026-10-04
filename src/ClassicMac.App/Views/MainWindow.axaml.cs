@@ -81,7 +81,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
         Closed += (_, _) =>
         {
             audio.Dispose();
-            (DataContext as MainViewModel)?.CleanUpDragOut();
+            (DataContext as MainViewModel)?.DragOut.CleanUpDragOut();
         };
     }
 
@@ -178,7 +178,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
         }
 
         var node = (press.Source as Visual)?.FindAncestorOfType<ListBoxItem>(includeSelf: true)?.DataContext as NodeViewModel;
-        if (DataContext is not MainViewModel model || !MainViewModel.CanDragOut(node))
+        if (DataContext is not MainViewModel model || !DragOut.CanDragOut(node))
         {
             dragPress = null;
             return;
@@ -187,7 +187,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
         node!.IsDragSource = true; // outlined while its files are written and dragged
         try
         {
-            var paths = await model.PrepareDragOutAsync(node!);
+            var paths = await model.DragOut.PrepareDragOutAsync(node!);
             // Released while the files were written: no drag (it would drop wherever the pointer is).
             if (paths.Count == 0 || dragPress != press)
             {

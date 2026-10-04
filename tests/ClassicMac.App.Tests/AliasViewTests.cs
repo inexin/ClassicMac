@@ -55,24 +55,24 @@ public sealed class AliasViewTests : IDisposable
         var note = Node(input, "Docs", "Note");
         model.Selected = Node(input, "Moved alias");
         Pump(model.PreviewTask);
-        Assert.Same(note, model.SelectedAlias?.Target);
+        Assert.Same(note, model.AliasActions.SelectedAlias?.Target);
         Assert.Equal("Alias to Note · SimpleText text document", model.Header!.Kind);
         Assert.Equal("Aliases: Docs: Note", model.Header.Original);
         Assert.Equal("Text", model.Preview.Kind.ToString());                // the original's preview
         Assert.Equal("Hello", model.Preview.Text);
-        Assert.Equal("Alias of Aliases: Docs: Note", model.AliasStrip);
-        Assert.False(model.AliasNotFound);
+        Assert.Equal("Alias of Aliases: Docs: Note", model.AliasActions.AliasStrip);
+        Assert.False(model.AliasActions.AliasNotFound);
         var card = model.Details.Groups.Single(g => g.Title == "Alias").Rows.ToDictionary(r => r.Label, r => r.Value);
         Assert.Equal("Aliases: Old: Note", card["Original"]);                 // where the alias recorded it
         Assert.Equal("Yes, by its file ID", card["Found"]);
         Assert.Equal("Aliases: Docs: Note", card["Now at"]);
         Assert.Equal("Aliases", card["Volume"]);
         Assert.Equal(((FileNode)note).File.CatalogId!.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), card["File ID"]);
-        Assert.True(model.ShowOriginalCommand.CanExecute(null));
-        model.ShowOriginalCommand.Execute(null);
+        Assert.True(model.AliasActions.ShowOriginalCommand.CanExecute(null));
+        model.AliasActions.ShowOriginalCommand.Execute(null);
         Assert.Same(note, model.Selected);
-        Assert.Null(model.SelectedAlias);
-        Assert.Null(model.AliasStrip);
+        Assert.Null(model.AliasActions.SelectedAlias);
+        Assert.Null(model.AliasActions.AliasStrip);
     });
 
     [Fact]
@@ -80,10 +80,10 @@ public sealed class AliasViewTests : IDisposable
     {
         var (model, input) = Open();
         model.Selected = Node(input, "Stuff alias");
-        Assert.Same(Node(input, "Stuff"), model.SelectedAlias?.Target);
+        Assert.Same(Node(input, "Stuff"), model.AliasActions.SelectedAlias?.Target);
         Assert.Equal("Alias to Stuff · folder", model.Header!.Kind);
         model.Selected = Node(input, "Chain alias");
-        Assert.Same(Node(input, "Note alias"), model.SelectedAlias?.Target);  // the Finder's Show Original goes one step
+        Assert.Same(Node(input, "Note alias"), model.AliasActions.SelectedAlias?.Target);  // the Finder's Show Original goes one step
     });
 
     [Fact]
@@ -92,15 +92,15 @@ public sealed class AliasViewTests : IDisposable
         var (model, input) = Open();
         model.Selected = Node(input, "Gone alias");
         Pump(model.PreviewTask);
-        Assert.True(model.AliasNotFound);
-        Assert.Null(model.AliasStrip);
+        Assert.True(model.AliasActions.AliasNotFound);
+        Assert.Null(model.AliasActions.AliasStrip);
         Assert.Equal("Alias to Gone · original missing", model.Header!.Kind);
-        Assert.Equal(AliasState.Missing, model.SelectedAlias!.Resolution.State);
-        Assert.Equal("Original missing", model.AliasNotFoundTitle);
-        Assert.Equal("The original is not on Aliases any more.", model.AliasNotFoundReason);
+        Assert.Equal(AliasState.Missing, model.AliasActions.SelectedAlias!.Resolution.State);
+        Assert.Equal("Original missing", model.AliasActions.AliasNotFoundTitle);
+        Assert.Equal("The original is not on Aliases any more.", model.AliasActions.AliasNotFoundReason);
         Assert.Equal("Aliases: Old: Gone", model.Header.Original);
-        Assert.Equal("Aliases", model.SelectedAlias!.Resolution.Alias.VolumeName.ToMacRoman());
-        Assert.False(model.ShowOriginalCommand.CanExecute(null));
+        Assert.Equal("Aliases", model.AliasActions.SelectedAlias!.Resolution.Alias.VolumeName.ToMacRoman());
+        Assert.False(model.AliasActions.ShowOriginalCommand.CanExecute(null));
         var card = model.Details.Groups.Single(g => g.Title == "Alias").Rows.ToDictionary(r => r.Label, r => r.Value);
         Assert.Equal("No", card["Found"]);
         Assert.Equal("The original is not on Aliases any more.", card["State"]);
@@ -116,16 +116,16 @@ public sealed class AliasViewTests : IDisposable
         model.Selected = Node(input, "Elsewhere alias");
         Pump(model.PreviewTask);
         Assert.Equal("Alias to Map · on another disk", model.Header!.Kind);
-        Assert.Equal("On a disk that is not open", model.AliasNotFoundTitle);
-        Assert.Equal("The original is on the 800K floppy disk “Bag of Holding”, which is not open.", model.AliasNotFoundReason);
+        Assert.Equal("On a disk that is not open", model.AliasActions.AliasNotFoundTitle);
+        Assert.Equal("The original is on the 800K floppy disk “Bag of Holding”, which is not open.", model.AliasActions.AliasNotFoundReason);
         Assert.Equal("Bag of Holding: Map", model.Header.Original);
 
         model.Selected = Node(input, "Server alias");
         Pump(model.PreviewTask);
         Assert.Equal("Alias to Plans · on a network volume", model.Header!.Kind);
-        Assert.Equal("On a network volume", model.AliasNotFoundTitle);
+        Assert.Equal("On a network volume", model.AliasActions.AliasNotFoundTitle);
         Assert.Equal("The original is on the network volume “Shared” on the server “Studio” (zone “Office”, as “lars”).",
-            model.AliasNotFoundReason);
+            model.AliasActions.AliasNotFoundReason);
         var card = model.Details.Groups.Single(g => g.Title == "Alias").Rows.ToDictionary(r => r.Label, r => r.Value);
         Assert.Equal("Studio", card["Server"]);
         Assert.Equal("Office", card["Zone"]);
@@ -157,7 +157,7 @@ public sealed class AliasViewTests : IDisposable
         var (model, here) = Open(path: path);
         var (_, there) = Open(model, otherPath);
         model.Selected = Node(here, "Far alias");
-        Assert.Same(Node(there, "Far"), model.SelectedAlias?.Target);
+        Assert.Same(Node(there, "Far"), model.AliasActions.SelectedAlias?.Target);
     });
 
     [Fact]

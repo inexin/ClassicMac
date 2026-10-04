@@ -235,9 +235,9 @@ public sealed class EditTests : EditTestsBase
         var (model, file, dialogs, picker, _) = await Open();
         model.Selected = file.Children.OfType<ResourceTypeNode>().First().Children[0];   // a 'STR '
         await model.PreviewTask;
-        Assert.False(model.IsSoundResource);
-        Assert.False(model.SaveAsWavCommand.CanExecute(null));
-        Assert.False(model.ReplaceFromWavCommand.CanExecute(null));
+        Assert.False(model.SoundHeaderActions.IsSoundResource);
+        Assert.False(model.SoundHeaderActions.SaveAsWavCommand.CanExecute(null));
+        Assert.False(model.SoundHeaderActions.ReplaceFromWavCommand.CanExecute(null));
 
         picker.Open = Path.Combine(folder, "beep.wav");
         File.WriteAllBytes(picker.Open, Wav(128, 200, 128, 50));
@@ -246,13 +246,13 @@ public sealed class EditTests : EditTestsBase
         await model.ImportCommand.ExecuteAsync(null);
         await model.PreviewTask;
         var snd = ((ResourceNode)model.Selected!).Resource;
-        Assert.True(model.IsSoundResource);
-        Assert.True(model.SaveAsWavCommand.CanExecute(null));
-        Assert.True(model.ReplaceFromWavCommand.CanExecute(null));
+        Assert.True(model.SoundHeaderActions.IsSoundResource);
+        Assert.True(model.SoundHeaderActions.SaveAsWavCommand.CanExecute(null));
+        Assert.True(model.SoundHeaderActions.ReplaceFromWavCommand.CanExecute(null));
 
         // Save as WAV…: the decoded sound, as extract writes it.
         File.Delete(picker.Open);
-        await model.SaveAsWavCommand.ExecuteAsync(null);
+        await model.SoundHeaderActions.SaveAsWavCommand.ExecuteAsync(null);
         var saved = Assert.Single(Directory.GetFiles(folder, "*.wav"));
         var wav = File.ReadAllBytes(saved);
         Assert.Equal("RIFF", System.Text.Encoding.ASCII.GetString(wav, 0, 4));
@@ -264,7 +264,7 @@ public sealed class EditTests : EditTestsBase
         var before = snd.GetData().ToArray();
         picker.Open = Path.Combine(folder, "tone.wav");
         File.WriteAllBytes(picker.Open, Wav(10, 20, 30, 40, 50));
-        await model.ReplaceFromWavCommand.ExecuteAsync(null);
+        await model.SoundHeaderActions.ReplaceFromWavCommand.ExecuteAsync(null);
         Assert.Equal(new byte[] { 10, 20, 30, 40, 50 }, snd.GetData()[^5..].ToArray());
         Assert.Equal("_Undo Replace from tone.wav", model.UndoTitle);
         Assert.Same(snd, ((ResourceNode)model.Selected!).Resource);
@@ -274,7 +274,7 @@ public sealed class EditTests : EditTestsBase
         model.Selected = file.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "snd ").Children[0];  // undo selects the file
         // A file that is not a WAV is refused.
         File.WriteAllBytes(picker.Open, [1, 2, 3]);
-        await model.ReplaceFromWavCommand.ExecuteAsync(null);
+        await model.SoundHeaderActions.ReplaceFromWavCommand.ExecuteAsync(null);
         Assert.StartsWith("“tone.wav” could not be read", model.Status);
         Assert.Equal(before, snd.GetData().ToArray());
     }

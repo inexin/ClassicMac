@@ -121,7 +121,7 @@ public sealed class TreeDisplayTests : IDisposable
         var group = realmz.Children.OfType<NoNameGroupNode>().Single();
         var tab = (FileNode)group.Children.Single(c => c.Name == "tab");
         Assert.Equal("Realmz.img:Realmz:\t", tab.Source);
-        Assert.True(MainViewModel.CanDragOut(tab));
+        Assert.True(DragOut.CanDragOut(tab));
         await tab.EnsureLoadedAsync();
         var str = (ResourceNode)tab.Children.Single().Children.Single();
         model.Selected = str;

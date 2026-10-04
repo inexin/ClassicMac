@@ -23,7 +23,7 @@ public enum DragOutFormat
 // Drag and drop out of the tree: the dragged item is written into a per-session temporary folder first (file
 // managers take dropped files by path), with the same writers as Unpack and Save Resource As, and the window hands
 // the paths to the platform's drag. The folder is deleted when the window closes.
-public sealed partial class MainViewModel
+public sealed partial class DragOut(MainViewModel main) : ObservableObject
 {
     [ObservableProperty]
     private DragOutFormat dragOutFormat = DragOutFormat.AppleDouble;
@@ -38,7 +38,7 @@ public sealed partial class MainViewModel
     partial void OnDragOutFormatChanged(DragOutFormat value) => OnPropertyChanged(nameof(DragOutAsMacBinary));
 
     /// <summary>The folder dragged items are written into, one subfolder per drag.</summary>
-    public string DragFolder { get; init; } = Path.Combine(Path.GetTempPath(), $"ClassicMac-drag-{Environment.ProcessId}");
+    public string DragFolder { get; set; } = Path.Combine(Path.GetTempPath(), $"ClassicMac-drag-{Environment.ProcessId}");
 
     /// <summary>Whether <paramref name="node"/> can be dragged out: a file (a container file as it is) or a resource.</summary>
     public static bool CanDragOut(NodeViewModel? node) => node is FileNode or ContainerFileNode or ResourceNode;
@@ -59,8 +59,8 @@ public sealed partial class MainViewModel
         var folder = Path.Combine(DragFolder, Guid.NewGuid().ToString("N"));
         var diagnostics = new List<Diagnostic>();
         // The status bar says what is written while the drag waits for it (boards/browse-tree.md, drag source).
-        var before = Status;
-        Status = node is ResourceNode ? $"Writing {node.BaseTitle}…"
+        var before = main.Status;
+        main.Status = node is ResourceNode ? $"Writing {node.BaseTitle}…"
             : DragOutFormat == DragOutFormat.MacBinary ? "Writing MacBinary…" : "Writing AppleDouble…";
         try
         {
@@ -74,16 +74,16 @@ public sealed partial class MainViewModel
             };
             foreach (var d in diagnostics)
             {
-                Report(new DiagnosticEntry(d, node.Source, node));
+                main.Report(new DiagnosticEntry(d, node.Source, node));
             }
 
-            Status = before;
+            main.Status = before;
             return paths;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", e.Message), node.Source, node));
-            Status = $"{node.BaseTitle} could not be dragged out: {e.Message}";
+            main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", e.Message), node.Source, node));
+            main.Status = $"{node.BaseTitle} could not be dragged out: {e.Message}";
             return [];
         }
     }
@@ -140,9 +140,9 @@ public sealed partial class MainViewModel
 
     private IReadOnlyList<string> WriteResource(ResourceNode node, string folder, List<Diagnostic> diagnostics)
     {
-        var (outputs, raw) = Decode(node, diagnostics);
+        var (outputs, raw) = main.Decode(node, diagnostics);
         var chosen = outputs.FirstOrDefault();
-        var path = Path.Combine(folder, HostNames.ToHostName(Stem(node.Resource), 200) + (chosen?.Extension ?? ".bin"));
+        var path = Path.Combine(folder, HostNames.ToHostName(MainViewModel.Stem(node.Resource), 200) + (chosen?.Extension ?? ".bin"));
         File.WriteAllBytes(path, (chosen?.Content ?? raw).ToArray());
         return [path];
     }

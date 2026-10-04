@@ -93,7 +93,7 @@ internal static class Aliases
 }
 
 // The selected alias: the header's original and Show Original, the preview's strip or not-found card, Details' card.
-public sealed partial class MainViewModel
+public sealed partial class AliasActions(MainViewModel main) : ObservableObject
 {
     /// <summary>The selected alias file and its original; null when the selection is no alias.</summary>
     [ObservableProperty]
@@ -149,6 +149,6 @@ public sealed partial class MainViewModel
             at.IsExpanded = true;
         }
 
-        Selected = target;
+        main.Selected = target;
     }
 }
