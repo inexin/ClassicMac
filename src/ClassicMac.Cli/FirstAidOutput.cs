@@ -40,7 +40,6 @@ internal static class FirstAidOutput
             w.WriteString("stage", problem.Stage);
             w.WriteBoolean("repairable", problem.Repairable);
             w.WriteString("code", problem.Code);
-            w.WriteString("origin", JsonNamingPolicy.CamelCase.ConvertName(problem.Origin.ToString()));
             w.WriteEndObject();
         }
 

@@ -242,12 +242,12 @@ not find OK, counts as one error (in JSON's `errors` too).
 Exit 0 when nothing is wrong (warnings allowed, unless `--strict`), 1 when there is an error or a volume fault, 4 when
 the input cannot be read. `--json` writes `{ "input", "diagnostics": [{ "source", "severity", "code", "message",
 "location"?, "offset"? }], "volume": { "passes", "fault" } or null, "firstAid": { "verdict", "summary", "problems":
-[{ "number", "message", "arg2", "arg3", "stage", "repairable", "code", "origin" }] } or null, "partitions"?:
+[{ "number", "message", "arg2", "arg3", "stage", "repairable", "code" }] } or null, "partitions"?:
 [{ "number", "name", "passes", "fault", "firstAid" }], "notOpened", "errors", "warnings" }`; `volume` and `firstAid`
 are null for input that is not a plain HFS volume, and `partitions` lists a partitioned disk's HFS partitions (text:
 `partition 3 "Macintosh HD": passes the writer's checks`). `verdict` is `appearsOk`, `needsRepair`, `cannotRepair`,
-`notHfs` or `notChecked` (an HFS Plus volume); `origin` is `diskFirstAid` or `classicMac` (ClassicMac's own checks,
-number 0, printed `first aid: Problem:  <text>.`, Info diagnostics that do not change the verdict).
+`notHfs` or `notChecked` (an HFS Plus volume). A problem with number 0 is MountCheck's or one of the checks Disk
+First Aid lacks, printed `first aid: Problem:  <text>.`.
 
 ## 3. Write commands
 

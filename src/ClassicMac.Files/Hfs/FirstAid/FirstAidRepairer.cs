@@ -11,9 +11,8 @@ namespace ClassicMac.Files.Hfs;
 // catalog with the repair list made, the extents tree without the records of files not in the catalog), then the
 // bitmap and the MDB from what a verify of the result computes, then a verify; at most three passes, as Disk First Aid
 // verifies again up to twice [Code: Disk First Aid 8.5.5, CODE 1 $1DF2A]. A volume Disk First Aid cannot repair is not
-// written. ClassicMac's extras ride along: first the alternate MDB from the primary (which can turn a disk Disk First Aid
-// calls not HFS, or cannot repair, into one it checks), the overflow records' start blocks, short physical lengths, and
-// the MDB's drNmFls and drFreeBks.
+// written. Beyond Disk First Aid: first the alternate MDB from the primary, then with the trees the overflow records'
+// start blocks and short physical lengths, and with the MDB its drNmFls and drFreeBks.
 internal static class FirstAidRepairer
 {
     private const int MaxPasses = 3, HeaderRecord = 14;
@@ -21,22 +20,21 @@ internal static class FirstAidRepairer
     public static FirstAidRepairResult Repair(HfsVolume volume)
     {
         var (run, before) = HfsFirstAid.Check(volume);
+        if (before.Verdict != FirstAidVerdict.NeedsRepair)
+        {
+            return new FirstAidRepairResult(before, before, [], null);
+        }
+
         var working = volume.Fork();
         var changes = new List<PlannedChange>();
         var after = before;
-        for (var pass = 0; pass < MaxPasses; pass++)
+        for (var pass = 0; pass < MaxPasses && after.Verdict == FirstAidVerdict.NeedsRepair; pass++)
         {
             int made = changes.Count;
-            if ((run.Extras & FirstAidRepairs.AlternateMdb) != 0)
+            if ((run.Repairs & FirstAidRepairs.AlternateMdb) != 0)
             {
                 working.Write((run.Sectors - 2) * FirstAidRun.SectorSize, run.Primary);
                 changes.Add(new PlannedChange("repair", "", "alternate master directory block written from the primary"));
-                (run, after) = HfsFirstAid.Check(working);
-            }
-
-            if (!Repairable(after))
-            {
-                break;
             }
 
             if (Trees(run, working, changes))
@@ -51,7 +49,7 @@ internal static class FirstAidRepairer
             Bitmap(run, working, changes);
             Mdb(run, working, changes);
             (run, after) = HfsFirstAid.Check(working);
-            if (changes.Count == made || !Repairable(after) && (after.Extras & FirstAidRepairs.AlternateMdb) == 0)
+            if (changes.Count == made)
             {
                 break;
             }
@@ -61,10 +59,6 @@ internal static class FirstAidRepairer
         return new FirstAidRepairResult(before, after, changes, written ? working : null);
     }
 
-    // A verify that leaves something to repair: Disk First Aid's, or ClassicMac's on a volume it checked through.
-    private static bool Repairable(FirstAidReport report) =>
-        report.Verdict == FirstAidVerdict.NeedsRepair || report.Verdict == FirstAidVerdict.AppearsOk && report.Extras != FirstAidRepairs.None;
-
     // The catalog and the extents tree, each written again when a repair needs it; true when either was.
     private static bool Trees(FirstAidRun run, HfsVolume volume, List<PlannedChange> changes)
     {
@@ -72,7 +66,7 @@ internal static class FirstAidRepairer
             | FirstAidRepairs.MissingFolder | FirstAidRepairs.MissingThreads | FirstAidRepairs.Valences | FirstAidRepairs.MountCheck
             | FirstAidRepairs.ForkLengths;
         bool written = false;
-        var wanted = run.Repairs | run.Extras;
+        var wanted = run.Repairs;
         if (run.Extents is { } extents && (run.TreesToRebuild.Contains(3) || (wanted & (FirstAidRepairs.OrphanedExtents | FirstAidRepairs.ExtentStarts)) != 0))
         {
             var orphans = new List<PlannedChange>();
@@ -114,7 +108,7 @@ internal static class FirstAidRepairer
         return written;
     }
 
-    // ClassicMac's: each fork's overflow records after its first numbered from the first's start block and the blocks of
+    // Beyond Disk First Aid: each fork's overflow records after its first numbered from the first's start block and the blocks of
     // those before (a record Disk First Aid's walk does not find first is left); returns how many changed.
     private static int Renumber(List<(byte[] Key, byte[] Data)> records)
     {

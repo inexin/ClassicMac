@@ -35,10 +35,21 @@ internal static class FirstAidImages
 
     public static void Put32(byte[] image, int offset, long value) => new BigEndianWriter(image).WriteUInt32At(offset, (uint)value);
 
+    // A field changed in both MDBs, so the alternate still matches the primary.
+    public static void PutBoth16(byte[] image, int offset, int value)
+    {
+        Put16(image, Primary + offset, value);
+        Put16(image, Alternate(image) + offset, value);
+    }
+
+    public static void PutBoth32(byte[] image, int offset, long value)
+    {
+        Put32(image, Primary + offset, value);
+        Put32(image, Alternate(image) + offset, value);
+    }
+
     public static FirstAidReport Verify(byte[] image) => HfsFirstAid.Verify(ForkData.FromBytes(image));
 
-    /// <summary>Disk First Aid's own problems, without ClassicMac's.</summary>
-    public static List<FirstAidProblem> DiskFirstAid(FirstAidReport report) => [.. report.Problems.Where(p => p.Origin == FirstAidOrigin.DiskFirstAid)];
 
     // The catalog's node n, by the MDB's first catalog extent (the test volumes' catalogs are in one piece).
     public static int CatalogNode(byte[] image, uint node)

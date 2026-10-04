@@ -72,7 +72,6 @@ public sealed class CheckFirstAidTests : IDisposable
         Assert.Equal((2, 0), (problem.GetProperty("arg2").GetInt64(), problem.GetProperty("arg3").GetInt64()));
         Assert.Equal("Checking volume info.", problem.GetProperty("stage").GetString());
         Assert.True(problem.GetProperty("repairable").GetBoolean());
-        Assert.Equal("diskFirstAid", problem.GetProperty("origin").GetString());
     }
 
     [Fact]

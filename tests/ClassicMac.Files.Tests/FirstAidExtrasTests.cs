@@ -3,23 +3,19 @@ using static ClassicMac.Files.Tests.FirstAidImages;
 
 namespace ClassicMac.Files.Tests;
 
-// ClassicMac's checks and repairs that Disk First Aid lacks (hfs.md §5.6): each is a problem of origin ClassicMac with
-// its own repair (Extras), and none changes Disk First Aid's verdict.
+// The checks and repairs beyond Disk First Aid's (hfs.md §5.6): problems like its own, in the same verdict.
 public class FirstAidExtrasTests
 {
     private static FirstAidProblem Extra(FirstAidReport report, string code)
     {
-        var problem = Assert.Single(report.Problems, p => p.Code == code);
-        Assert.Equal(FirstAidOrigin.ClassicMac, problem.Origin);
-        return problem;
+        return Assert.Single(report.Problems, p => p.Code == code);
     }
 
     private static byte[] Repaired(byte[] image)
     {
         var result = HfsFirstAid.Repair(ForkData.FromBytes(image));
         Assert.True(result.Written);
-        Assert.True(result.After.Verdict == FirstAidVerdict.AppearsOk && result.After.Extras == FirstAidRepairs.None,
-            string.Join("; ", result.After.Problems));
+        Assert.True(result.After.Verdict == FirstAidVerdict.AppearsOk, string.Join("; ", result.After.Problems));
         Assert.Null(HfsWriter.Check(ForkData.FromBytes(result.Volume!)));
         return result.Volume!;
     }
@@ -32,9 +28,10 @@ public class FirstAidExtrasTests
 
         var report = Verify(image);
 
-        Assert.Equal(FirstAidVerdict.NotHfs, report.Verdict);                      // Disk First Aid's word stands
+        Assert.Equal(FirstAidVerdict.NeedsRepair, report.Verdict);                 // checked by the primary MDB
+        Assert.Single(report.Problems);
         Extra(report, "firstaid.alternate-mdb-missing");
-        Assert.True(report.Extras.HasFlag(FirstAidRepairs.AlternateMdb));
+        Assert.True(report.Repairs.HasFlag(FirstAidRepairs.AlternateMdb));
         var repaired = Repaired(image);
         Assert.Equal(repaired.AsSpan(Primary, Sector).ToArray(), repaired.AsSpan(Alternate(repaired), Sector).ToArray());
     }
@@ -47,7 +44,8 @@ public class FirstAidExtrasTests
 
         var report = Verify(image);
 
-        Assert.NotEqual(FirstAidVerdict.AppearsOk, report.Verdict);
+        Assert.Equal(FirstAidVerdict.NeedsRepair, report.Verdict);
+        Assert.Single(report.Problems);
         Extra(report, "firstaid.alternate-mdb-stale");
         Repaired(image);
     }
@@ -61,7 +59,7 @@ public class FirstAidExtrasTests
 
         var report = Verify(image);
 
-        Assert.Equal(FirstAidVerdict.AppearsOk, report.Verdict);
+        Assert.Equal(FirstAidVerdict.NeedsRepair, report.Verdict);
         Extra(report, "firstaid.mdb-counts");
         Assert.Equal(files, U16(Repaired(image), Primary + 0x0C));
     }
@@ -75,7 +73,7 @@ public class FirstAidExtrasTests
 
         var report = Verify(image);
 
-        Assert.Equal(FirstAidVerdict.AppearsOk, report.Verdict);
+        Assert.Equal(FirstAidVerdict.NeedsRepair, report.Verdict);
         Extra(report, "firstaid.mdb-counts");
         Assert.Equal(free, U16(Repaired(image), Primary + 0x22));
     }
@@ -92,7 +90,7 @@ public class FirstAidExtrasTests
 
         var report = Verify(image);
 
-        Assert.Equal(FirstAidVerdict.AppearsOk, report.Verdict);
+        Assert.Equal(FirstAidVerdict.NeedsRepair, report.Verdict);
         Extra(report, "firstaid.extent-start");
         var repaired = Repaired(image);
         Assert.Equal(6, U16(repaired, ExtentsKeys(repaired)[1] + 6));
@@ -123,20 +121,21 @@ public class FirstAidExtrasTests
         uint blocks = U16(image, Primary + 0x12);
         Put16(image, file + 0x4A, (int)blocks - 2);                                 // its 10 blocks from N − 2
 
-        var problem = Extra(Verify(image), "firstaid.extent-past-end");
+        var report = Verify(image);
 
+        var problem = Extra(report, "firstaid.extent-past-end");
         Assert.False(problem.Repairable);
+        Assert.Equal(FirstAidVerdict.CannotRepair, report.Verdict);
         Assert.Equal($"Problem:  {problem.Message}.", problem.ToString());
     }
 
     [Fact]
-    public void ClassicMac_s_volumes_have_no_extra_problems()
+    public void A_fragmented_volume_ClassicMac_builds_has_no_problems()
     {
         var builder = new HfsBuilder();
         builder.File(HfsBuilder.Root, "Fragmented", new byte[8 * HfsBuilder.Block], new byte[3 * HfsBuilder.Block], fragments: 8, thread: true);
         var report = Verify(builder.Build("Disk"));
 
-        Assert.Equal(FirstAidRepairs.None, report.Extras);
         Assert.Empty(report.Problems);
     }
 }

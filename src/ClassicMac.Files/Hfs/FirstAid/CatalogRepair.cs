@@ -96,7 +96,7 @@ internal sealed class CatalogRepair
         writer.WriteUInt16At(0x1E, flags);
     }
 
-    // ClassicMac's: a fork's physical length short of its blocks set to them (Disk First Aid's MountCheck finds it, as
+    // Beyond Disk First Aid: a fork's physical length short of its blocks set to them (Disk First Aid's MountCheck finds it, as
     // minor, and leaves it).
     private void ForkLength(byte[] data, int at, byte fork, string name)
     {

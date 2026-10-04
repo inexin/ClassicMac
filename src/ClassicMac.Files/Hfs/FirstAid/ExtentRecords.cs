@@ -78,10 +78,10 @@ internal static class ExtentRecords
                 return null;
             }
 
-            // ClassicMac's: each record's start block is the fork's blocks before it.
+            // Beyond Disk First Aid: each record's start block is the fork's blocks before it.
             if ((records[at].Key[6] << 8 | records[at].Key[7]) != blocks)
             {
-                run.Extra("An overflow extents record's start block is not the fork's blocks before it", "firstaid.extent-start", FirstAidRepairs.ExtentStarts);
+                run.Problem("An overflow extents record's start block is not the fork's blocks before it", "firstaid.extent-start", FirstAidRepairs.ExtentStarts);
             }
 
             foreach (var extent in Of(records[at].Data))

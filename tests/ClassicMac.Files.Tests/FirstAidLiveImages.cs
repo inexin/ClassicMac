@@ -82,7 +82,7 @@ public class FirstAidLiveImages
     {
         foreach (var problem in report.Problems)
         {
-            text.AppendLine(CultureInfo.InvariantCulture, $"  {(problem.Origin == FirstAidOrigin.ClassicMac ? "[ClassicMac] " : "")}{problem}");
+            text.AppendLine(CultureInfo.InvariantCulture, $"  {problem}");
         }
 
         text.AppendLine(CultureInfo.InvariantCulture, $"  {summary ?? report.Summary}");

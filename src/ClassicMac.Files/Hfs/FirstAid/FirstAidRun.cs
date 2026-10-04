@@ -56,13 +56,13 @@ public enum FirstAidRepairs
     /// <summary>MountCheck's minor findings: MountCheck runs again and the MDB is written.</summary>
     MountCheck = 1 << 13,
 
-    /// <summary>ClassicMac's: the alternate MDB is written from the primary.</summary>
+    /// <summary>The alternate MDB is written from the primary.</summary>
     AlternateMdb = 1 << 14,
 
-    /// <summary>ClassicMac's: overflow extents records' start blocks (<c>xkrFABN</c>) are renumbered.</summary>
+    /// <summary>Overflow extents records' start blocks (<c>xkrFABN</c>) are renumbered.</summary>
     ExtentStarts = 1 << 15,
 
-    /// <summary>ClassicMac's: a fork's physical length short of its blocks is set to them.</summary>
+    /// <summary>A fork's physical length short of its blocks is set to them.</summary>
     ForkLengths = 1 << 16,
 }
 
@@ -133,8 +133,8 @@ internal sealed class FirstAidRun(HfsVolume volume)
 
     public FirstAidRepairs Repairs { get; set; }
 
-    /// <summary>The repairs ClassicMac's own checks found needed; they never change Disk First Aid's verdict.</summary>
-    public FirstAidRepairs Extras { get; set; }
+    /// <summary>A problem no repair fixes was found, though the check went on.</summary>
+    public bool Unrepairable { get; set; }
 
     /// <summary>How the check ended early, or null while it runs or when every stage passed.</summary>
     public FirstAidVerdict? Ended { get; set; }
@@ -197,24 +197,19 @@ internal sealed class FirstAidRun(HfsVolume volume)
         Repairs |= repairs;
     }
 
-    /// <summary>Records one of Disk First Aid's lines with no number (MountCheck's), repairable.</summary>
-    public void Problem(string message, string code, FirstAidRepairs repairs)
-    {
-        Problems.Add(new FirstAidProblem(0, message, 0, 0, stage, Repairable: true, code));
-        Repairs |= repairs;
-    }
-
     /// <summary>
-    /// Records one of ClassicMac's problems (once per code), with the repair it needs, or none when it is only reported.
+    /// Records a problem with no number (MountCheck's, and the checks Disk First Aid lacks) once per code, with the repair
+    /// it needs; with none, no repair fixes it.
     /// </summary>
-    public void Extra(string message, string code, FirstAidRepairs repairs = FirstAidRepairs.None)
+    public void Problem(string message, string code, FirstAidRepairs repairs)
     {
         if (!Problems.Exists(p => p.Code == code))
         {
-            Problems.Add(new FirstAidProblem(0, message, 0, 0, stage, repairs != FirstAidRepairs.None, code, FirstAidOrigin.ClassicMac));
+            Problems.Add(new FirstAidProblem(0, message, 0, 0, stage, repairs != FirstAidRepairs.None, code));
         }
 
-        Extras |= repairs;
+        Repairs |= repairs;
+        Unrepairable |= repairs == FirstAidRepairs.None;
     }
 
     /// <summary>Records a problem that needs no repair: the volume can still appear to be OK.</summary>

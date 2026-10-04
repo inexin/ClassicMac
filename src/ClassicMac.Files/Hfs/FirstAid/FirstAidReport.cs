@@ -12,9 +12,9 @@ public sealed class FirstAidReport
         Stages = [.. run.Stages];
         Problems = [.. run.Problems];
         Repairs = run.Repairs;
-        Extras = run.Extras;
         VolumeName = run.VolumeName;
-        Verdict = run.Ended ?? (run.Repairs != FirstAidRepairs.None ? FirstAidVerdict.NeedsRepair : FirstAidVerdict.AppearsOk);
+        Verdict = run.Ended ?? (run.Unrepairable ? FirstAidVerdict.CannotRepair
+            : run.Repairs != FirstAidRepairs.None ? FirstAidVerdict.NeedsRepair : FirstAidVerdict.AppearsOk);
     }
 
     /// <summary>The stage lines, in the order they ran.</summary>
@@ -25,9 +25,6 @@ public sealed class FirstAidReport
 
     /// <summary>The repairs the problems need.</summary>
     public FirstAidRepairs Repairs { get; }
-
-    /// <summary>The repairs ClassicMac's own checks found needed (problems of origin ClassicMac); not part of the verdict.</summary>
-    public FirstAidRepairs Extras { get; }
 
     /// <summary>The volume's name (from its MDB).</summary>
     public string VolumeName { get; }
@@ -46,13 +43,13 @@ public sealed class FirstAidReport
     };
 
     /// <summary>
-    /// The problems as diagnostics: an Error for one repair cannot fix, a Warning for one it can, Info for ClassicMac's
-    /// own; a disk that is not HFS is an Error.
+    /// The problems as diagnostics: an Error for one repair cannot fix, a Warning for one it can; a disk that is not HFS is
+    /// an Error.
     /// </summary>
     public IReadOnlyList<Diagnostic> ToDiagnostics()
     {
         var diagnostics = Problems.Select(p => new Diagnostic(
-            p.Origin == FirstAidOrigin.ClassicMac ? DiagnosticSeverity.Info : p.Repairable ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error,
+            p.Repairable ? DiagnosticSeverity.Warning : DiagnosticSeverity.Error,
             p.Code, $"First Aid: {p.Message}, {p.Arg2}, {p.Arg3}")).ToList();
         if (Verdict == FirstAidVerdict.NotHfs)
         {

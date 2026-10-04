@@ -18,10 +18,23 @@ public class FirstAidVolumeInfoTests
     }
 
     [Fact]
-    public void Without_the_alternate_MDB_it_is_not_an_HFS_disk()
+    public void Without_the_alternate_MDB_the_primary_is_checked_and_the_alternate_needs_repair()
     {
         var image = Base();
-        Put16(image, Alternate(image), 0);                                         // A1 [Verified]
+        Put16(image, Alternate(image), 0);                                         // A1: Disk First Aid says not HFS
+
+        var report = Verify(image);
+
+        Assert.Equal("firstaid.alternate-mdb-missing", Assert.Single(report.Problems).Code);
+        Assert.Equal(FirstAidVerdict.NeedsRepair, report.Verdict);
+    }
+
+    [Fact]
+    public void Without_either_MDB_it_is_not_an_HFS_disk()
+    {
+        var image = Base();
+        Put16(image, Alternate(image), 0);
+        Put16(image, Primary, 0);
 
         var report = Verify(image);
 
@@ -40,18 +53,17 @@ public class FirstAidVolumeInfoTests
         var image = Base();
         if (size == 2)
         {
-            Put16(image, Alternate(image) + offset, (int)value);
+            PutBoth16(image, offset, (int)value);
         }
         else
         {
-            Put32(image, Alternate(image) + offset, value);
+            PutBoth32(image, offset, value);
         }
 
         var report = Verify(image);
 
-        var problem = Assert.Single(DiskFirstAid(report));
+        var problem = Assert.Single(report.Problems);
         Assert.Equal(number, problem.Number);
-        Assert.Contains(report.Problems, p => p.Code == "firstaid.alternate-mdb-stale");     // ClassicMac's, besides
         Assert.False(problem.Repairable);
         Assert.Equal(FirstAidVerdict.CannotRepair, report.Verdict);
         Assert.Equal("Test done. Problems were found, but Disk First Aid cannot repair them.", report.Summary);
@@ -62,9 +74,9 @@ public class FirstAidVolumeInfoTests
     {
         // 64 MB in 512-byte blocks would be 131,068 blocks: the smallest size that fits is 1,024.
         var image = HfsWriter.Format(64L * 1024 * 1024, "Big");
-        Put32(image, Alternate(image) + 0x14, 512);
+        PutBoth32(image, 0x14, 512);
 
-        Assert.Equal(7, Assert.Single(DiskFirstAid(Verify(image))).Number);
+        Assert.Equal(7, Assert.Single(Verify(image).Problems).Number);
     }
 
     [Fact]

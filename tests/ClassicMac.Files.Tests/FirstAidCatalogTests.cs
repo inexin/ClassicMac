@@ -10,7 +10,7 @@ public class FirstAidCatalogTests
 {
     private static FirstAidProblem Single(byte[] image, int number) => Assert.Single(Verify(image).Problems, p => p.Number == number);
 
-    private static string[] Lines(byte[] image) => [.. DiskFirstAid(Verify(image)).Select(p => p.ToString())];
+    private static string[] Lines(byte[] image) => [.. Verify(image).Problems.Select(p => p.ToString())];
 
     [Fact]
     public void Reserved_fields_in_a_file_record_are_repaired_and_the_scan_goes_on()
@@ -70,7 +70,7 @@ public class FirstAidCatalogTests
         Put32(image, file + 0x1E, peof);
         Put32(image, file + 0x1A, Math.Min(U32(image, file + 0x1A), peof));
 
-        Assert.Equal(["Problem:  MountCheck found minor errors."], Lines(image));
+        Assert.Equal(["Problem:  MountCheck found minor errors.", "Problem:  A fork's physical length is short of its blocks."], Lines(image));
         Assert.Equal(FirstAidVerdict.NeedsRepair, Verify(image).Verdict);
     }
 
@@ -185,13 +185,16 @@ public class FirstAidCatalogTests
     }
 
     [Fact]
-    public void A_wrong_free_block_count_is_not_Disk_First_Aid_s_concern()
+    public void A_wrong_free_block_count_or_root_file_count_needs_repair()
     {
         var image = Base();
         Put16(image, Primary + 0x22, U16(image, Primary + 0x22) - 1);              // B4 [Verified]
         Put16(image, Primary + 0x0C, U16(image, Primary + 0x0C) + 1);              // B5: drNmFls [Verified]
 
-        Assert.DoesNotContain(Verify(image).Problems, p => p.Origin == FirstAidOrigin.DiskFirstAid);
+        var report = Verify(image);                                                // Disk First Aid ignores both
+
+        Assert.Equal(["firstaid.mdb-counts"], report.Problems.Select(p => p.Code));
+        Assert.Equal(FirstAidVerdict.NeedsRepair, report.Verdict);
     }
 
     [Fact]
