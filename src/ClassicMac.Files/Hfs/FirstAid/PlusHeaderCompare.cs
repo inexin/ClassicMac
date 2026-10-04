@@ -35,7 +35,9 @@ internal static class PlusHeaderCompare
         run.ComputedMdb = computed;
         if (!computed.AsSpan().SequenceEqual(run.Primary))
         {
-            run.Flag(59, FirstAidRepairs.Mdb);
+            // Disk First Aid prints the compare group, 1 for the header's counts [Verified: Mac RE P1, P4, H2 "1, 0";
+            // fitted, the other groups not seen].
+            run.Flag(59, FirstAidRepairs.Mdb, 1);
         }
 
         if (run.Extents!.Records.Exists(r => new BigEndianReader(r.Key).ReadUInt32At(4) is var id && id >= 16 && !run.FileIds.Contains(id)))

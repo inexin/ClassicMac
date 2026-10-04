@@ -77,6 +77,9 @@ public class FirstAidRepairTests
         int root = Record(image, 1, "First Aid");
         Put16(image, root + 0x1E, U16(image, root + 0x1E) | 0x1000);               // RC7
 
+        var locked = Assert.Single(Verify(image).Problems, p => p.Number == 55);
+        Assert.Equal(4, locked.Arg2);                                              // the catalog's file ID, then the leaf node
+        Assert.True(locked.Arg3 > 0);
         var (repaired, _) = Repaired(image);
 
         Assert.Equal(0, U16(repaired, Record(repaired, 1, "First Aid") + 0x1E) & 0x1000);

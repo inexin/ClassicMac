@@ -42,7 +42,7 @@ public sealed class PlusFirstAidTests : IDisposable
         var (code, output) = Run("check", Volume(damaged: true));
 
         Assert.Equal(1, code);
-        Assert.Contains("first aid: Problem:  Volume Header needs minor repair, 0, 0\n", output);
+        Assert.Contains("first aid: Problem:  Volume Header needs minor repair, 1, 0\n", output);   // the compare group, as Disk First Aid prints it
     }
 
     // A file's thread made a folder thread: the reader refuses the volume, but First Aid still checks and repairs it.

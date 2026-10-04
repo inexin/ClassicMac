@@ -4,10 +4,12 @@ namespace ClassicMac.Files.Hfs;
 
 // "Checking for locked volume name." (hfs.md §5.6): the catalog's first leaf record, the root folder's, gives the volume
 // its name, and the root's name lock is a problem repair clears [Code: Disk First Aid 8.5.5, CODE 1 $1D4B2]
-// [Verified: root frFlags | $1000 → "Directory name locked", needs repair].
+// [Verified: root frFlags | $1000 → "Directory name locked", needs repair]. Its numbers are the catalog's file ID (4,
+// which the stage sets as the record's ID and never replaces) and the leaf node [Verified: C7 "4, 2", RC7 "4, 5"].
 internal static class LockedNameCheck
 {
     private const ushort NameLocked = 0x1000;
+    private const int CatalogFileId = 4;
 
     public static bool Run(FirstAidRun run)
     {
@@ -22,7 +24,7 @@ internal static class LockedNameCheck
         run.RootName = key.Slice(7, System.Math.Min(key.Span[6], key.Length - 7)).ToArray();
         if (data.Length >= 0x46 && data.Span[0] == 1 && (new BigEndianReader(data).ReadUInt16At(0x1E) & NameLocked) != 0)
         {
-            run.Flag(55, FirstAidRepairs.FinderFlags, new BigEndianReader(data).ReadUInt32At(6), node);
+            run.Flag(55, FirstAidRepairs.FinderFlags, CatalogFileId, node);
         }
 
         return true;

@@ -172,9 +172,13 @@ public class FirstAidPlusTests
         int docs = Record(image, HfsPlusBuilder.Root, "Docs");
         Put32(image, docs + 4, U32(image, docs + 4) + 1);
 
-        var problem = Single(Verify(image), 3);
+        var report = Verify(image);
+        var problem = Single(report, 3);
 
         Assert.Equal((Docs, true), ((uint)problem.Arg2, problem.Repairable));
+        // MountCheck's line comes first, as Disk First Aid prints it [Verified: Mac RE P3, H1, H3].
+        var mountCheck = Assert.Single(report.Problems, p => p.Code == "firstaid.mountcheck-minor");
+        Assert.True(report.Problems.ToList().IndexOf(mountCheck) < report.Problems.ToList().IndexOf(problem));
     }
 
     [Fact]
@@ -228,7 +232,10 @@ public class FirstAidPlusTests
         int bitmap = (int)(U32(image, Header + 112 + 16) * Block);
         image[bitmap + (int)(last / 8)] |= (byte)(0x80 >> (int)(last % 8));
 
-        Assert.True(Single(Verify(image), 60).Repairable);
+        var problem = Single(Verify(image), 60);
+
+        Assert.True(problem.Repairable);
+        Assert.Equal((4L, 0L), (problem.Arg2, problem.Arg3));                     // the catalog's file ID, node 0
     }
 
     [Theory]
@@ -244,6 +251,7 @@ public class FirstAidPlusTests
         var report = Verify(image);
 
         Assert.True(Single(report, 59).Repairable);
+        Assert.Equal((1L, 0L), (Single(report, 59).Arg2, Single(report, 59).Arg3));   // the compare group [Verified: Mac RE P1, P4, H2]
         Assert.Equal(FirstAidVerdict.NeedsRepair, report.Verdict);
     }
 }

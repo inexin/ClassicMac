@@ -125,8 +125,9 @@ Standing decisions, with their dates; superseded ones are dropped.
 In rough priority; each item names what blocks it, if anything.
 
 1. **First Aid on real volumes**: HFS passes Disk First Aid 8.5.5 live (27 repaired faults, clean disks), and the
-   Digital Corpora journaled Mac OS X image checks out; HFS Plus repair on Mac OS 9-made volumes awaits the Mac RE
-   session's re-run, and HFSX has been tried only on built volumes.
+   Digital Corpora journaled Mac OS X image checks out; HFS Plus repairs on Mac OS 9-made volumes (valences, header
+   counts, the alternate header, a fragmented wrapped disk) pass it too. HFSX has been tried only on built volumes, and
+   the in-place extents-tree edits and multi-partition writes await a live check.
 2. **Writing, still to do**: NDIF changed chunks compressed again, segmented images, a check against Disk Copy; `resize` shrinking and a
    new block size.
 3. **Fuzzing**: SharpFuzz with libFuzzer per reader in CI. The seeded mutation tests (`tests/Shared/Mutations.cs`)

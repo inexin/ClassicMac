@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- First Aid prints Disk First Aid's numbers where the live runs showed them: #55 and #60 as "4, node" and "4, 0", HFS
+  Plus #59 as "1, 0", and HFS Plus valence faults with "MountCheck found minor errors." first.
 - Writing to disks with several partitions (partition-map.md §5): each HFS partition is edited by its name
   (`classicmac mkdir disk.img:Two:New`, `repair disk.img:Two`) and written back in place; in the app each partition
   node takes the Volume menu, First Aid and resource edits, and Save As writes them all.

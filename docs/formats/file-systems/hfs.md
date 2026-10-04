@@ -799,7 +799,8 @@ A nonzero reserved header byte (`bthResv` byte 6, node 0 + $32) is cleared by re
 **"Checking for locked volume name."** The catalog's first leaf record is the root folder's; if there is none, #56
 "Catalog file entry not found for extent" ends the check (the text does not fit the condition). Its key's name is the
 volume's name for the later MDB compare. A root folder with `frFlags` bit $1000 (name locked) is #55 "Directory name
-locked", repaired by clearing the bit [Verified].
+locked", repaired by clearing the bit [Verified]; its %2 is 4, the catalog's file ID, which the stage sets as the record
+ID and never replaces, and %3 the leaf node [Code: CODE 1 $1D4B2] [Verified: "4, 2", "4, 5"].
 
 **"Checking extent BTree."**, **"Checking extent file."**, **"Checking catalog BTree."** Each tree is checked so (the
 header node, then a depth-first walk from the root; %3 = the node):
@@ -883,7 +884,8 @@ Then MountCheck's view, one line with no numbers:
 block claimed twice is #12 "Overlapped extent allocation" (once, repaired by giving the files their own copies). It is
 compared with the volume's bitmap whole sector by whole sector, so bits after `drNmAlBlks` and bytes after the bitmap
 in its last sector must be clear: any difference is #60 "Volume Bit Map needs minor repair", repaired by writing the
-built bitmap [Verified: a leaked block, a trailing byte, the bit after the last block]. %2 and %3 are not traced.
+built bitmap [Verified: a leaked block, a trailing byte, the bit after the last block]. %2 and %3 are 4 and 0: the
+record ID the catalog stage left, and node 0 [Code: CODE 1 $1A0CC] [Verified].
 
 **"Checking volume info."** The primary MDB is compared with one built so: the signature, creation date, `drVBMSt`,
 `drNmAlBlks`, `drAlBlSt`, the cache sizes ($7C–$81) and the B-tree files' sizes and extents from the alternate MDB;

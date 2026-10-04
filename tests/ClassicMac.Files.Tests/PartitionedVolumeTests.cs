@@ -125,8 +125,10 @@ public sealed class PartitionedVolumeTests : IDisposable
         Assert.Equal(Slice(written, partitions[0]), Slice(current, partitions[0]));
         Assert.Contains(HfsReader.Instance.ReadFolders(ForkData.FromBytes(session.VolumeOf("Two")), new ContainerContext()), f => f.MacPath == "Docs:New");
 
-        session.SaveInPlace();
-        Assert.Equal(written, File.ReadAllBytes(path));
+        session.SaveInPlace();                                                     // its fork edit made again, maybe a second later
+        var inPlace = File.ReadAllBytes(path);
+        Assert.Equal(Slice(written, partitions[0]), Slice(inPlace, partitions[0]));
+        Assert.Equal(["Docs:Letter", "Read Me"], Files(Slice(inPlace, partitions[1])).Select(f => f.MacPath).Order());
         Assert.Equal(original, File.ReadAllBytes(path + ".orig"));
     }
 

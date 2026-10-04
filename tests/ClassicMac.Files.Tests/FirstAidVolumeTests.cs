@@ -64,6 +64,7 @@ public class FirstAidVolumeTests
 
         Assert.True(Single(image, 60).Repairable);
         Assert.Equal("Checking volume bit map.", Single(image, 60).Stage);
+        Assert.Equal((4L, 0L), (Single(image, 60).Arg2, Single(image, 60).Arg3));
         Assert.True(report.Repairs.HasFlag(FirstAidRepairs.Bitmap));
     }
 

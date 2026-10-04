@@ -517,7 +517,10 @@ item 7; `firstaid.folder-count`, repaired). A volume the reader refuses (§5.2) 
    and file needs its thread naming its parent and name (#36, repaired); a thread whose folder is missing is #37
    (repaired from the thread), whose file is missing #6 (deleted). Each fork's extents must cover its block count
    (#1), its logical size lie within it (#2), and an overflow record's start block be the fork's blocks before it
-   (`firstaid.extent-start`); a block count short of the extents is `firstaid.short-peof`.
+   (`firstaid.extent-start`); a block count short of the extents is `firstaid.short-peof`. At the end, MountCheck's
+   view: the folders' valences summed against the files and folders (the root aside), any difference "MountCheck found
+   minor errors" [Verified: Disk First Aid 8.5.5 on Mac OS 9 volumes with a valence one off; its other HFS Plus checks
+   not seen].
 5. **"Checking catalog hierarchy."**: each folder's valence is its folders and files (#3, repaired); an item whose
    parent folder is missing, with no thread to make it again, is `firstaid.missing-parent` (not repaired); a folder
    that is its own ancestor is #41. Hard links (§1.8): each file link's indirect file `iNode<n>` in
@@ -532,9 +535,10 @@ item 7; `firstaid.folder-count`, repaired). A volume the reader refuses (§5.2) 
    use. Other record types are ignored. Each file's and folder's has-attributes flag ($0004) matches whether it keeps
    attributes (`firstaid.attribute-flag`). The records that fail are deleted by repair, and the flags set.
 6. **"Checking volume bit map."**: the allocation file's bytes for the volume's blocks against the blocks the extents
-   use (#60, repaired; #12 for blocks used twice).
+   use (#60, %2 and %3 4 and 0 as on HFS, repaired; #12 for blocks used twice).
 7. **"Checking volume info."**: `fileCount`, `folderCount`, `freeBlocks` and `nextCatalogID` (above the highest CNID,
-   unless `kHFSCatalogNodeIDsReusedBit`) against what the check counted: #59 "Volume Header needs minor repair".
+   unless `kHFSCatalogNodeIDsReusedBit`) against what the check counted: #59 "Volume Header needs minor repair", its
+   %2 the compare group, 1 for these counts [Verified: "1, 0" for wrong counts; fitted, the other groups not seen].
    Overflow extents records of files not in the catalog are `firstaid.orphaned-extents`.
 
 **Repair** (`HfsFirstAid.Repair`, the CLI's `repair`, the app's Volume ▸ First Aid…), as on HFS, at most three

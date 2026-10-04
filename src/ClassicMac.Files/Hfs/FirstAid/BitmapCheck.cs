@@ -6,6 +6,9 @@ namespace ClassicMac.Files.Hfs;
 // D4].
 internal static class BitmapCheck
 {
+    // #60's numbers: the catalog's file ID, left as the record ID by the catalog stage, and node 0 [Verified: Mac RE "4, 0"].
+    private const int CatalogFileId = 4;
+
     public static bool Run(FirstAidRun run)
     {
         run.Stage(FirstAidMessages.CheckingBitmap);
@@ -34,7 +37,7 @@ internal static class BitmapCheck
             onDisk = run.ReadExtents(allocation, computed.Length);
             if (!System.MemoryExtensions.SequenceEqual(computed, onDisk))
             {
-                run.Flag(60, FirstAidRepairs.Bitmap);
+                run.Flag(60, FirstAidRepairs.Bitmap, CatalogFileId);
             }
 
             run.ComputedBitmap = computed;
@@ -47,7 +50,7 @@ internal static class BitmapCheck
             var span = System.MemoryExtensions.AsSpan(computed, sector * FirstAidRun.SectorSize, FirstAidRun.SectorSize);
             if (!System.MemoryExtensions.SequenceEqual(span, System.MemoryExtensions.AsSpan(onDisk, sector * FirstAidRun.SectorSize, FirstAidRun.SectorSize)))
             {
-                run.Flag(60, FirstAidRepairs.Bitmap);
+                run.Flag(60, FirstAidRepairs.Bitmap, CatalogFileId);
                 break;
             }
         }

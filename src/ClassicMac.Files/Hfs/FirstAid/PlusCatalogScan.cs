@@ -39,6 +39,7 @@ internal sealed class PlusCatalogScan
             return false;
         }
 
+        scan.MountCheck();
         run.Stage(FirstAidMessages.CheckingHierarchy);
         if (!scan.Hierarchy())
         {
@@ -226,6 +227,17 @@ internal sealed class PlusCatalogScan
     {
         items[parent] = items.GetValueOrDefault(parent) + 1;
         parents.Add((id, parent, node));
+    }
+
+    // MountCheck's view at the end of the scan: the folders' valences summed against the files and folders (the root
+    // aside) [Verified: Mac RE P3, H1, H3, a valence one off → "MountCheck found minor errors." before the hierarchy;
+    // fitted, MountCheck's other HFS Plus checks not seen].
+    private void MountCheck()
+    {
+        if (folders.Values.Sum(f => (long)f.Valence) != parents.Count)
+        {
+            run.Problem(FirstAidMessages.MountCheckMinor, "firstaid.mountcheck-minor", FirstAidRepairs.Valences);
+        }
     }
 
     // Each folder's valence; every item's parent a folder; no folder its own ancestor.
