@@ -118,8 +118,8 @@ public abstract class EditTestsBase : IDisposable
     // Edit Hex in place: the selected resource's bytes replaced by typing, then applied.
     internal static async Task EditBytes(MainViewModel model, byte[] data)
     {
-        await model.EditHexCommand.ExecuteAsync(null);
-        var editor = model.HexEdit!;
+        await model.EditActions.EditHexCommand.ExecuteAsync(null);
+        var editor = model.EditActions.HexEdit!;
         editor.MoveTo(0);
         while (editor.Length > 0)
         {
@@ -132,7 +132,7 @@ public abstract class EditTestsBase : IDisposable
             editor.TypeDigit(b & 0xF);
         }
 
-        model.ApplyHexEditCommand.Execute(null);
+        model.EditActions.ApplyHexEditCommand.Execute(null);
     }
 
     protected static ResourceNode Resource(FileNode file, short id) =>

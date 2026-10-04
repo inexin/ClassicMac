@@ -330,10 +330,10 @@ public sealed class TreePerformanceTests
             Headless.Pump(model.PreviewTask);
             Render(window);
 
-            model.BeginHexEditCommand.Execute(null);
-            model.HexEdit!.TypeDigit(9);
-            model.HexEdit.TypeDigit(9);
-            model.ApplyHexEditCommand.Execute(null);
+            model.EditActions.BeginHexEditCommand.Execute(null);
+            model.EditActions.HexEdit!.TypeDigit(9);
+            model.EditActions.HexEdit.TypeDigit(9);
+            model.EditActions.ApplyHexEditCommand.Execute(null);
             Render(window);
             Render(window);
 

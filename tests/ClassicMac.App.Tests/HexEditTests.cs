@@ -35,22 +35,22 @@ public sealed class HexEditTests : IDisposable
         Assert.False(model.HasHex); // has a preview: no Hex tab
         Assert.Equal(1, model.SelectedTab);
 
-        await model.EditHexCommand.ExecuteAsync(null);
+        await model.EditActions.EditHexCommand.ExecuteAsync(null);
 
-        Assert.True(model.IsHexEditing);
+        Assert.True(model.EditActions.IsHexEditing);
         Assert.True(model.HasHex);
         Assert.Equal(2, model.SelectedTab);
-        Assert.Equal(11, model.HexEdit!.Length);
+        Assert.Equal(11, model.EditActions.HexEdit!.Length);
 
         // Again while editing: stays, same editor.
-        var editor = model.HexEdit;
+        var editor = model.EditActions.HexEdit;
         model.SelectedTab = 0;
-        await model.EditHexCommand.ExecuteAsync(null);
-        Assert.Same(editor, model.HexEdit);
+        await model.EditActions.EditHexCommand.ExecuteAsync(null);
+        Assert.Same(editor, model.EditActions.HexEdit);
         Assert.Equal(2, model.SelectedTab);
 
         // Discarding ends it; the previewed resource has no Hex tab again.
-        model.DiscardHexEditCommand.Execute(null);
+        model.EditActions.DiscardHexEditCommand.Execute(null);
         Assert.False(model.HasHex);
         Assert.Equal(1, model.SelectedTab);  // back to its preview
     }
@@ -61,15 +61,15 @@ public sealed class HexEditTests : IDisposable
         var (model, input) = await Open();
         model.Selected = Resource(input, "ZZZZ");
         await model.PreviewTask;
-        await model.EditHexCommand.ExecuteAsync(null);
-        model.HexEdit!.TypeDigit(0);
-        model.HexEdit.TypeDigit(1);
+        await model.EditActions.EditHexCommand.ExecuteAsync(null);
+        model.EditActions.HexEdit!.TypeDigit(0);
+        model.EditActions.HexEdit.TypeDigit(1);
 
-        model.ApplyHexEditCommand.Execute(null);
+        model.EditActions.ApplyHexEditCommand.Execute(null);
 
-        Assert.False(model.IsHexEditing);
+        Assert.False(model.EditActions.IsHexEditing);
         Assert.Equal(0x01, Resource(input, "ZZZZ").Resource.GetData().Span[0]);
-        Assert.Equal("_Undo Edit 'ZZZZ' 1", model.UndoTitle);
+        Assert.Equal("_Undo Edit 'ZZZZ' 1", model.EditActions.UndoTitle);
     }
 
     [Fact]
@@ -164,18 +164,18 @@ public sealed class HexEditTests : IDisposable
         var (model, input) = await Open();
         model.Selected = Resource(input, "ZZZZ");
         await model.PreviewTask;
-        await model.EditHexCommand.ExecuteAsync(null);
-        model.GoToText = "0x4";
-        model.GoToCommand.Execute(null);
-        Assert.Equal(4, model.HexEdit!.Cursor);
-        Assert.Null(model.GoToError);
-        model.GoToText = "nope";
-        model.GoToCommand.Execute(null);
-        Assert.Equal("Not a hex offset", model.GoToError);
-        Assert.Equal(4, model.HexEdit.Cursor);
-        model.GoToText = "2";
-        model.GoToCommand.Execute(null);
-        Assert.Null(model.GoToError);
+        await model.EditActions.EditHexCommand.ExecuteAsync(null);
+        model.EditActions.GoToText = "0x4";
+        model.EditActions.GoToCommand.Execute(null);
+        Assert.Equal(4, model.EditActions.HexEdit!.Cursor);
+        Assert.Null(model.EditActions.GoToError);
+        model.EditActions.GoToText = "nope";
+        model.EditActions.GoToCommand.Execute(null);
+        Assert.Equal("Not a hex offset", model.EditActions.GoToError);
+        Assert.Equal(4, model.EditActions.HexEdit.Cursor);
+        model.EditActions.GoToText = "2";
+        model.EditActions.GoToCommand.Execute(null);
+        Assert.Null(model.EditActions.GoToError);
     }
 
     [Fact]
@@ -247,8 +247,8 @@ public sealed class HexEditTests : IDisposable
         var (model, input) = await Open();
         model.Selected = Resource(input, "STR#");
         await model.PreviewTask;
-        await model.EditHexCommand.ExecuteAsync(null);
-        var editor = model.HexEdit!;
+        await model.EditActions.EditHexCommand.ExecuteAsync(null);
+        var editor = model.EditActions.HexEdit!;
 
         Assert.Equal(new ByteMeaning("Number of strings", 0, 2, "1"), editor.Inspector.Meaning);
         Assert.Equal([true, true, false], editor.Lines[0].Cells.Take(3).Select(c => c.IsInField));
@@ -270,9 +270,9 @@ public sealed class HexEditTests : IDisposable
         var (model, input) = await Open();
         model.Selected = Resource(input, "ZZZZ");
         await model.PreviewTask;
-        await model.EditHexCommand.ExecuteAsync(null);
-        Assert.Null(model.HexEdit!.Inspector.Meaning);
-        Assert.All(model.HexEdit.Lines[0].Cells, c => Assert.False(c.IsInField));
+        await model.EditActions.EditHexCommand.ExecuteAsync(null);
+        Assert.Null(model.EditActions.HexEdit!.Inspector.Meaning);
+        Assert.All(model.EditActions.HexEdit.Lines[0].Cells, c => Assert.False(c.IsInField));
     }
 
     // Read only (the hex view of a resource with no preview): a click selects a byte; the pair highlights, and the
@@ -289,28 +289,28 @@ public sealed class HexEditTests : IDisposable
         model.Selected = Resource(input, "Rsrc");
         await model.PreviewTask;
         Assert.True(model.HasHex);
-        Assert.Null(model.HexInspection);
+        Assert.Null(model.EditActions.HexInspection);
         var changed = new System.Collections.Concurrent.ConcurrentQueue<string?>();
-        model.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
+        model.EditActions.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
 
-        model.SelectHexByte(1);
+        model.EditActions.SelectHexByte(1);
 
-        Assert.Contains(nameof(MainViewModel.HexInspection), changed);
-        Assert.Equal("At 0x0001", model.HexInspection!.Heading);
-        Assert.Equal("2,047", model.HexInspection.Rows[2].Value);   // UInt16 BE at 1: 07 FF
-        Assert.Equal(new ByteMeaning("ID", 0, 2, "7"), model.HexInspection.Meaning);
+        Assert.Contains(nameof(EditActions.HexInspection), changed);
+        Assert.Equal("At 0x0001", model.EditActions.HexInspection!.Heading);
+        Assert.Equal("2,047", model.EditActions.HexInspection.Rows[2].Value);   // UInt16 BE at 1: 07 FF
+        Assert.Equal(new ByteMeaning("ID", 0, 2, "7"), model.EditActions.HexInspection.Meaning);
         var cells = model.HexLines![0].Cells;
         Assert.Equal([false, true, false], cells.Select(c => c.IsSelected));
         Assert.Equal([true, true, false], cells.Select(c => c.IsInField));
         Assert.All(cells, c => Assert.False(c.IsCursor));
 
         // Editing shows the editor's inspector; a new selection drops the read-only one.
-        await model.EditHexCommand.ExecuteAsync(null);
-        Assert.Same(model.HexEdit!.Inspector, model.HexInspection);
-        model.HexEdit.MoveTo(2);
-        Assert.Equal("At 0x0002", model.HexInspection!.Heading);
-        model.DiscardHexEditCommand.Execute(null);
+        await model.EditActions.EditHexCommand.ExecuteAsync(null);
+        Assert.Same(model.EditActions.HexEdit!.Inspector, model.EditActions.HexInspection);
+        model.EditActions.HexEdit.MoveTo(2);
+        Assert.Equal("At 0x0002", model.EditActions.HexInspection!.Heading);
+        model.EditActions.DiscardHexEditCommand.Execute(null);
         model.Selected = input;
-        Assert.Null(model.HexInspection);
+        Assert.Null(model.EditActions.HexInspection);
     }
 }

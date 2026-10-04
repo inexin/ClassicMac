@@ -30,7 +30,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
 
     // Resource ▸ Import: a PNG (or other image) or WAV file made into a new resource, or into the data of the one
     // of that type and ID, as one undoable edit.
-    private bool CanImport() => main.CanNewResource();
+    private bool CanImport() => main.EditActions.CanNewResource();
 
     [RelayCommand(CanExecute = nameof(CanImport))]
     private async Task Import()
@@ -40,7 +40,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
             return;
         }
 
-        if (MainViewModel.FileOwner(main.Selected) is not { } owner || main.FilePicker is null || main.EditDialogs is null)
+        if (EditActions.FileOwner(main.Selected) is not { } owner || main.FilePicker is null || main.EditDialogs is null)
         {
             return;
         }
@@ -71,7 +71,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
             return;
         }
 
-        var fork = main.StateFor(owner).Session.Fork;
+        var fork = main.EditActions.StateFor(owner).Session.Fork;
         IReadOnlyList<string> types = isSound ? ["snd "] : [.. ImageImport.Types, IconFamily];
         var selected = (main.Selected as ResourceNode)?.Resource;
         var type = selected is not null && types.Contains(selected.Type.ToString()) ? selected.Type.ToString() : types[0];
@@ -115,7 +115,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
 
                 continue;
             }
-            if (await main.Validate(fork, new ResourceInfo(madeType, choice.Id, choice.Name, ResourceAttributes.None), null) is not { } valid)
+            if (await main.EditActions.Validate(fork, new ResourceInfo(madeType, choice.Id, choice.Name, ResourceAttributes.None), null) is not { } valid)
             {
                 return;
             }
@@ -127,7 +127,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
                 select = () => add.Added;
             }
         }
-        main.Execute(owner, edits.Count == 1 ? edits[0] : new CompoundEdit($"Import {fileName}", [.. edits]), select);
+        main.EditActions.Execute(owner, edits.Count == 1 ? edits[0] : new CompoundEdit($"Import {fileName}", [.. edits]), select);
     }
 
     // An image's size and depth ("32 × 32 · 24-bit", or 32-bit with alpha when a pixel is not opaque), and what each

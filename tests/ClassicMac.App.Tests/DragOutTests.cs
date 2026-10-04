@@ -93,7 +93,7 @@ public sealed class DragOutTests : IDisposable
         model.DragOut.DragOutAsMacBinary = true;
         Assert.Equal(DragOutFormat.MacBinary, model.DragOut.DragOutFormat);
         model.Selected = file.Children.OfType<ResourceTypeNode>().Single().Children.OfType<ResourceNode>().Single(r => r.Resource.Id == 129);
-        model.DeleteResourceCommand.Execute(null);
+        model.EditActions.DeleteResourceCommand.Execute(null);
 
         var paths = await model.DragOut.PrepareDragOutAsync(file);
 

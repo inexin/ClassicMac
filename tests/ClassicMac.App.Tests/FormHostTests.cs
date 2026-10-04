@@ -111,7 +111,7 @@ public sealed class FormHostTests : IDisposable
         Assert.Equal("Fichier", Assert.IsType<MenuForm>(model.Forms.Form).Title);
         Assert.Equal("Applied · Undo Edit 'MENU' 129 (Ctrl+Z)", model.FormEditing.LastApplied);
 
-        await model.UndoCommand.ExecuteAsync(null);                         // one edit: one undo brings it all back
+        await model.EditActions.UndoCommand.ExecuteAsync(null);                         // one edit: one undo brings it all back
         await Select(model, input, "MENU");
         Assert.Equal("File", Assert.IsType<MenuForm>(model.Forms.Form).Title);
         Assert.Equal(1, Assert.IsType<MenuForm>(model.Forms.Form).Items[0].Face);

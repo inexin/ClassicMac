@@ -207,14 +207,14 @@ public sealed class ShellTests : IDisposable
         // concurrent queue takes them, and the new selection's tasks are awaited before the names are looked at.
         var changed = new System.Collections.Concurrent.ConcurrentQueue<string?>();
         model.ShellActions.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
-        await model.DeleteResourceCommand.ExecuteAsync(null);
+        await model.EditActions.DeleteResourceCommand.ExecuteAsync(null);
         await model.PreviewTask;
         await model.InspectorActions.HeaderIconTask;
         Assert.True(model.ShellActions.TitleUnsaved);
         Assert.Equal("Icons.rsrc • — ClassicMac", model.ShellActions.WindowTitle);
         Assert.Contains(nameof(ShellActions.TitleUnsaved), changed.ToArray());
         Assert.Contains(nameof(ShellActions.WindowTitle), changed.ToArray());
-        await model.UndoCommand.ExecuteAsync(null);
+        await model.EditActions.UndoCommand.ExecuteAsync(null);
         await model.PreviewTask;
         Assert.False(model.ShellActions.TitleUnsaved);
 

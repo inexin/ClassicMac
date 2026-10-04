@@ -121,15 +121,13 @@ public sealed class EditState(EditSession session, SaveLocation? location, MacFi
         fork.Resources.ToDictionary(r => (r.Type, r.Id), r => (r.GetData(), r.Name, r.Attributes));
 }
 
-public sealed partial class MainViewModel
+public sealed partial class EditActions(MainViewModel main) : ObservableObject
 {
-    public IEditDialogs? EditDialogs { get; set; }
-
     /// <summary>The last save's task (tests wait for it).</summary>
     internal Task SaveTask { get; private set; } = Task.CompletedTask;
 
     /// <summary>Whether any open file has unsaved edits.</summary>
-    public bool HasUnsavedChanges => Roots.Any(r => r.HasVolumeChanges) || Roots.SelectMany(EditedFiles).Any(e => e.State.Session.IsDirty);
+    public bool HasUnsavedChanges => main.Roots.Any(r => r.HasVolumeChanges) || main.Roots.SelectMany(EditedFiles).Any(e => e.State.Session.IsDirty);
 
     // The file node (a FileNode, or an input read as a fork) that the node belongs to, when its resources are loaded.
     internal static NodeViewModel? FileOwner(NodeViewModel? node)
@@ -235,21 +233,21 @@ public sealed partial class MainViewModel
     internal void NotifyEditCommands()
     {
         foreach (var command in new IRelayCommand[] { NewResourceCommand, DuplicateResourceCommand, DeleteResourceCommand, GetInfoCommand,
-            ReplaceDataCommand, EditHexCommand, BeginHexEditCommand, ImportActions.ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand,
-            VolumeActions.NewFileCommand, VolumeActions.ImportFileCommand, VolumeActions.NewFolderCommand, VolumeActions.DeleteItemCommand })
+            ReplaceDataCommand, EditHexCommand, BeginHexEditCommand, main.ImportActions.ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand,
+            main.VolumeActions.NewFileCommand, main.VolumeActions.ImportFileCommand, main.VolumeActions.NewFolderCommand, main.VolumeActions.DeleteItemCommand })
         {
             command.NotifyCanExecuteChanged();
         }
 
         OnPropertyChanged(nameof(UndoTitle));
         OnPropertyChanged(nameof(RedoTitle));
-        ShellActions.NotifyTitle();
+        main.ShellActions.NotifyTitle();
     }
 
-    private void OnSelectedChanged(NodeViewModel? oldValue, NodeViewModel? newValue)
+    internal void OnSelectedChanged(NodeViewModel? oldValue, NodeViewModel? newValue)
     {
         NotifyEditCommands();
-        Forms.UpdateForm(newValue);
+        main.Forms.UpdateForm(newValue);
     }
 
     // Makes an edit in the selection's file and selects the resource it concerns.
@@ -258,14 +256,14 @@ public sealed partial class MainViewModel
         var state = StateFor(owner);
         state.Session.Execute(edit);
         SelectResource(owner, select());
-        Status = edit.Description + ".";
+        main.Status = edit.Description + ".";
     }
 
     private void SelectResource(NodeViewModel owner, Resource? resource)
     {
         if (resource is null)
         {
-            Selected = owner;
+            main.Selected = owner;
             return;
         }
         var typeNode = owner.Children.OfType<ResourceTypeNode>().FirstOrDefault(t => t.Type == resource.Type);
@@ -276,7 +274,7 @@ public sealed partial class MainViewModel
 
         owner.IsExpanded = true;
         typeNode.IsExpanded = true;
-        Selected = typeNode.Children.OfType<ResourceNode>().FirstOrDefault(r => r.Resource == resource) ?? (NodeViewModel)typeNode;
+        main.Selected = typeNode.Children.OfType<ResourceNode>().FirstOrDefault(r => r.Resource == resource) ?? (NodeViewModel)typeNode;
     }
 
     // Checks an edit's type, ID, name and attributes: errors refuse it, warnings ask.
@@ -284,7 +282,7 @@ public sealed partial class MainViewModel
     {
         if (!FourCC.TryParse(info.Type, out var type))
         {
-            Status = $"'{info.Type}' is not a resource type (four Mac OS Roman characters).";
+            main.Status = $"'{info.Type}' is not a resource type (four Mac OS Roman characters).";
             return null;
         }
         MacString? name = null;
@@ -292,7 +290,7 @@ public sealed partial class MainViewModel
         {
             if (!MacRoman.TryEncode(info.Name, out var bytes) || bytes.Length > 255)
             {
-                Status = "The name must be at most 255 Mac OS Roman characters.";
+                main.Status = "The name must be at most 255 Mac OS Roman characters.";
                 return null;
             }
             name = new MacString(bytes);
@@ -301,12 +299,12 @@ public sealed partial class MainViewModel
             existing is not null && (existing.Attributes & ResourceAttributes.Compressed) != 0);
         if (problems.FirstOrDefault(p => p.Severity == DiagnosticSeverity.Error) is { } error)
         {
-            Status = error.Message;
+            main.Status = error.Message;
             return null;
         }
         foreach (var warning in problems)
         {
-            if (EditDialogs is null || !await EditDialogs.ConfirmAsync("Resource ID", warning.Message + " Use it anyway?"))
+            if (main.EditDialogs is null || !await main.EditDialogs.ConfirmAsync("Resource ID", warning.Message + " Use it anyway?"))
             {
                 return null;
             }
@@ -315,27 +313,27 @@ public sealed partial class MainViewModel
         return (type, name);
     }
 
-    private bool CanEditResource() => !ExportActions.IsExporting && Selected is ResourceNode && FileOwner(Selected) is not null;
+    private bool CanEditResource() => !main.ExportActions.IsExporting && main.Selected is ResourceNode && FileOwner(main.Selected) is not null;
 
-    internal bool CanNewResource() => !ExportActions.IsExporting && FileOwner(Selected) is not null;
+    internal bool CanNewResource() => !main.ExportActions.IsExporting && FileOwner(main.Selected) is not null;
 
     [RelayCommand(CanExecute = nameof(CanNewResource))]
     private async Task NewResource()
     {
-        if (!await Drafts.ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (FileOwner(Selected) is not { } owner || EditDialogs is null)
+        if (FileOwner(main.Selected) is not { } owner || main.EditDialogs is null)
         {
             return;
         }
 
         var fork = StateFor(owner).Session.Fork;
-        var type = Selected switch { ResourceNode r => r.Resource.Type, ResourceTypeNode t => t.Type, _ => FourCC.FromString("STR ") };
+        var type = main.Selected switch { ResourceNode r => r.Resource.Type, ResourceTypeNode t => t.Type, _ => FourCC.FromString("STR ") };
         var initial = new ResourceInfo(type.ToString(), ResourceEditRules.NextFreeId(fork, type), "", ResourceAttributes.None);
-        if (await EditDialogs.ResourceInfoAsync("New Resource", initial, isNew: true, subject: null) is not { } info)
+        if (await main.EditDialogs.ResourceInfoAsync("New Resource", initial, isNew: true, subject: null) is not { } info)
         {
             return;
         }
@@ -352,12 +350,12 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanEditResource))]
     private async Task DuplicateResource()
     {
-        if (!await Drafts.ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (Selected is not ResourceNode node || FileOwner(node) is not { } owner)
+        if (main.Selected is not ResourceNode node || FileOwner(node) is not { } owner)
         {
             return;
         }
@@ -369,12 +367,12 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanEditResource))]
     private async Task DeleteResource()
     {
-        if (!await Drafts.ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (Selected is not ResourceNode node || FileOwner(node) is not { } owner)
+        if (main.Selected is not ResourceNode node || FileOwner(node) is not { } owner)
         {
             return;
         }
@@ -385,12 +383,12 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanEditResource))]
     private async Task GetInfo()
     {
-        if (!await Drafts.ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || EditDialogs is null)
+        if (main.Selected is not ResourceNode node || FileOwner(node) is not { } owner || main.EditDialogs is null)
         {
             return;
         }
@@ -400,7 +398,7 @@ public sealed partial class MainViewModel
         var header = InspectorHeader.For(node)!;
         var subject = new DialogSubject(header.Name, string.Create(CultureInfo.InvariantCulture, $"{header.Kind} · {resource.Length:N0} bytes"),
             await Task.Run(() => NodeViewModel.LargeIcon(node)));
-        if (await EditDialogs.ResourceInfoAsync($"Info for {resource}", initial, isNew: false, subject) is not { } info || info == initial)
+        if (await main.EditDialogs.ResourceInfoAsync($"Info for {resource}", initial, isNew: false, subject) is not { } info || info == initial)
         {
             return;
         }
@@ -416,17 +414,17 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanEditResource))]
     private async Task ReplaceData()
     {
-        if (!await Drafts.ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || FilePicker is null)
+        if (main.Selected is not ResourceNode node || FileOwner(node) is not { } owner || main.FilePicker is null)
         {
             return;
         }
 
-        if ((await FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
+        if ((await main.FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
         {
             return;
         }
@@ -444,11 +442,11 @@ public sealed partial class MainViewModel
     {
         if (IsHexEditing)
         {
-            SelectedTab = 2;
+            main.SelectedTab = 2;
             return;
         }
 
-        if (!await Drafts.ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }
@@ -476,32 +474,32 @@ public sealed partial class MainViewModel
             return;
         }
 
-        if (HexSource is not { } source || HexLines is not { } lines || offset < 0 || offset >= source.Data.Length)
+        if (main.HexSource is not { } source || main.HexLines is not { } lines || offset < 0 || offset >= source.Data.Length)
         {
             return;
         }
 
         // Reads what is around the byte; a meaning needs the whole resource (the hex view shows resources only).
-        var data = source.Data.Length <= ReadOptions.MaxResourceSize ? source.Data.ToArray() : null;
-        var meanings = data is not null && Selected is ResourceNode node ? TemplateFinder.MeaningsFor(node) : null;
+        var data = source.Data.Length <= main.ReadOptions.MaxResourceSize ? source.Data.ToArray() : null;
+        var meanings = data is not null && main.Selected is ResourceNode node ? main.TemplateFinder.MeaningsFor(node) : null;
         readInspection = data is not null
             ? HexInspection.At(data, (int)offset, meanings)
             : HexInspection.At(source.Data.Slice(offset, Math.Min(4, source.Data.Length - offset)).ToArray(), 0, null) with
             {
                 Heading = string.Create(CultureInfo.InvariantCulture, $"At 0x{offset:X4}"),
             };
-        HexFind.hexSelectedOffset = offset;
+        main.HexFind.hexSelectedOffset = offset;
         lines.Select(offset, readInspection.Meaning is { } field ? (field.Start, field.Length) : null);
         OnPropertyChanged(nameof(HexInspection));
     }
 
-    // The read-only selection goes with the lines it was made on.
-    partial void OnHexLinesChanged(HexLines? value)
+    // MainViewModel.HexLines changed: the read-only selection goes with the lines it was made on.
+    internal void HexLinesChanged()
     {
         readInspection = null;
-        HexFind.hexSelectedOffset = -1;
-        HexFind.FindStatus = null;
-        HexFind.FindFailed = false;
+        main.HexFind.hexSelectedOffset = -1;
+        main.HexFind.FindStatus = null;
+        main.HexFind.FindFailed = false;
         OnPropertyChanged(nameof(HexInspection));
     }
 
@@ -517,6 +515,7 @@ public sealed partial class MainViewModel
             newValue.PropertyChanged += OnHexEditorChanged;
         }
 
+        main.RaisePropertyChanged(nameof(MainViewModel.HasHex));
         OnPropertyChanged(nameof(HexInspection));
     }
 
@@ -551,7 +550,6 @@ public sealed partial class MainViewModel
     /// <summary>The bytes being edited in the hex view, or null.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsHexEditing))]
-    [NotifyPropertyChangedFor(nameof(HasHex))]
     [NotifyCanExecuteChangedFor(nameof(BeginHexEditCommand), nameof(SaveCommand))]
     private HexEditor? hexEdit;
 
@@ -562,17 +560,17 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanBeginHexEdit))]
     private void BeginHexEdit()
     {
-        if (Selected is not ResourceNode node || FileOwner(node) is not { } owner)
+        if (main.Selected is not ResourceNode node || FileOwner(node) is not { } owner)
         {
             return;
         }
 
         hexEditTarget = (node.Resource, owner);
-        HexEdit = new HexEditor(node.Resource.GetData(), TemplateFinder.MeaningsFor(node));
+        HexEdit = new HexEditor(node.Resource.GetData(), main.TemplateFinder.MeaningsFor(node));
         GoToError = null;
         HexEdit.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
-        HexLines = HexEdit.Lines;
-        SelectedTab = 2;
+        main.HexLines = HexEdit.Lines;
+        main.SelectedTab = 2;
     }
 
     private bool CanBeginHexEdit() => CanEditResource() && !IsHexEditing;
@@ -592,11 +590,11 @@ public sealed partial class MainViewModel
     internal void DiscardHexEdit()
     {
         TakeHexEdit();
-        HexLines = HexSource is null ? null : new HexLines(HexSource.Data);
+        main.HexLines = main.HexSource is null ? null : new HexLines(main.HexSource.Data);
     }
 
     // Ends hex editing; the edited bytes when they differ from the resource's.
-    private (Resource Resource, NodeViewModel Owner, byte[] Data)? TakeHexEdit()
+    internal (Resource Resource, NodeViewModel Owner, byte[] Data)? TakeHexEdit()
     {
         if (HexEdit is not { } editor || hexEditTarget is not { } target)
         {
@@ -606,15 +604,15 @@ public sealed partial class MainViewModel
         HexEdit = null;
         hexEditTarget = null;
         // A resource with a preview has no Hex tab once its bytes are not being edited: back to the preview.
-        if (SelectedTab == 2 && Hex.Sources.Count == 0)
+        if (main.SelectedTab == 2 && main.Hex.Sources.Count == 0)
         {
-            SelectedTab = Preview.HasPreview ? 1 : 0;
+            main.SelectedTab = main.Preview.HasPreview ? 1 : 0;
         }
 
         return editor.IsModified ? (target.Resource, target.Owner, editor.ToArray()) : null;
     }
 
-    private EditState? SelectedState => FileOwner(Selected) is { } owner ? EditingOf(owner) : null;
+    private EditState? SelectedState => FileOwner(main.Selected) is { } owner ? EditingOf(owner) : null;
 
     public string UndoTitle => SelectedState?.Session.NextUndo is { } edit ? $"_Undo {edit.Description}" : "_Undo";
 
@@ -627,36 +625,36 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanUndo))]
     private async Task Undo()
     {
-        if (!await Drafts.ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (SelectedState is { } state && FileOwner(Selected) is { } owner && state.Session.NextUndo is { } edit)
+        if (SelectedState is { } state && FileOwner(main.Selected) is { } owner && state.Session.NextUndo is { } edit)
         {
             state.Session.Undo();
-            Selected = owner;
-            Status = $"Undid {edit.Description}.";
+            main.Selected = owner;
+            main.Status = $"Undid {edit.Description}.";
         }
     }
 
     [RelayCommand(CanExecute = nameof(CanRedo))]
     private async Task Redo()
     {
-        if (!await Drafts.ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (SelectedState is { } state && FileOwner(Selected) is { } owner && state.Session.NextRedo is { } edit)
+        if (SelectedState is { } state && FileOwner(main.Selected) is { } owner && state.Session.NextRedo is { } edit)
         {
             state.Session.Redo();
-            Selected = owner;
-            Status = $"Redid {edit.Description}.";
+            main.Selected = owner;
+            main.Status = $"Redid {edit.Description}.";
         }
     }
 
-    private bool CanSave() => !ExportActions.IsExporting && (SelectedState is { Session.IsDirty: true, Location: not null } || FileOwner(Selected) is not null && Drafts.HasDraft);
+    private bool CanSave() => !main.ExportActions.IsExporting && (SelectedState is { Session.IsDirty: true, Location: not null } || FileOwner(main.Selected) is not null && main.Drafts.HasDraft);
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private Task Save() => SaveTask = SaveSelectedAsync();
@@ -664,12 +662,12 @@ public sealed partial class MainViewModel
     // Unapplied edits are applied (or discarded) first; cancelled, nothing is saved.
     private async Task SaveSelectedAsync()
     {
-        if (!await Drafts.ResolveDraftAsync())
+        if (!await main.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (FileOwner(Selected) is { } owner)
+        if (FileOwner(main.Selected) is { } owner)
         {
             await SaveAsync(owner);
         }
@@ -685,7 +683,7 @@ public sealed partial class MainViewModel
 
         if (state.Location is not { } location)
         {
-            Status = $"{owner.BaseTitle} is inside a disk image or archive; use Save As.";
+            main.Status = $"{owner.BaseTitle} is inside a disk image or archive; use Save As.";
             return false;
         }
         try
@@ -697,7 +695,7 @@ public sealed partial class MainViewModel
             }
             catch (FileChangedException e)
             {
-                if (EditDialogs is null || !await EditDialogs.ConfirmAsync("File changed", $"{e.FilePath} has changed on disk since it was opened. Overwrite it?"))
+                if (main.EditDialogs is null || !await main.EditDialogs.ConfirmAsync("File changed", $"{e.FilePath} has changed on disk since it was opened. Overwrite it?"))
                 {
                     return false;
                 }
@@ -707,19 +705,19 @@ public sealed partial class MainViewModel
             state.Location = saved;
             state.File = saved.File;
             state.Session.MarkSaved();
-            Status = $"Saved {owner.BaseTitle} ({saved.Target}); the original is kept as {Path.GetFileName(saved.Path)}.orig.";
+            main.Status = $"Saved {owner.BaseTitle} ({saved.Target}); the original is kept as {Path.GetFileName(saved.Path)}.orig.";
             return true;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
-            Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "save.failed", e.Message), owner.Source, owner));
-            Status = $"{owner.BaseTitle} was not saved: {e.Message}";
+            main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "save.failed", e.Message), owner.Source, owner));
+            main.Status = $"{owner.BaseTitle} was not saved: {e.Message}";
             return false;
         }
     }
 
     private bool CanSaveAs(SaveAsFormat format) =>
-        !ExportActions.IsExporting && (format == SaveAsFormat.HfsImage ? Selected?.Input.IsWritableHfs == true : FileOwner(Selected) is not null);
+        !main.ExportActions.IsExporting && (format == SaveAsFormat.HfsImage ? main.Selected?.Input.IsWritableHfs == true : FileOwner(main.Selected) is not null);
 
     [RelayCommand(CanExecute = nameof(CanSaveAs))]
     private async Task SaveAs(SaveAsFormat format)
@@ -729,7 +727,7 @@ public sealed partial class MainViewModel
             await SaveHfsImageAs();
             return;
         }
-        if (FileOwner(Selected) is not { } owner || FilePicker is null)
+        if (FileOwner(main.Selected) is not { } owner || main.FilePicker is null)
         {
             return;
         }
@@ -744,7 +742,7 @@ public sealed partial class MainViewModel
             _ => "",
         };
         var name = HostNames.ToHostName(state.File.Name, 200);
-        var path = await FilePicker.PickSaveFileAsync($"Save {owner.BaseTitle} As", name + extension, extension.Length > 0 ? [extension] : []);
+        var path = await main.FilePicker.PickSaveFileAsync($"Save {owner.BaseTitle} As", name + extension, extension.Length > 0 ? [extension] : []);
         if (path is null)
         {
             return;
@@ -754,12 +752,12 @@ public sealed partial class MainViewModel
         {
             var file = state.File;
             var written = await Task.Run(() => ForkSaver.SaveAs(path, format, file, state.Session.Fork, state.ForkInDataFork));
-            Status = $"Saved {owner.BaseTitle} as {string.Join(", ", written.Select(Path.GetFileName))}.";
+            main.Status = $"Saved {owner.BaseTitle} as {string.Join(", ", written.Select(Path.GetFileName))}.";
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
         {
-            Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "save.failed", e.Message), owner.Source, owner));
-            Status = $"{owner.BaseTitle} was not saved: {e.Message}";
+            main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "save.failed", e.Message), owner.Source, owner));
+            main.Status = $"{owner.BaseTitle} was not saved: {e.Message}";
         }
     }
 
@@ -767,12 +765,12 @@ public sealed partial class MainViewModel
     // edited fork in it (the selected file's always), written and verified; the image itself is not changed.
     private async Task SaveHfsImageAs()
     {
-        if (Selected?.Input is not { IsWritableHfs: true } input || FilePicker is null)
+        if (main.Selected?.Input is not { IsWritableHfs: true } input || main.FilePicker is null)
         {
             return;
         }
 
-        var selectedOwner = FileOwner(Selected);
+        var selectedOwner = FileOwner(main.Selected);
         if (selectedOwner is not null)
         {
             StateFor(selectedOwner);
@@ -783,7 +781,7 @@ public sealed partial class MainViewModel
             .Select(e => new HfsForkReplacement(e.State.File.MacPath, e.State.Session.Fork, e.State.ForkInDataFork))
             .ToList();
         var extension = Path.GetExtension(input.Path) is { Length: > 0 } imageExtension ? imageExtension : ".img";
-        var path = await FilePicker.PickSaveFileAsync($"Save {input.BaseTitle} As", Path.GetFileNameWithoutExtension(input.Path) + "-edited" + extension, [extension]);
+        var path = await main.FilePicker.PickSaveFileAsync($"Save {input.BaseTitle} As", Path.GetFileNameWithoutExtension(input.Path) + "-edited" + extension, [extension]);
         if (path is null)
         {
             return;
@@ -793,37 +791,37 @@ public sealed partial class MainViewModel
         {
             var volumeChanged = input.HasVolumeChanges;
             var written = await Task.Run(() => input.VolumeSession.SaveAs(path, forks));
-            Status = $"Saved HFS image {written[0]} ({forks.Count} fork{(forks.Count == 1 ? "" : "s")}{(volumeChanged ? ", files and folders" : "")} changed).";
+            main.Status = $"Saved HFS image {written[0]} ({forks.Count} fork{(forks.Count == 1 ? "" : "s")}{(volumeChanged ? ", files and folders" : "")} changed).";
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or InvalidDataException)
         {
-            Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "save.failed", e.Message), input.Source, input));
-            Status = $"{input.BaseTitle} was not saved: {e.Message}";
+            main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "save.failed", e.Message), input.Source, input));
+            main.Status = $"{input.BaseTitle} was not saved: {e.Message}";
         }
     }
 
-    private bool CanRevert() => SelectedState is { Session.IsDirty: true } || Selected?.Input.HasVolumeChanges == true;
+    private bool CanRevert() => SelectedState is { Session.IsDirty: true } || main.Selected?.Input.HasVolumeChanges == true;
 
     /// <summary>Revert: the input read again from disk, discarding its edits.</summary>
     [RelayCommand(CanExecute = nameof(CanRevert))]
     private async Task Revert()
     {
-        if (Selected?.Input is not { } input)
+        if (main.Selected?.Input is not { } input)
         {
             return;
         }
 
-        if (EditDialogs is not null && !await EditDialogs.ConfirmAsync("Revert", $"Discard the edits to {input.BaseTitle} and read it again from disk?"))
+        if (main.EditDialogs is not null && !await main.EditDialogs.ConfirmAsync("Revert", $"Discard the edits to {input.BaseTitle} and read it again from disk?"))
         {
             return;
         }
 
-        Drafts.DiscardDraft();
-        var index = Roots.IndexOf(input);
-        RemoveInput(input);
-        if (await OpenAsync(input.Path) is { } reopened && index >= 0 && index < Roots.Count - 1)
+        main.Drafts.DiscardDraft();
+        var index = main.Roots.IndexOf(input);
+        main.RemoveInput(input);
+        if (await main.OpenAsync(input.Path) is { } reopened && index >= 0 && index < main.Roots.Count - 1)
         {
-            Roots.Move(Roots.IndexOf(reopened), index);
+            main.Roots.Move(main.Roots.IndexOf(reopened), index);
         }
     }
 
@@ -835,14 +833,14 @@ public sealed partial class MainViewModel
     {
         inputs = inputs.ToList();
         // Unapplied edits in a closing file are applied or discarded first, then its saving is asked.
-        if (Selected?.Input is { } selectedInput && inputs.Contains(selectedInput) && !await Drafts.ResolveDraftAsync())
+        if (main.Selected?.Input is { } selectedInput && inputs.Contains(selectedInput) && !await main.Drafts.ResolveDraftAsync())
         {
             return false;
         }
 
         foreach (var input in inputs.Where(i => i.HasVolumeChanges))
         {
-            var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(input.BaseTitle, "Files and folders were created or deleted.");
+            var choice = main.EditDialogs is null ? SaveChanges.Discard : await main.EditDialogs.AskSaveChangesAsync(input.BaseTitle, "Files and folders were created or deleted.");
             if (choice == SaveChanges.Cancel)
             {
                 return false;
@@ -850,7 +848,7 @@ public sealed partial class MainViewModel
 
             if (choice == SaveChanges.Save)
             {
-                Status = $"The files and folders created or deleted in {input.BaseTitle} are saved with Save As ▸ HFS Volume Image.";
+                main.Status = $"The files and folders created or deleted in {input.BaseTitle} are saved with Save As ▸ HFS Volume Image.";
                 return false;
             }
         }
@@ -861,7 +859,7 @@ public sealed partial class MainViewModel
                 continue;
             }
 
-            var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(node.Input.BaseTitle,
+            var choice = main.EditDialogs is null ? SaveChanges.Discard : await main.EditDialogs.AskSaveChangesAsync(node.Input.BaseTitle,
                 EditedSummary(state.UnsavedCount, ReferenceEquals(node, node.Input) ? null : node.BaseTitle));
             if (choice == SaveChanges.Cancel)
             {
@@ -889,5 +887,5 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>Whether the app may quit: unsaved edits are saved or discarded first.</summary>
-    public Task<bool> ConfirmQuitAsync() => ConfirmCloseAsync(Roots.ToList());
+    public Task<bool> ConfirmQuitAsync() => ConfirmCloseAsync(main.Roots.ToList());
 }

@@ -970,25 +970,25 @@
         <MenuItem Header="_Open…" Command="{Binding OpenCommand}" InputGesture="Ctrl+O" HotKey="Ctrl+O" />
         <MenuItem Header="_Close" Command="{Binding CloseCommand}" InputGesture="Ctrl+W" HotKey="Ctrl+W" />
         <Separator />
-        <MenuItem Header="_Save" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" HotKey="Ctrl+S" />
+        <MenuItem Header="_Save" Command="{Binding EditActions.SaveCommand}" InputGesture="Ctrl+S" HotKey="Ctrl+S" />
         <MenuItem Header="Save _As">
-          <MenuItem Header="_MacBinary III…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.MacBinary}" />
-          <MenuItem Header="_BinHex 4.0…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.BinHex}" />
-          <MenuItem Header="Apple_Single…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.AppleSingle}" />
-          <MenuItem Header="Apple_Double Pair…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.AppleDoublePair}" />
-          <MenuItem Header="Basilisk _II Folder Entry…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.BasiliskEntry}" />
-          <MenuItem Header="_HFS Volume Image…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.HfsImage}" />
-          <MenuItem Header="_Resource Fork Only…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.RawFork}" />
+          <MenuItem Header="_MacBinary III…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.MacBinary}" />
+          <MenuItem Header="_BinHex 4.0…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.BinHex}" />
+          <MenuItem Header="Apple_Single…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.AppleSingle}" />
+          <MenuItem Header="Apple_Double Pair…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.AppleDoublePair}" />
+          <MenuItem Header="Basilisk _II Folder Entry…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.BasiliskEntry}" />
+          <MenuItem Header="_HFS Volume Image…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.HfsImage}" />
+          <MenuItem Header="_Resource Fork Only…" Command="{Binding EditActions.SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.RawFork}" />
         </MenuItem>
-        <MenuItem Header="_Revert" Command="{Binding RevertCommand}" />
+        <MenuItem Header="_Revert" Command="{Binding EditActions.RevertCommand}" />
         <Separator />
         <MenuItem Header="Show _Original" Command="{Binding AliasActions.ShowOriginalCommand}" InputGesture="Ctrl+R" HotKey="Ctrl+R" />
         <Separator />
         <MenuItem Header="_Quit" Click="OnQuit" />
       </MenuItem>
       <MenuItem Header="_Edit">
-        <MenuItem Header="{Binding UndoTitle}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" HotKey="Ctrl+Z" />
-        <MenuItem Header="{Binding RedoTitle}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" HotKey="Ctrl+Y" />
+        <MenuItem Header="{Binding EditActions.UndoTitle}" Command="{Binding EditActions.UndoCommand}" InputGesture="Ctrl+Z" HotKey="Ctrl+Z" />
+        <MenuItem Header="{Binding EditActions.RedoTitle}" Command="{Binding EditActions.RedoCommand}" InputGesture="Ctrl+Y" HotKey="Ctrl+Y" />
       </MenuItem>
       <MenuItem Header="_View">
         <MenuItem Header="Zoom _In" Command="{Binding ShellActions.ZoomInCommand}" InputGesture="Ctrl+OemPlus" HotKey="Ctrl+OemPlus" />
@@ -1015,13 +1015,13 @@
         </MenuItem>
       </MenuItem>
       <MenuItem Header="_Resource">
-        <MenuItem Header="_New Resource…" Command="{Binding NewResourceCommand}" InputGesture="Ctrl+K" HotKey="Ctrl+K" />
-        <MenuItem Header="_Duplicate" Command="{Binding DuplicateResourceCommand}" InputGesture="Ctrl+D" HotKey="Ctrl+D" />
-        <MenuItem Header="De_lete" Command="{Binding DeleteResourceCommand}" InputGesture="Delete" />
+        <MenuItem Header="_New Resource…" Command="{Binding EditActions.NewResourceCommand}" InputGesture="Ctrl+K" HotKey="Ctrl+K" />
+        <MenuItem Header="_Duplicate" Command="{Binding EditActions.DuplicateResourceCommand}" InputGesture="Ctrl+D" HotKey="Ctrl+D" />
+        <MenuItem Header="De_lete" Command="{Binding EditActions.DeleteResourceCommand}" InputGesture="Delete" />
         <Separator />
-        <MenuItem Header="Get _Info…" Command="{Binding GetInfoCommand}" InputGesture="Ctrl+I" HotKey="Ctrl+I" />
-        <MenuItem Header="Edit _Hex…" Command="{Binding EditHexCommand}" InputGesture="Ctrl+H" HotKey="Ctrl+H" />
-        <MenuItem Header="_Replace Data from File…" Command="{Binding ReplaceDataCommand}" />
+        <MenuItem Header="Get _Info…" Command="{Binding EditActions.GetInfoCommand}" InputGesture="Ctrl+I" HotKey="Ctrl+I" />
+        <MenuItem Header="Edit _Hex…" Command="{Binding EditActions.EditHexCommand}" InputGesture="Ctrl+H" HotKey="Ctrl+H" />
+        <MenuItem Header="_Replace Data from File…" Command="{Binding EditActions.ReplaceDataCommand}" />
         <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportActions.ImportCommand}" />
       </MenuItem>
       <MenuItem Header="_Volume">
@@ -1082,20 +1082,20 @@
               <TextBlock Text="Open" />
             </StackPanel>
           </Button>
-          <Button Classes="flat tool" Command="{Binding SaveCommand}" ToolTip.Tip="Save (Ctrl+S)" AutomationProperties.Name="Save">
+          <Button Classes="flat tool" Command="{Binding EditActions.SaveCommand}" ToolTip.Tip="Save (Ctrl+S)" AutomationProperties.Name="Save">
             <StackPanel>
               <Path Classes="tool-icon" Data="M9,2 V11 M5.5,7.5 L9,11 L12.5,7.5 M2,11 V15 H16 V11" />
               <TextBlock Text="Save" />
             </StackPanel>
           </Button>
           <Border Classes="tool-divider" />
-          <Button Classes="flat tool" Command="{Binding GetInfoCommand}" ToolTip.Tip="Get Info (Ctrl+I)" AutomationProperties.Name="Get Info">
+          <Button Classes="flat tool" Command="{Binding EditActions.GetInfoCommand}" ToolTip.Tip="Get Info (Ctrl+I)" AutomationProperties.Name="Get Info">
             <StackPanel>
               <Path Classes="tool-icon" Data="M9,1.75 A7.25,7.25 0 1 1 8.99,1.75 Z M9,8 V13 M9,5 V5.6" />
               <TextBlock Text="Get Info" />
             </StackPanel>
           </Button>
-          <Button Classes="flat tool" Command="{Binding EditHexCommand}" ToolTip.Tip="Edit Hex (Ctrl+H)" AutomationProperties.Name="Edit Hex">
+          <Button Classes="flat tool" Command="{Binding EditActions.EditHexCommand}" ToolTip.Tip="Edit Hex (Ctrl+H)" AutomationProperties.Name="Edit Hex">
             <StackPanel>
               <Path Classes="tool-icon" Data="M6,5 L2,9 L6,13 M12,5 L16,9 L12,13 M10.5,4 L7.5,14" />
               <TextBlock Text="Edit Hex" />
@@ -1189,7 +1189,7 @@
         <views:BrowseTree x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding TreeRows}" SelectedItem="{Binding Selected, Mode=OneWay}"
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.AllowAutoHide="False">
           <ListBox.KeyBindings>
-            <KeyBinding Gesture="Delete" Command="{Binding DeleteResourceCommand}" />
+            <KeyBinding Gesture="Delete" Command="{Binding EditActions.DeleteResourceCommand}" />
           </ListBox.KeyBindings>
           <ListBox.ItemTemplate>
             <DataTemplate DataType="vm:NodeViewModel">
@@ -1250,12 +1250,12 @@
           </ListBox.ItemTemplate>
           <ListBox.ContextMenu>
             <ContextMenu>
-              <MenuItem Header="_New Resource…" Command="{Binding NewResourceCommand}" InputGesture="Ctrl+K" />
-              <MenuItem Header="_Duplicate" Command="{Binding DuplicateResourceCommand}" InputGesture="Ctrl+D" />
-              <MenuItem Header="De_lete" Command="{Binding DeleteResourceCommand}" InputGesture="Delete" />
-              <MenuItem Header="Get _Info…" Command="{Binding GetInfoCommand}" InputGesture="Ctrl+I" />
-              <MenuItem Header="Edit _Hex…" Command="{Binding EditHexCommand}" InputGesture="Ctrl+H" />
-              <MenuItem Header="_Replace Data from File…" Command="{Binding ReplaceDataCommand}" />
+              <MenuItem Header="_New Resource…" Command="{Binding EditActions.NewResourceCommand}" InputGesture="Ctrl+K" />
+              <MenuItem Header="_Duplicate" Command="{Binding EditActions.DuplicateResourceCommand}" InputGesture="Ctrl+D" />
+              <MenuItem Header="De_lete" Command="{Binding EditActions.DeleteResourceCommand}" InputGesture="Delete" />
+              <MenuItem Header="Get _Info…" Command="{Binding EditActions.GetInfoCommand}" InputGesture="Ctrl+I" />
+              <MenuItem Header="Edit _Hex…" Command="{Binding EditActions.EditHexCommand}" InputGesture="Ctrl+H" />
+              <MenuItem Header="_Replace Data from File…" Command="{Binding EditActions.ReplaceDataCommand}" />
               <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportActions.ImportCommand}" />
               <Separator />
               <MenuItem Header="New _File…" Command="{Binding VolumeActions.NewFileCommand}" />
@@ -2815,19 +2815,19 @@
               <Border DockPanel.Dock="Top" Classes="hex-bar">
                 <DockPanel>
                   <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                    <TextBlock Text="{Binding GoToError}" Classes="error" VerticalAlignment="Center"
-                               IsVisible="{Binding GoToError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <TextBlock Text="{Binding EditActions.GoToError}" Classes="error" VerticalAlignment="Center"
+                               IsVisible="{Binding EditActions.GoToError, Converter={x:Static ObjectConverters.IsNotNull}}" />
                     <TextBlock Text="Go to" Classes="muted" VerticalAlignment="Center" />
-                    <TextBox x:Name="GoToBox" Classes="go-to" PlaceholderText="0x0000" Text="{Binding GoToText}" IsEnabled="{Binding IsHexEditing}"
+                    <TextBox x:Name="GoToBox" Classes="go-to" PlaceholderText="0x0000" Text="{Binding EditActions.GoToText}" IsEnabled="{Binding EditActions.IsHexEditing}"
                              AutomationProperties.Name="Go to offset">
                       <TextBox.KeyBindings>
-                        <KeyBinding Gesture="Enter" Command="{Binding GoToCommand}" />
+                        <KeyBinding Gesture="Enter" Command="{Binding EditActions.GoToCommand}" />
                       </TextBox.KeyBindings>
                     </TextBox>
                   </StackPanel>
                   <Panel HorizontalAlignment="Left">
-                    <Button Content="Edit Bytes" Command="{Binding BeginHexEditCommand}" IsVisible="{Binding !IsHexEditing}" />
-                    <Border Classes="editing-badge" IsVisible="{Binding IsHexEditing}" VerticalAlignment="Center">
+                    <Button Content="Edit Bytes" Command="{Binding EditActions.BeginHexEditCommand}" IsVisible="{Binding !EditActions.IsHexEditing}" />
+                    <Border Classes="editing-badge" IsVisible="{Binding EditActions.IsHexEditing}" VerticalAlignment="Center">
                       <TextBlock Text="Editing bytes" />
                     </Border>
                   </Panel>
@@ -2851,24 +2851,24 @@
                   <TextBlock x:Name="FindStatusText" Text="{Binding HexFind.FindStatus}" Classes="muted" Classes.error="{Binding HexFind.FindFailed}" VerticalAlignment="Center" />
                 </StackPanel>
               </Border>
-              <Border x:Name="HexFooter" DockPanel.Dock="Bottom" Classes="host-footer" IsVisible="{Binding IsHexEditing}">
+              <Border x:Name="HexFooter" DockPanel.Dock="Bottom" Classes="host-footer" IsVisible="{Binding EditActions.IsHexEditing}">
                 <DockPanel>
                   <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
-                    <Button Content="Discard" Command="{Binding DiscardHexEditCommand}" />
-                    <Button Classes="accent" Content="Apply" Command="{Binding ApplyHexEditCommand}" />
+                    <Button Content="Discard" Command="{Binding EditActions.DiscardHexEditCommand}" />
+                    <Button Classes="accent" Content="Apply" Command="{Binding EditActions.ApplyHexEditCommand}" />
                   </StackPanel>
                   <ListBox x:Name="HexMode" DockPanel.Dock="Left" Classes="segmented" ItemsSource="{x:Static vm:HexEditor.Modes}"
-                           SelectedIndex="{Binding HexEdit.ModeIndex, Mode=TwoWay, FallbackValue=0}" AutomationProperties.Name="Overwrite or insert" />
-                  <TextBlock Classes="hex-status" Text="{Binding HexEdit.Status, FallbackValue={x:Null}}" TextTrimming="CharacterEllipsis" />
+                           SelectedIndex="{Binding EditActions.HexEdit.ModeIndex, Mode=TwoWay, FallbackValue=0}" AutomationProperties.Name="Overwrite or insert" />
+                  <TextBlock Classes="hex-status" Text="{Binding EditActions.HexEdit.Status, FallbackValue={x:Null}}" TextTrimming="CharacterEllipsis" />
                 </DockPanel>
               </Border>
-              <Border x:Name="HexInspector" DockPanel.Dock="Right" Classes="hex-inspector" IsVisible="{Binding HexInspection, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <Border x:Name="HexInspector" DockPanel.Dock="Right" Classes="hex-inspector" IsVisible="{Binding EditActions.HexInspection, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <!-- Rows without spacing so the readings fit under the Find bar at 1200 × 780; "In this resource" scrolls. -->
                 <!-- 10 on the right: the overlay scroll bar never covers the text. -->
                 <ScrollViewer x:Name="HexInspectorScroll" HorizontalScrollBarVisibility="Disabled" Padding="0,0,10,0">
                 <StackPanel Spacing="4">
-                  <TextBlock Classes="caption" Text="{Binding HexInspection.Heading, FallbackValue={x:Null}}" />
-                  <ItemsControl ItemsSource="{Binding HexInspection.Rows, FallbackValue={x:Null}}">
+                  <TextBlock Classes="caption" Text="{Binding EditActions.HexInspection.Heading, FallbackValue={x:Null}}" />
+                  <ItemsControl ItemsSource="{Binding EditActions.HexInspection.Rows, FallbackValue={x:Null}}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate DataType="vm:HexReading">
                         <Grid ColumnDefinitions="72,*">
@@ -2879,17 +2879,17 @@
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
                   <StackPanel Spacing="4" Margin="0,12,0,0"
-                              IsVisible="{Binding HexInspection.Meaning, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}">
+                              IsVisible="{Binding EditActions.HexInspection.Meaning, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}">
                     <TextBlock Classes="caption" Text="IN THIS RESOURCE" />
-                    <TextBlock Text="{Binding HexInspection.Meaning.Text, FallbackValue={x:Null}}" TextWrapping="Wrap" />
-                    <TextBlock Classes="mono" Text="{Binding HexInspection.Meaning.Value, StringFormat='= {0}', FallbackValue={x:Null}}"
-                               IsVisible="{Binding HexInspection.Meaning.Value, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
+                    <TextBlock Text="{Binding EditActions.HexInspection.Meaning.Text, FallbackValue={x:Null}}" TextWrapping="Wrap" />
+                    <TextBlock Classes="mono" Text="{Binding EditActions.HexInspection.Meaning.Value, StringFormat='= {0}', FallbackValue={x:Null}}"
+                               IsVisible="{Binding EditActions.HexInspection.Meaning.Value, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
                   </StackPanel>
                 </StackPanel>
                 </ScrollViewer>
               </Border>
               <!-- As the read-then-edit host (E1): a 3 px CmAccent line over the values while editing. -->
-              <Border x:Name="HexEditLine" DockPanel.Dock="Top" Height="3" Background="{DynamicResource CmAccent}" IsVisible="{Binding IsHexEditing}" />
+              <Border x:Name="HexEditLine" DockPanel.Dock="Top" Height="3" Background="{DynamicResource CmAccent}" IsVisible="{Binding EditActions.IsHexEditing}" />
               <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Classes="hex-header">
                 <TextBlock Classes="hex-offset" Text="Offset" />
                 <ItemsControl ItemsSource="{x:Static vm:HexLines.HeaderCells}">

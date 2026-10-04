@@ -57,7 +57,7 @@ public sealed class DraftTests : EditTestsBase
         Assert.Equal("hi", Assert.IsType<StringForm>(model.Forms.Form).Text);
         Assert.False(model.Drafts.HasDraft);
         Assert.Equal("hello"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
-        Assert.False(model.HasUnsavedChanges);
+        Assert.False(model.EditActions.HasUnsavedChanges);
     }
 
     [Fact]
@@ -74,8 +74,8 @@ public sealed class DraftTests : EditTestsBase
         // The type's nodes were rebuilt by the edit: the clicked resource is selected in the new ones.
         Assert.Same(Resource(file, 129), model.Selected);
         Assert.Equal("hi", Assert.IsType<StringForm>(model.Forms.Form).Text);
-        Assert.Equal("_Undo Edit 'STR ' 128 \"greeting\"", model.UndoTitle);
-        Assert.True(model.HasUnsavedChanges);
+        Assert.Equal("_Undo Edit 'STR ' 128 \"greeting\"", model.EditActions.UndoTitle);
+        Assert.True(model.EditActions.HasUnsavedChanges);
 
         // Applied but unsaved: moving on does not ask.
         model.Selected = Resource(file, 128);
@@ -117,7 +117,7 @@ public sealed class DraftTests : EditTestsBase
         Assert.Equal("'STR ' 128", what);
         Assert.Contains("Mac OS Roman", error);
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
-        Assert.False(model.HasUnsavedChanges);
+        Assert.False(model.EditActions.HasUnsavedChanges);
 
         dialogs.Draft = DraftChoice.Discard;
         model.Selected = Resource(file, 129);
@@ -159,8 +159,8 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 129);
-        model.BeginHexEditCommand.Execute(null);
-        model.HexEdit!.Delete();
+        model.EditActions.BeginHexEditCommand.Execute(null);
+        model.EditActions.HexEdit!.Delete();
         Assert.True(model.Drafts.HasDraft);
 
         dialogs.Draft = DraftChoice.Cancel;
@@ -168,21 +168,21 @@ public sealed class DraftTests : EditTestsBase
         await model.DraftTask;
         Assert.Equal(("'STR ' 129", (string?)null), Assert.Single(dialogs.DraftAsked));
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
-        Assert.True(model.IsHexEditing);
+        Assert.True(model.EditActions.IsHexEditing);
 
         dialogs.Draft = DraftChoice.Discard;
         model.Selected = Resource(file, 128);
         await model.DraftTask;
-        Assert.False(model.IsHexEditing);
+        Assert.False(model.EditActions.IsHexEditing);
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
         Assert.Equal(3, Resource(file, 129).Resource.Length);
-        Assert.False(model.HasUnsavedChanges);
+        Assert.False(model.EditActions.HasUnsavedChanges);
 
         // Hex editing with no bytes changed is no draft.
-        model.BeginHexEditCommand.Execute(null);
+        model.EditActions.BeginHexEditCommand.Execute(null);
         model.Selected = Resource(file, 129);
         Assert.Equal(2, dialogs.DraftAsked.Count);
-        Assert.False(model.IsHexEditing);
+        Assert.False(model.EditActions.IsHexEditing);
     }
 
     [Fact]
@@ -259,14 +259,14 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 129);
-        model.DuplicateResourceCommand.Execute(null);                       // 'STR ' 130
+        model.EditActions.DuplicateResourceCommand.Execute(null);                       // 'STR ' 130
         model.Selected = Resource(file, 128);
         Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
 
         dialogs.Draft = DraftChoice.Cancel;
-        await model.UndoCommand.ExecuteAsync(null);
-        await model.DeleteResourceCommand.ExecuteAsync(null);
-        await model.DuplicateResourceCommand.ExecuteAsync(null);
+        await model.EditActions.UndoCommand.ExecuteAsync(null);
+        await model.EditActions.DeleteResourceCommand.ExecuteAsync(null);
+        await model.EditActions.DuplicateResourceCommand.ExecuteAsync(null);
         Assert.Equal(3, dialogs.DraftAsked.Count);
         Assert.NotNull(file.Resources!.Fork!.Find(Str, 130));               // nothing undone, deleted or duplicated
         Assert.NotNull(file.Resources.Fork.Find(Str, 128));
@@ -274,17 +274,17 @@ public sealed class DraftTests : EditTestsBase
         Assert.True(model.Drafts.HasDraft);
 
         dialogs.Draft = DraftChoice.Apply;
-        await model.UndoCommand.ExecuteAsync(null);                         // the draft applied, then undone
+        await model.EditActions.UndoCommand.ExecuteAsync(null);                         // the draft applied, then undone
         Assert.Equal("hello"u8.ToArray(), file.Resources.Fork.Find(Str, 128)!.GetData().ToArray());
         Assert.NotNull(file.Resources.Fork.Find(Str, 130));
-        Assert.Equal("_Redo Edit 'STR ' 128 \"greeting\"", model.RedoTitle);
+        Assert.Equal("_Redo Edit 'STR ' 128 \"greeting\"", model.EditActions.RedoTitle);
 
         model.Selected = Resource(file, 128);
         Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
         dialogs.Draft = DraftChoice.Discard;
-        await model.DeleteResourceCommand.ExecuteAsync(null);
+        await model.EditActions.DeleteResourceCommand.ExecuteAsync(null);
         Assert.Null(file.Resources.Fork.Find(Str, 128));
-        Assert.Equal("_Undo Delete 'STR ' 128", model.UndoTitle);
+        Assert.Equal("_Undo Delete 'STR ' 128", model.EditActions.UndoTitle);
     }
 
     [Fact]
@@ -314,13 +314,13 @@ public sealed class DraftTests : EditTestsBase
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
         Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
-        Assert.False(model.HasUnsavedChanges);
+        Assert.False(model.EditActions.HasUnsavedChanges);
         Assert.True(model.Drafts.HasDraft);
 
         dialogs.Draft = DraftChoice.Cancel;
-        Assert.False(await model.ConfirmQuitAsync());
+        Assert.False(await model.EditActions.ConfirmQuitAsync());
         dialogs.Draft = DraftChoice.Discard;
-        Assert.True(await model.ConfirmQuitAsync());
+        Assert.True(await model.EditActions.ConfirmQuitAsync());
         Assert.Equal(["draft 'STR ' 128", "draft 'STR ' 128"], dialogs.Log);  // discarded: nothing to save
     }
 
@@ -392,20 +392,20 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, path) = await Open();
         model.Selected = Resource(file, 128);
-        Assert.False(model.SaveCommand.CanExecute(null));
+        Assert.False(model.EditActions.SaveCommand.CanExecute(null));
         Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
-        Assert.True(model.SaveCommand.CanExecute(null));                    // a draft alone can be saved
+        Assert.True(model.EditActions.SaveCommand.CanExecute(null));                    // a draft alone can be saved
 
         dialogs.Draft = DraftChoice.Cancel;
-        await model.SaveCommand.ExecuteAsync(null);
+        await model.EditActions.SaveCommand.ExecuteAsync(null);
         Assert.False(File.Exists(path + ".orig"));                          // not saved
         Assert.True(model.Drafts.HasDraft);
 
         dialogs.Draft = DraftChoice.Apply;
-        await model.SaveCommand.ExecuteAsync(null);
+        await model.EditActions.SaveCommand.ExecuteAsync(null);
         Assert.Equal("edited"u8.ToArray(), Saved(path).Find(Str, 128)!.GetData().ToArray());
         Assert.False(model.Drafts.HasDraft);
-        Assert.False(model.HasUnsavedChanges);
+        Assert.False(model.EditActions.HasUnsavedChanges);
         Assert.Equal(2, dialogs.DraftAsked.Count);
     }
 
@@ -414,12 +414,12 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, path) = await Open();
         model.Selected = Resource(file, 129);
-        await model.DeleteResourceCommand.ExecuteAsync(null);
+        await model.EditActions.DeleteResourceCommand.ExecuteAsync(null);
         model.Selected = Resource(file, 128);
         Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
 
         dialogs.Draft = DraftChoice.Discard;
-        await model.SaveCommand.ExecuteAsync(null);
+        await model.EditActions.SaveCommand.ExecuteAsync(null);
         var saved = Saved(path);
         Assert.Null(saved.Find(Str, 129));
         Assert.Equal("hello"u8.ToArray(), saved.Find(Str, 128)!.GetData().ToArray());
@@ -449,22 +449,22 @@ public sealed class DraftTests : EditTestsBase
         var form = Assert.IsType<StringListForm>(model.Forms.Form);
         var edited = 0;
         form.Edited += (_, _) => edited++;
-        var changes = Watch(model.SaveCommand);
-        Assert.False(model.SaveCommand.CanExecute(null));
+        var changes = Watch(model.EditActions.SaveCommand);
+        Assert.False(model.EditActions.SaveCommand.CanExecute(null));
 
         form.Strings[0].Text = "b";                                         // an item's text
         Assert.Equal((1, 1), (edited, changes()));
-        Assert.True(model.SaveCommand.CanExecute(null));
+        Assert.True(model.EditActions.SaveCommand.CanExecute(null));
         form.Strings[0].Text = "a";
-        Assert.False(model.SaveCommand.CanExecute(null));
+        Assert.False(model.EditActions.SaveCommand.CanExecute(null));
 
         form.AddCommand.Execute(null);                                      // a new item, then its text
-        Assert.True(model.SaveCommand.CanExecute(null));
+        Assert.True(model.EditActions.SaveCommand.CanExecute(null));
         var before = changes();
         form.Strings[1].Text = "c";
         Assert.True(changes() > before);
         form.RemoveCommand.Execute(form.Strings[1]);
-        Assert.False(model.SaveCommand.CanExecute(null));
+        Assert.False(model.EditActions.SaveCommand.CanExecute(null));
     }
 
     [Fact]
@@ -482,19 +482,19 @@ public sealed class DraftTests : EditTestsBase
         await input.EnsureLoadedAsync();
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type == rsrc).Children[0];
         var form = Assert.IsType<TemplateForm>(model.Forms.Form);
-        var changes = Watch(model.SaveCommand);
+        var changes = Watch(model.EditActions.SaveCommand);
         var list = (TemplateListRow)form.Fields[2];
 
         ((TemplateScalarRow)list.Items[0].Fields[0]).Text = "$0003";         // a field inside a list item
         Assert.True(changes() > 0);
-        Assert.True(model.SaveCommand.CanExecute(null));
+        Assert.True(model.EditActions.SaveCommand.CanExecute(null));
         ((TemplateScalarRow)list.Items[0].Fields[0]).Text = "$0002";
-        Assert.False(model.SaveCommand.CanExecute(null));
+        Assert.False(model.EditActions.SaveCommand.CanExecute(null));
 
         var before = changes();
         list.AddCommand.Execute(null);                                      // a new item, then its field
         Assert.True(changes() > before);
-        Assert.True(model.SaveCommand.CanExecute(null));
+        Assert.True(model.EditActions.SaveCommand.CanExecute(null));
         before = changes();
         ((TemplateScalarRow)list.Items[1].Fields[0]).Text = "$0009";
         Assert.True(changes() > before);
@@ -505,12 +505,12 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, _, _, _) = await Open();
         model.Selected = Resource(file, 129);
-        model.BeginHexEditCommand.Execute(null);
-        var changes = Watch(model.SaveCommand);
-        Assert.False(model.SaveCommand.CanExecute(null));
-        model.HexEdit!.TypeDigit(4);
+        model.EditActions.BeginHexEditCommand.Execute(null);
+        var changes = Watch(model.EditActions.SaveCommand);
+        Assert.False(model.EditActions.SaveCommand.CanExecute(null));
+        model.EditActions.HexEdit!.TypeDigit(4);
         Assert.True(changes() > 0);
-        Assert.True(model.SaveCommand.CanExecute(null));
+        Assert.True(model.EditActions.SaveCommand.CanExecute(null));
         Assert.True(model.Drafts.HasDraft);
     }
 }

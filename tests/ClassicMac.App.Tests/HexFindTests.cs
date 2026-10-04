@@ -96,43 +96,43 @@ public sealed class HexFindTests : IDisposable
 
         model.HexFind.FindNextCommand.Execute(null);
 
-        Assert.Equal("At 0x0002", model.HexInspection!.Heading);
+        Assert.Equal("At 0x0002", model.EditActions.HexInspection!.Heading);
         Assert.Equal("1 of 2", model.HexFind.FindStatus);
         Assert.Equal([false, false, true, true, true, false], model.HexLines![0].Cells.Take(6).Select(c => c.IsMatch));
         Assert.Equal([0], scrolled);
         model.HexFind.FindNextCommand.Execute(null);
-        Assert.Equal(("At 0x0009", "2 of 2"), (model.HexInspection!.Heading, model.HexFind.FindStatus));
+        Assert.Equal(("At 0x0009", "2 of 2"), (model.EditActions.HexInspection!.Heading, model.HexFind.FindStatus));
         model.HexFind.FindNextCommand.Execute(null);                                 // wraps
-        Assert.Equal(("At 0x0002", "1 of 2"), (model.HexInspection!.Heading, model.HexFind.FindStatus));
+        Assert.Equal(("At 0x0002", "1 of 2"), (model.EditActions.HexInspection!.Heading, model.HexFind.FindStatus));
         model.HexFind.FindPreviousCommand.Execute(null);                             // wraps back
-        Assert.Equal("At 0x0009", model.HexInspection!.Heading);
+        Assert.Equal("At 0x0009", model.EditActions.HexInspection!.Heading);
 
         // Hex: the bytes of "HELLO".
         model.HexFind.FindMode = HexFindMode.Hex;
         model.HexFind.FindText = "48 45";
         model.HexFind.FindNextCommand.Execute(null);
-        Assert.Equal(("At 0x000E", "1 of 1"), (model.HexInspection!.Heading, model.HexFind.FindStatus));
+        Assert.Equal(("At 0x000E", "1 of 1"), (model.EditActions.HexInspection!.Heading, model.HexFind.FindStatus));
     }
 
     [Fact]
     public async Task Find_moves_the_cursor_while_editing()
     {
         var (model, _) = await Open([0, 1, 2, 3, 2, 3]);
-        await model.EditHexCommand.ExecuteAsync(null);
+        await model.EditActions.EditHexCommand.ExecuteAsync(null);
         model.HexFind.FindMode = HexFindMode.Hex;
         model.HexFind.FindText = "02 03";
         model.HexFind.FindNextCommand.Execute(null);
-        Assert.Equal(2, model.HexEdit!.Cursor);
-        Assert.True(model.HexEdit.Lines[0].Cells[3].IsMatch);
+        Assert.Equal(2, model.EditActions.HexEdit!.Cursor);
+        Assert.True(model.EditActions.HexEdit.Lines[0].Cells[3].IsMatch);
         model.HexFind.FindNextCommand.Execute(null);
-        Assert.Equal(4, model.HexEdit.Cursor);
+        Assert.Equal(4, model.EditActions.HexEdit.Cursor);
 
         // The edited bytes are searched: 02 03 at 2 overwritten, one left.
-        model.HexEdit.MoveTo(2);
-        model.HexEdit.TypeDigit(0);
-        model.HexEdit.TypeDigit(0);
+        model.EditActions.HexEdit.MoveTo(2);
+        model.EditActions.HexEdit.TypeDigit(0);
+        model.EditActions.HexEdit.TypeDigit(0);
         model.HexFind.FindPreviousCommand.Execute(null);
-        Assert.Equal((4, "1 of 1"), (model.HexEdit.Cursor, model.HexFind.FindStatus));
+        Assert.Equal((4, "1 of 1"), (model.EditActions.HexEdit.Cursor, model.HexFind.FindStatus));
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public sealed class HexFindTests : IDisposable
         model.HexFind.FindText = "09";
         model.HexFind.FindNextCommand.Execute(null);
         Assert.Equal("Not found", model.HexFind.FindStatus);
-        Assert.Null(model.HexInspection);
+        Assert.Null(model.EditActions.HexInspection);
         model.HexFind.FindText = "zz";
         model.HexFind.FindNextCommand.Execute(null);
         Assert.Equal("Not hex: z", model.HexFind.FindStatus);

@@ -210,7 +210,7 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
         parent.Items!.Remove(item);
         Tree.Relayout(parent);
         main.Selected = parent;
-        main.NotifyEditCommands();
+        main.EditActions.NotifyEditCommands();
         main.Status = $"Deleted {name}; Save As ▸ HFS Volume Image writes the change.";
     }
 
@@ -263,7 +263,7 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
             return false;
         }
         input.Title = input.BaseTitle + " •";
-        main.NotifyEditCommands();
+        main.EditActions.NotifyEditCommands();
         return true;
     }
 

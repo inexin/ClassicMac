@@ -46,7 +46,7 @@ public sealed class HexViewTests
             Assert.False(window.FindControl<Border>("HexEditLine")!.IsEffectivelyVisible);
             Assert.Contains("zero", Cell(window, 4).Classes);
 
-            Pump(model.EditHexCommand.ExecuteAsync(null));
+            Pump(model.EditActions.EditHexCommand.ExecuteAsync(null));
             Dispatcher.UIThread.RunJobs();
             Assert.True(window.FindControl<Border>("HexInspector")!.IsEffectivelyVisible);
             Assert.True(window.FindControl<Border>("HexFooter")!.IsEffectivelyVisible);
@@ -74,15 +74,15 @@ public sealed class HexViewTests
             window.MouseDown(at, MouseButton.Left);
             window.MouseUp(at, MouseButton.Left);
             Dispatcher.UIThread.RunJobs();
-            Assert.Equal(3, model.HexEdit!.Cursor);
-            model.GoToText = "0x5";
-            model.GoToCommand.Execute(null);
-            Assert.Equal(5, model.HexEdit.Cursor);
+            Assert.Equal(3, model.EditActions.HexEdit!.Cursor);
+            model.EditActions.GoToText = "0x5";
+            model.EditActions.GoToCommand.Execute(null);
+            Assert.Equal(5, model.EditActions.HexEdit.Cursor);
 
             // The footer's switch is the editor's mode.
             var mode = window.FindControl<ListBox>("HexMode")!;
             mode.SelectedIndex = 1;
-            Assert.True(model.HexEdit.InsertMode);
+            Assert.True(model.EditActions.HexEdit.InsertMode);
             Assert.Contains(window.FindControl<Border>("HexFooter")!.GetVisualDescendants().OfType<TextBlock>(),
                 t => t.Text?.StartsWith("0x0005 = 255 · 1 byte changed", StringComparison.Ordinal) == true);
             window.Close();
@@ -234,7 +234,7 @@ public sealed class HexViewTests
             Pump(open.Result!.EnsureLoadedAsync());
             model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single().Children[0];
             Pump(model.PreviewTask);
-            model.BeginHexEditCommand.Execute(null);
+            model.EditActions.BeginHexEditCommand.Execute(null);
             model.SelectedTab = 2;
             Dispatcher.UIThread.RunJobs();
             window.CaptureRenderedFrame();

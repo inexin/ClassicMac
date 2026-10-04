@@ -73,7 +73,7 @@ public sealed partial class ShellActions(MainViewModel main) : ObservableObject
     public string? TitleFile => main.Selected?.Input.BaseTitle;
 
     /// <summary>Whether the selected input has unsaved edits (the title's " •").</summary>
-    public bool TitleUnsaved => main.Selected?.Input is { } input && (input.HasVolumeChanges || MainViewModel.EditedFiles(input).Any(e => e.State.Session.IsDirty));
+    public bool TitleUnsaved => main.Selected?.Input is { } input && (input.HasVolumeChanges || EditActions.EditedFiles(input).Any(e => e.State.Session.IsDirty));
 
     /// <summary>The window's title: "Mac OS 9.hfv • — ClassicMac".</summary>
     public string WindowTitle => TitleFile is { } file ? $"{file}{(TitleUnsaved ? " •" : "")} — ClassicMac" : "ClassicMac";

@@ -218,7 +218,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
     {
         if (DataContext is MainViewModel model && (e.Source as StyledElement)?.DataContext is HexCell cell)
         {
-            model.SelectHexByte(cell.Offset);
+            model.EditActions.SelectHexByte(cell.Offset);
             HexList.Focus();
         }
     }
@@ -226,7 +226,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
     // Keys of the hex view go to the byte editor while it is on; the cursor's line is kept in view.
     private void OnHexKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MainViewModel { HexEdit: { } editor } || !editor.OnKey(e.Key, e.KeyModifiers))
+        if (DataContext is not MainViewModel { EditActions.HexEdit: { } editor } || !editor.OnKey(e.Key, e.KeyModifiers))
         {
             return;
         }
@@ -320,13 +320,13 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
     // discarded, and saved or discarded.
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (quitting || DataContext is not MainViewModel model || !model.Drafts.HasDraft && !model.HasUnsavedChanges)
+        if (quitting || DataContext is not MainViewModel model || !model.Drafts.HasDraft && !model.EditActions.HasUnsavedChanges)
         {
             return;
         }
 
         e.Cancel = true;
-        if (!await model.ConfirmQuitAsync())
+        if (!await model.EditActions.ConfirmQuitAsync())
         {
             return;
         }

@@ -161,7 +161,7 @@ public sealed partial class HexFind(MainViewModel main) : ObservableObject
 
         byte[] data;
         long position;
-        if (main.HexEdit is { } editor)
+        if (main.EditActions.HexEdit is { } editor)
         {
             data = editor.ToArray();
             position = editor.Cursor;
@@ -185,14 +185,14 @@ public sealed partial class HexFind(MainViewModel main) : ObservableObject
             return;
         }
 
-        if (main.HexEdit is { } editing)
+        if (main.EditActions.HexEdit is { } editing)
         {
             editing.MoveTo(found);
             editing.Lines.ShowMatch(found, pattern.Length);
         }
         else
         {
-            main.SelectHexByte(found);
+            main.EditActions.SelectHexByte(found);
             main.HexLines?.ShowMatch(found, pattern.Length);
         }
 

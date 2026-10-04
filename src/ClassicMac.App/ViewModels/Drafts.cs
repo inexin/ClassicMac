@@ -30,7 +30,7 @@ public sealed class Drafts(MainViewModel main)
     {
         get
         {
-            if (main.HexEdit is { IsModified: true } && main.hexEditTarget is { } target)
+            if (main.EditActions.HexEdit is { IsModified: true } && main.EditActions.hexEditTarget is { } target)
             {
                 return (Name(target.Resource), null);
             }
@@ -79,9 +79,9 @@ public sealed class Drafts(MainViewModel main)
         switch (choice)
         {
             case DraftChoice.Apply when draft.Error is null:
-                if (main.HexEdit is { IsModified: true })
+                if (main.EditActions.HexEdit is { IsModified: true })
                 {
-                    main.ApplyHexEdit();
+                    main.EditActions.ApplyHexEdit();
                 }
                 else
                 {
@@ -100,9 +100,9 @@ public sealed class Drafts(MainViewModel main)
     // Drops unapplied edits: the hex view's bytes, the form's values read again from the resource.
     internal void DiscardDraft()
     {
-        if (main.HexEdit is { IsModified: true })
+        if (main.EditActions.HexEdit is { IsModified: true })
         {
-            main.DiscardHexEdit();
+            main.EditActions.DiscardHexEdit();
         }
         else if (main.Forms.Form is { Draft.IsDraft: true })
         {

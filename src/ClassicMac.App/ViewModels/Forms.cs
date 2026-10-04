@@ -26,7 +26,7 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
     partial void OnFormChanged(ResourceForm? value)
     {
         main.FormEditing.EditFormCommand.NotifyCanExecuteChanged();
-        main.SaveCommand.NotifyCanExecuteChanged();
+        main.EditActions.SaveCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(HasForm));
         main.FormEditing.HostForm(value);
     }
@@ -34,7 +34,7 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
     internal void UpdateForm(NodeViewModel? node)
     {
         ResourceForm? typed = null, template = null;
-        if (node is ResourceNode r && MainViewModel.FileOwner(r) is { } owner)
+        if (node is ResourceNode r && EditActions.FileOwner(r) is { } owner)
         {
             typed = ResourceForm.For(r.Resource, r.Fork, main.ReadOptions);
             template = main.TemplateFinder.TemplateFormFor(r, owner);
@@ -45,7 +45,7 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
         // A draft can be saved (Save applies it first): Save's state follows the form's values.
         if (form is not null)
         {
-            form.Edited += (_, _) => main.SaveCommand.NotifyCanExecuteChanged();
+            form.Edited += (_, _) => main.EditActions.SaveCommand.NotifyCanExecuteChanged();
         }
 
         Form = form;
@@ -106,7 +106,7 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
     [RelayCommand(CanExecute = nameof(CanApplyForm))]
     internal void ApplyForm()
     {
-        if (Form is not { } form || main.Selected is not ResourceNode node || MainViewModel.FileOwner(node) is not { } owner)
+        if (Form is not { } form || main.Selected is not ResourceNode node || EditActions.FileOwner(node) is not { } owner)
         {
             return;
         }
@@ -114,7 +114,7 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
         IResourceEdit edit;
         try
         {
-            edit = form.BuildEdit(main.StateFor(owner).Session.Fork);
+            edit = form.BuildEdit(main.EditActions.StateFor(owner).Session.Fork);
         }
         catch (ArgumentException e)
         {
@@ -124,8 +124,8 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
         var resource = form.Resource;
         // Applied: no longer a draft, so the selection the edit moves to is not refused.
         form.MarkClean();
-        main.Execute(owner, edit, () => resource);
+        main.EditActions.Execute(owner, edit, () => resource);
         main.FormEditing.IsEditingForm = false;
-        main.FormEditing.LastApplied = $"Applied · {main.UndoTitle.Replace("_", "", StringComparison.Ordinal)} (Ctrl+Z)";
+        main.FormEditing.LastApplied = $"Applied · {main.EditActions.UndoTitle.Replace("_", "", StringComparison.Ordinal)} (Ctrl+Z)";
     }
 }

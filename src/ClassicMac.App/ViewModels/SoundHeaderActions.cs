@@ -22,7 +22,7 @@ public sealed partial class SoundHeaderActions(MainViewModel main) : ObservableO
 
     private bool CanSaveAsWav() => !main.ExportActions.IsExporting && IsSoundResource;
 
-    private bool CanReplaceFromWav() => CanSaveAsWav() && MainViewModel.FileOwner(main.Selected) is not null;
+    private bool CanReplaceFromWav() => CanSaveAsWav() && EditActions.FileOwner(main.Selected) is not null;
 
     /// <summary>Save as WAV…: the sound decoded as <c>extract</c> writes it.</summary>
     [RelayCommand(CanExecute = nameof(CanSaveAsWav))]
@@ -65,7 +65,7 @@ public sealed partial class SoundHeaderActions(MainViewModel main) : ObservableO
             return;
         }
 
-        if (main.Selected is not ResourceNode node || MainViewModel.FileOwner(node) is not { } owner || main.FilePicker is null)
+        if (main.Selected is not ResourceNode node || EditActions.FileOwner(node) is not { } owner || main.FilePicker is null)
         {
             return;
         }
@@ -88,7 +88,7 @@ public sealed partial class SoundHeaderActions(MainViewModel main) : ObservableO
         }
 
         var resource = node.Resource;
-        main.Execute(owner, new SetResourceData(resource, data, $"Replace from {fileName}"), () => resource);
+        main.EditActions.Execute(owner, new SetResourceData(resource, data, $"Replace from {fileName}"), () => resource);
     }
 
     internal void OnSelectionChangedForSoundHeader()

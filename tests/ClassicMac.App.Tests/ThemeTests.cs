@@ -433,7 +433,7 @@ public class ThemeTests
             }
             model.Selected = Resource("ZZZZ");
             Pump(model.PreviewTask);
-            model.BeginHexEditCommand.Execute(null);   // the cursor shows while editing
+            model.EditActions.BeginHexEditCommand.Execute(null);   // the cursor shows while editing
             Dispatcher.UIThread.RunJobs();
             var cursor = window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("hex-cell") && b.Classes.Contains("cursor"));
             var cursorText = cursor.GetVisualDescendants().OfType<TextBlock>().Single();

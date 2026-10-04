@@ -51,38 +51,38 @@ public sealed class EditTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 129);
-        Assert.True(model.BeginHexEditCommand.CanExecute(null));
-        model.BeginHexEditCommand.Execute(null);
-        Assert.False(model.BeginHexEditCommand.CanExecute(null));
-        Assert.True(model.IsHexEditing);
-        Assert.Same(model.HexEdit!.Lines, model.HexLines);
+        Assert.True(model.EditActions.BeginHexEditCommand.CanExecute(null));
+        model.EditActions.BeginHexEditCommand.Execute(null);
+        Assert.False(model.EditActions.BeginHexEditCommand.CanExecute(null));
+        Assert.True(model.EditActions.IsHexEditing);
+        Assert.Same(model.EditActions.HexEdit!.Lines, model.HexLines);
 
-        model.HexEdit.MoveTo(1);
-        model.HexEdit.TypeDigit(4);
-        model.HexEdit.TypeDigit(1);                                           // 'A'
-        model.ApplyHexEditCommand.Execute(null);
-        Assert.False(model.IsHexEditing);
+        model.EditActions.HexEdit.MoveTo(1);
+        model.EditActions.HexEdit.TypeDigit(4);
+        model.EditActions.HexEdit.TypeDigit(1);                                           // 'A'
+        model.EditActions.ApplyHexEditCommand.Execute(null);
+        Assert.False(model.EditActions.IsHexEditing);
         Assert.Equal("Ai"u8.ToArray(), Resource(file, 129).Resource.GetData().ToArray());
-        Assert.Equal("_Undo Edit 'STR ' 129", model.UndoTitle);
+        Assert.Equal("_Undo Edit 'STR ' 129", model.EditActions.UndoTitle);
 
         // Clicking another resource asks; Apply applies the edit, then selects it.
         dialogs.Draft = DraftChoice.Apply;
         model.Selected = Resource(file, 129);
-        model.BeginHexEditCommand.Execute(null);
-        model.HexEdit!.Delete();
+        model.EditActions.BeginHexEditCommand.Execute(null);
+        model.EditActions.HexEdit!.Delete();
         model.Selected = Resource(file, 128);
-        Assert.False(model.IsHexEditing);
+        Assert.False(model.EditActions.IsHexEditing);
         Assert.Equal(2, Resource(file, 129).Resource.Length);
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
 
         // Discard leaves the resource alone.
-        model.BeginHexEditCommand.Execute(null);
-        model.HexEdit!.Delete();
-        model.DiscardHexEditCommand.Execute(null);
-        Assert.False(model.IsHexEditing);
+        model.EditActions.BeginHexEditCommand.Execute(null);
+        model.EditActions.HexEdit!.Delete();
+        model.EditActions.DiscardHexEditCommand.Execute(null);
+        Assert.False(model.EditActions.IsHexEditing);
         Assert.Equal(6, Resource(file, 128).Resource.Length);
-        model.UndoCommand.Execute(null);
-        model.UndoCommand.Execute(null);
+        model.EditActions.UndoCommand.Execute(null);
+        model.EditActions.UndoCommand.Execute(null);
         Assert.Equal(3, Resource(file, 129).Resource.Length);
     }
 
@@ -91,27 +91,27 @@ public sealed class EditTests : EditTestsBase
     {
         var (model, file, dialogs, _, path) = await Open();
         model.Selected = Resource(file, 128);
-        Assert.True(model.DuplicateResourceCommand.CanExecute(null));
-        Assert.False(model.SaveCommand.CanExecute(null));
+        Assert.True(model.EditActions.DuplicateResourceCommand.CanExecute(null));
+        Assert.False(model.EditActions.SaveCommand.CanExecute(null));
 
-        model.DuplicateResourceCommand.Execute(null);
+        model.EditActions.DuplicateResourceCommand.Execute(null);
         Assert.Equal(130, ((ResourceNode)model.Selected!).Resource.Id);
         Assert.Equal("Prefs •", file.Title);
-        Assert.Equal("_Undo Duplicate 'STR ' 128", model.UndoTitle);
+        Assert.Equal("_Undo Duplicate 'STR ' 128", model.EditActions.UndoTitle);
 
         dialogs.Info = i => i with { Id = 200, Name = "renamed" };
-        await model.GetInfoCommand.ExecuteAsync(null);
+        await model.EditActions.GetInfoCommand.ExecuteAsync(null);
         Assert.Equal((200, "renamed"), ((int)((ResourceNode)model.Selected!).Resource.Id, ((ResourceNode)model.Selected).Resource.Name!.Value.ToMacRoman()));
 
         await EditBytes(model, [1, 2, 3]);
-        model.UndoCommand.Execute(null);
-        model.UndoCommand.Execute(null);
-        model.RedoCommand.Execute(null);                       // back to the renamed copy with its old data
+        model.EditActions.UndoCommand.Execute(null);
+        model.EditActions.UndoCommand.Execute(null);
+        model.EditActions.RedoCommand.Execute(null);                       // back to the renamed copy with its old data
 
         model.Selected = Resource(file, 129);
-        model.DeleteResourceCommand.Execute(null);
+        model.EditActions.DeleteResourceCommand.Execute(null);
 
-        await model.SaveCommand.ExecuteAsync(null);
+        await model.EditActions.SaveCommand.ExecuteAsync(null);
         Assert.Equal("Prefs", file.Title);
         Assert.True(File.Exists(path + ".orig"));
         var saved = Saved(path);
@@ -136,26 +136,26 @@ public sealed class EditTests : EditTestsBase
 
         // A new resource is unsaved; a rename marks the resource too.
         model.Selected = Resource(file, 128);
-        model.DuplicateResourceCommand.Execute(null);
+        model.EditActions.DuplicateResourceCommand.Execute(null);
         Assert.True(Resource(file, 130).IsUnsaved);
         model.Selected = Resource(file, 128);
         dialogs.Info = i => i with { Name = "renamed" };
-        await model.GetInfoCommand.ExecuteAsync(null);
+        await model.EditActions.GetInfoCommand.ExecuteAsync(null);
         Assert.True(Resource(file, 128).IsUnsaved);
 
         // Undo back to the saved resource clears its mark; the others keep theirs.
-        model.UndoCommand.Execute(null);
+        model.EditActions.UndoCommand.Execute(null);
         Assert.False(Resource(file, 128).IsUnsaved);
         Assert.True(Resource(file, 129).IsUnsaved);
 
-        await model.SaveCommand.ExecuteAsync(null);
+        await model.EditActions.SaveCommand.ExecuteAsync(null);
         Assert.False(file.IsUnsaved);
         Assert.All(file.Children.OfType<ResourceTypeNode>().Single().Children, r => Assert.False(r.IsUnsaved));
 
         // After a save, the saved file is what edits compare with: undoing past it marks the resource again.
-        model.UndoCommand.Execute(null);
+        model.EditActions.UndoCommand.Execute(null);
         Assert.Null(file.Children.OfType<ResourceTypeNode>().Single().Children.OfType<ResourceNode>().FirstOrDefault(r => r.Resource.Id == 130));
-        model.UndoCommand.Execute(null);
+        model.EditActions.UndoCommand.Execute(null);
         Assert.True(Resource(file, 129).IsUnsaved);
     }
 
@@ -165,12 +165,12 @@ public sealed class EditTests : EditTestsBase
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
         dialogs.Info = i => i with { Id = 129 };
-        await model.GetInfoCommand.ExecuteAsync(null);
+        await model.EditActions.GetInfoCommand.ExecuteAsync(null);
         Assert.Equal("The file already has a 'STR ' 129.", model.Status);
         Assert.Equal("Prefs", file.Title);
 
         dialogs.Info = i => i with { Type = "TEXT", Name = "notes" };
-        await model.NewResourceCommand.ExecuteAsync(null);
+        await model.EditActions.NewResourceCommand.ExecuteAsync(null);
         var added = (ResourceNode)model.Selected!;
         Assert.Equal(("TEXT", 130, 0), (added.Resource.Type.ToString(), (int)added.Resource.Id, added.Resource.Length));
     }
@@ -201,11 +201,11 @@ public sealed class EditTests : EditTestsBase
         await model.ImportActions.ImportCommand.ExecuteAsync(null);
         var fork = file.Editing!.Session.Fork;
         Assert.All(new[] { "ICN#", "icl4", "icl8", "ics#", "ics4", "ics8" }, t => Assert.NotNull(fork.Find(FourCC.FromString(t), 200)));
-        Assert.Equal("_Undo Import art.png", model.UndoTitle);
+        Assert.Equal("_Undo Import art.png", model.EditActions.UndoTitle);
         dialogs.Confirm = false;
         await model.ImportActions.ImportCommand.ExecuteAsync(null);
-        Assert.Equal("_Undo Import art.png", model.UndoTitle);                          // declined: nothing done
-        model.UndoCommand.Execute(null);
+        Assert.Equal("_Undo Import art.png", model.EditActions.UndoTitle);                          // declined: nothing done
+        model.EditActions.UndoCommand.Execute(null);
         Assert.Null(fork.Find(FourCC.FromString("icl8"), 200));
 
         // A WAV file becomes a 'snd '; a file that is not one is refused.
@@ -266,9 +266,9 @@ public sealed class EditTests : EditTestsBase
         File.WriteAllBytes(picker.Open, Wav(10, 20, 30, 40, 50));
         await model.SoundHeaderActions.ReplaceFromWavCommand.ExecuteAsync(null);
         Assert.Equal(new byte[] { 10, 20, 30, 40, 50 }, snd.GetData()[^5..].ToArray());
-        Assert.Equal("_Undo Replace from tone.wav", model.UndoTitle);
+        Assert.Equal("_Undo Replace from tone.wav", model.EditActions.UndoTitle);
         Assert.Same(snd, ((ResourceNode)model.Selected!).Resource);
-        model.UndoCommand.Execute(null);
+        model.EditActions.UndoCommand.Execute(null);
         Assert.Equal(before, snd.GetData().ToArray());
 
         model.Selected = file.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "snd ").Children[0];  // undo selects the file
@@ -328,7 +328,7 @@ public sealed class EditTests : EditTestsBase
         ((TemplateScalarRow)edited.Fields[0]).Text = "70000";
         model.Forms.ApplyFormCommand.Execute(null);
         Assert.Contains("does not fit", model.Status);
-        model.UndoCommand.Execute(null);
+        model.EditActions.UndoCommand.Execute(null);
         Assert.Equal(8, Node().Resource.Length);
     }
 
@@ -360,8 +360,8 @@ public sealed class EditTests : EditTestsBase
     {
         var (model, file, dialogs, _, path) = await Open();
         model.Selected = Resource(file, 129);
-        model.DeleteResourceCommand.Execute(null);
-        Assert.True(model.HasUnsavedChanges);
+        model.EditActions.DeleteResourceCommand.Execute(null);
+        Assert.True(model.EditActions.HasUnsavedChanges);
 
         dialogs.Choice = SaveChanges.Cancel;
         await model.CloseCommand.ExecuteAsync(null);
@@ -383,19 +383,19 @@ public sealed class EditTests : EditTestsBase
     [InlineData(0, "Finder", "Resources in Finder were edited.")]
     [InlineData(0, null, "Resources were edited.")]
     public void The_save_question_counts_the_edited_resources(int count, string? file, string expected) =>
-        Assert.Equal(expected, MainViewModel.EditedSummary(count, file));
+        Assert.Equal(expected, EditActions.EditedSummary(count, file));
 
     [Fact]
     public async Task The_save_question_counts_new_changed_and_deleted_resources()
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
-        model.DuplicateResourceCommand.Execute(null);                  // new (130)
+        model.EditActions.DuplicateResourceCommand.Execute(null);                  // new (130)
         model.Selected = Resource(file, 129);
-        model.DeleteResourceCommand.Execute(null);                     // deleted
+        model.EditActions.DeleteResourceCommand.Execute(null);                     // deleted
         dialogs.Info = i => i with { Name = "renamed" };
         model.Selected = Resource(file, 128);
-        await model.GetInfoCommand.ExecuteAsync(null);                 // changed
+        await model.EditActions.GetInfoCommand.ExecuteAsync(null);                 // changed
         Assert.Equal(3, file.Editing!.UnsavedCount);
         dialogs.Choice = SaveChanges.Cancel;
         await model.CloseCommand.ExecuteAsync(null);
@@ -408,12 +408,12 @@ public sealed class EditTests : EditTestsBase
         var (model, file, dialogs, _, _) = await Open();
         var node = Resource(file, 128);
         model.Selected = node;
-        await model.GetInfoCommand.ExecuteAsync(null);
+        await model.EditActions.GetInfoCommand.ExecuteAsync(null);
         var subject = Assert.Single(dialogs.Subjects)!;
         Assert.Equal((InspectorHeader.For(node)!.Name, "String in Prefs · 6 bytes"), (subject.Name, subject.Line));
         Assert.Equal(NodeViewModel.LargeIcon(node), subject.IconPng);
 
-        await model.NewResourceCommand.ExecuteAsync(null);
+        await model.EditActions.NewResourceCommand.ExecuteAsync(null);
         Assert.Null(dialogs.Subjects[1]);
     }
 
@@ -460,15 +460,15 @@ public sealed class EditTests : EditTestsBase
     {
         var (model, file, _, _, path) = await Open();
         model.Selected = Resource(file, 129);
-        model.DeleteResourceCommand.Execute(null);
-        await model.SaveAsCommand.ExecuteAsync(SaveAsFormat.BinHex);
+        model.EditActions.DeleteResourceCommand.Execute(null);
+        await model.EditActions.SaveAsCommand.ExecuteAsync(SaveAsFormat.BinHex);
         var hqx = Path.Combine(folder, "Prefs.hqx");
         var copy = BinHexReader.Instance.Read(ForkData.FromFile(hqx), new ContainerContext())[0];
         Assert.Single(ResourceFork.Read(copy.ResourceFork.ToArray()).Resources);
         Assert.Equal([7], copy.DataFork.ToArray());
 
         model.Selected = file;
-        await model.RevertCommand.ExecuteAsync(null);
+        await model.EditActions.RevertCommand.ExecuteAsync(null);
         var reopened = model.Roots.Single().Children.OfType<FileNode>().Single();
         await reopened.EnsureLoadedAsync();
         Assert.Equal(2, reopened.Resources!.Fork!.Resources.Count);
@@ -497,7 +497,7 @@ public sealed class EditTests : EditTestsBase
         model.Selected = Resource(fileNode, 128);
         await EditBytes(model, [3, (byte)'b', (byte)'y', (byte)'e']);
 
-        await model.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        await model.EditActions.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
 
         var savedPath = Path.Combine(folder, "Volume-edited.hfs");
         Assert.True(File.Exists(savedPath), model.Status);
@@ -554,7 +554,7 @@ public sealed class EditTests : EditTestsBase
         var docs = Assert.IsType<FolderNode>(model.Selected);
         Assert.Equal("Docs", docs.Title);
         Assert.Contains(docs, input.Children);
-        Assert.True(model.HasUnsavedChanges);
+        Assert.True(model.EditActions.HasUnsavedChanges);
         Assert.EndsWith("•", input.Title);
 
         dialogs.NewFile = c => c with { Name = "Notes", Type = "TEXT", Creator = "ttxt" };
@@ -587,7 +587,7 @@ public sealed class EditTests : EditTestsBase
         Assert.DoesNotContain(input.Children, n => n.Title == "Other");
 
         Assert.Equal(original, File.ReadAllBytes(path));                 // nothing written until Save As
-        await model.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        await model.EditActions.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
         var saved = HfsReader.Instance.Read(ForkData.FromFile(Path.Combine(folder, "Volume-edited.hfs")), new ContainerContext());
         Assert.Equal(["Docs:Notes", "Folder:Prefs", "Imported"], saved.Select(f => f.MacPath).Order(StringComparer.Ordinal));
         var savedImport = saved.Single(f => f.MacPath == "Imported");
@@ -608,7 +608,7 @@ public sealed class EditTests : EditTestsBase
         model.Selected = folderNode;
         await model.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
         Assert.Contains(folderNode, input.Children);
-        Assert.False(model.HasUnsavedChanges);
+        Assert.False(model.EditActions.HasUnsavedChanges);
 
         dialogs.Confirm = true;
         await model.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
@@ -620,9 +620,9 @@ public sealed class EditTests : EditTestsBase
         await model.VolumeActions.NewFileCommand.ExecuteAsync(null);
         var fresh = Assert.IsType<FileNode>(model.Selected);
         dialogs.Info = i => i with { Type = "STR ", Id = 300 };
-        await model.NewResourceCommand.ExecuteAsync(null);
+        await model.EditActions.NewResourceCommand.ExecuteAsync(null);
         model.Selected = input;
-        await model.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        await model.EditActions.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
         var saved = HfsReader.Instance.Read(ForkData.FromFile(Path.Combine(folder, "Volume-edited.hfs")), new ContainerContext());
         Assert.Equal(["Fresh", "Other"], saved.Select(f => f.MacPath).Order(StringComparer.Ordinal));
         Assert.NotNull(ResourceFork.Read(saved.Single(f => f.MacPath == "Fresh").ResourceFork.ToArray()).Find(Str, 300));
@@ -656,11 +656,11 @@ public sealed class EditTests : EditTestsBase
         model.Selected = disk.Children.Single(n => n.Title == "Read Me");
         dialogs.Confirm = true;
         await model.VolumeActions.DeleteItemCommand.ExecuteAsync(null);
-        Assert.True(model.HasUnsavedChanges);
+        Assert.True(model.EditActions.HasUnsavedChanges);
         Assert.Equal(original, File.ReadAllBytes(path));                 // nothing written until Save As
 
         model.Selected = input;
-        await model.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        await model.EditActions.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
         var saved = Path.Combine(folder, Path.GetFileNameWithoutExtension(path) + "-edited" + Path.GetExtension(path));
         var session = ClassicMac.Files.Editing.InputEditSession.Open(saved);
         Assert.Equal(ClassicMac.Files.Editing.InputEditKind.HfsVolume, session.Kind);
@@ -678,12 +678,12 @@ public sealed class EditTests : EditTestsBase
         dialogs.FolderName = "Bad:Name";
         await model.VolumeActions.NewFolderCommand.ExecuteAsync(null);
         Assert.Contains("Could not", model.Status);
-        Assert.False(model.HasUnsavedChanges);
+        Assert.False(model.EditActions.HasUnsavedChanges);
 
         dialogs.FolderName = "Folder";                                     // already there
         await model.VolumeActions.NewFolderCommand.ExecuteAsync(null);
         Assert.Contains("Could not", model.Status);
-        Assert.False(model.HasUnsavedChanges);
+        Assert.False(model.EditActions.HasUnsavedChanges);
 
         dialogs.NewFile = c => c with { Type = "TOOLONG" };
         await model.VolumeActions.NewFileCommand.ExecuteAsync(null);
@@ -695,7 +695,7 @@ public sealed class EditTests : EditTestsBase
         Assert.False(other.VolumeActions.NewFileCommand.CanExecute(null));
         Assert.False(other.VolumeActions.NewFolderCommand.CanExecute(null));
         Assert.False(other.VolumeActions.DeleteItemCommand.CanExecute(null));
-        Assert.False(other.SaveAsCommand.CanExecute(SaveAsFormat.HfsImage));
+        Assert.False(other.EditActions.SaveAsCommand.CanExecute(SaveAsFormat.HfsImage));
     }
 
     [Fact]
@@ -715,10 +715,10 @@ public sealed class EditTests : EditTestsBase
         model.Forms.ApplyFormCommand.Execute(null);
         Assert.Contains("Mac OS Roman", model.Status);
 
-        model.UndoCommand.Execute(null);
+        model.EditActions.UndoCommand.Execute(null);
         model.Selected = Resource(file, 128);
         Assert.Equal("hello", Assert.IsType<StringForm>(model.Forms.Form).Text);
-        Assert.False(model.HasUnsavedChanges);
+        Assert.False(model.EditActions.HasUnsavedChanges);
         await Task.CompletedTask;
         _ = path;
     }

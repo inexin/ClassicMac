@@ -437,7 +437,7 @@ public sealed class TemplateFinder(MainViewModel main)
 
         var type = node.Resource.Type;
         var id = node.Resource.Id;
-        var template = type.ToString() is "STR " or "STR#" or "CODE" ? null : FindTemplate(type, node.Fork, MainViewModel.FileOwner(node))?.Template;
+        var template = type.ToString() is "STR " or "STR#" or "CODE" ? null : FindTemplate(type, node.Fork, EditActions.FileOwner(node))?.Template;
         return (data, offset) => ClassicMac.Resources.Decoders.Templates.ByteMeanings.MeaningAt(type, id, data, offset, template);
     }
 

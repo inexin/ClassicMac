@@ -68,6 +68,11 @@ public interface IFilePicker
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    private EditActions? editActions;
+
+    /// <summary>Editing: new, duplicate, delete, Get Info, replace and hex editing, undo and redo, save and revert.</summary>
+    public EditActions EditActions => editActions ??= new(this);
+
     private Forms? forms;
 
     /// <summary>The selection's form: the typed or template editor, Apply, and the template switch.</summary>
@@ -311,6 +316,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     public IFilePicker? FilePicker { get; set; }
 
+    public IEditDialogs? EditDialogs { get; set; }
+
     public ContainerReadOptions ContainerOptions { get; init; } = ContainerReadOptions.Default;
 
     public ReadOptions ReadOptions { get; init; } = ReadOptions.Default;
@@ -357,7 +364,7 @@ public sealed partial class MainViewModel : ObservableObject
             }
 
             OnSelectedChanged(value);
-            OnSelectedChanged(old, value);
+            EditActions.OnSelectedChanged(old, value);
         }
     }
 
@@ -409,13 +416,15 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>
     /// Whether the Hex tab shows: for a resource with no preview (an unknown type), or while bytes are edited there.
     /// </summary>
-    public bool HasHex => Hex.Sources.Count > 0 || IsHexEditing;
+    public bool HasHex => Hex.Sources.Count > 0 || EditActions.IsHexEditing;
 
     [ObservableProperty]
     private HexSource? hexSource;
 
     [ObservableProperty]
     private HexLines? hexLines;
+
+    partial void OnHexLinesChanged(HexLines? value) => EditActions.HexLinesChanged();
 
     /// <summary>The tab shown: 0 details, 1 preview, 2 hex.</summary>
     [ObservableProperty]
@@ -508,7 +517,7 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        if (!await ConfirmCloseAsync([input]))
+        if (!await EditActions.ConfirmCloseAsync([input]))
         {
             return;
         }
@@ -516,7 +525,7 @@ public sealed partial class MainViewModel : ObservableObject
         RemoveInput(input);
     }
 
-    private void RemoveInput(InputNode input)
+    internal void RemoveInput(InputNode input)
     {
         Roots.Remove(input);
         DiagnosticsPanel.RemoveAll(d => d.Node?.Input == input || d.Source == input.BaseTitle && d.Node is null);
@@ -530,7 +539,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void OnSelectedChanged(NodeViewModel? value)
     {
-        TakeHexEdit();                       // unchanged bytes (changed ones were applied or discarded before the move)
+        EditActions.TakeHexEdit();                       // unchanged bytes (changed ones were applied or discarded before the move)
         AliasActions.SelectedAlias = Aliases.Of(value, Roots);
         Details = DetailsViewModel.For(value, DetailsActions.ProblemsIn(value), AliasActions.SelectedAlias);
         InspectorActions.OnSelectionChangedForInspector();
