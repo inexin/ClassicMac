@@ -41,6 +41,9 @@
       <Color x:Key="CmLoopRegionColor">#E5EAFB</Color>
       <Color x:Key="CmPlayheadColor">#B42318</Color>
       <Color x:Key="CmTokenOnSelectionColor">#5871CE</Color>
+      <Color x:Key="CmSuccessColor">#2F7D3A</Color>
+      <Color x:Key="CmSuccessTintColor">#E5F3E7</Color>
+      <Color x:Key="CmMapPartialColor">#A9B6E6</Color>
       <Color x:Key="SystemAccentColor">#2E4EC2</Color>
     </ResourceDictionary>
     <ResourceDictionary x:Key="Dark">
@@ -78,6 +81,9 @@
       <Color x:Key="CmLoopRegionColor">#263058</Color>
       <Color x:Key="CmPlayheadColor">#FF8A7A</Color>
       <Color x:Key="CmTokenOnSelectionColor">#5C6795</Color>
+      <Color x:Key="CmSuccessColor">#7FD18B</Color>
+      <Color x:Key="CmSuccessTintColor">#183020</Color>
+      <Color x:Key="CmMapPartialColor">#4A5687</Color>
       <Color x:Key="SystemAccentColor">#8FA3FF</Color>
     </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>
@@ -119,6 +125,9 @@
   <SolidColorBrush x:Key="CmPlayhead" Color="{DynamicResource CmPlayheadColor}" />
   <!-- A whitespace token inside the selected tree row: CmSelection under a 20% white tint. -->
   <SolidColorBrush x:Key="CmTokenOnSelection" Color="{DynamicResource CmTokenOnSelectionColor}" />
+  <SolidColorBrush x:Key="CmSuccess" Color="{DynamicResource CmSuccessColor}" />
+  <SolidColorBrush x:Key="CmSuccessTint" Color="{DynamicResource CmSuccessTintColor}" />
+  <SolidColorBrush x:Key="CmMapPartial" Color="{DynamicResource CmMapPartialColor}" />
 
   <x:Double x:Key="CmSpace1">4</x:Double>
   <x:Double x:Key="CmSpace2">8</x:Double>

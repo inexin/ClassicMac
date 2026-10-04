@@ -62,6 +62,9 @@ public class ThemeTests
         { "CmLoopRegion", 0xE5EAFB, 0x263058 },
         { "CmPlayhead", 0xB42318, 0xFF8A7A },
         { "CmTokenOnSelection", 0x5871CE, 0x5C6795 },                  // CmSelection under a 20% white tint
+        { "CmSuccess", 0x2F7D3A, 0x7FD18B },
+        { "CmSuccessTint", 0xE5F3E7, 0x183020 },
+        { "CmMapPartial", 0xA9B6E6, 0x4A5687 },
     };
 
     private static Color Rgb(uint rgb) => Color.FromUInt32(0xFF000000 | rgb);

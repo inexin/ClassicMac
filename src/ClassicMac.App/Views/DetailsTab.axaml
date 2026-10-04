@@ -14,9 +14,44 @@
         <Border Classes="detail-card" Margin="7">
           <DockPanel>
             <Border DockPanel.Dock="Top" Classes="detail-card-header">
-              <TextBlock Classes="caption" Text="{Binding Caption}" />
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="12" IsVisible="{Binding HasVolume}">
+                  <Button Classes="link" Padding="0" Content="Defragment…" FontSize="{DynamicResource CmFontSizeMeta}"
+                          IsVisible="{Binding Volume.CanDefragment, FallbackValue=False}"
+                          Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).VolumeActions.DefragmentCommand, FallbackValue={x:Null}}" />
+                  <Button Classes="link" Padding="0" Content="First Aid…" FontSize="{DynamicResource CmFontSizeMeta}"
+                          Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).VolumeActions.FirstAidCommand, FallbackValue={x:Null}}" />
+                </StackPanel>
+                <TextBlock Classes="caption" Text="{Binding Caption}" VerticalAlignment="Center" />
+              </DockPanel>
             </Border>
             <StackPanel Classes="detail-rows">
+              <StackPanel Spacing="6" IsVisible="{Binding HasVolume}">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock TextTrimming="CharacterEllipsis">
+                    <Run FontWeight="{DynamicResource CmFontWeightStrong}" Text="{Binding Volume.Size, FallbackValue={x:Null}}" />
+                    <Run Text=" " /><Run Text="{Binding Volume.Kind, FallbackValue={x:Null}}" />
+                  </TextBlock>
+                  <TextBlock Grid.Column="1" Classes="mono muted" Margin="8,0,0,0" FontSize="{DynamicResource CmFontSizeMeta}"
+                             Text="{Binding Volume.FreeText, FallbackValue={x:Null}}" VerticalAlignment="Center" />
+                </Grid>
+                <controls:ShareBar Classes="volume-bar" Value="{Binding Volume.UsedShare, FallbackValue=0}"
+                                   AutomationProperties.Name="{Binding Volume.UsedLabel, FallbackValue={x:Null}}" />
+                <StackPanel Spacing="6" IsVisible="{Binding HasMap}" Margin="0,6,0,0">
+                  <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Classes="muted" Text="Where the free space lies" VerticalAlignment="Top" />
+                    <TextBlock Classes="mono muted" Margin="8,1,0,0" FontSize="{DynamicResource CmFontSizeMeta}" TextAlignment="Right" TextWrapping="Wrap"
+                               Text="{Binding Volume.RunsText, FallbackValue={x:Null}}" />
+                  </DockPanel>
+                  <controls:AllocationMap x:Name="AllocationMap" Classes="volume-map" Layout="{Binding Volume.Layout, FallbackValue={x:Null}}" />
+                  <WrapPanel Classes="map-legend">
+                    <StackPanel Orientation="Horizontal"><Border Classes="swatch used" /><TextBlock Text="Used" /></StackPanel>
+                    <StackPanel Orientation="Horizontal"><Border Classes="swatch split" /><TextBlock Text="Split file" /></StackPanel>
+                    <StackPanel Orientation="Horizontal"><Border Classes="swatch partial" /><TextBlock Text="Partly free" /></StackPanel>
+                    <StackPanel Orientation="Horizontal"><Border Classes="swatch free" /><TextBlock Text="Free" /></StackPanel>
+                  </WrapPanel>
+                </StackPanel>
+              </StackPanel>
               <ItemsControl Classes="flags" ItemsSource="{Binding Flags}" IsVisible="{Binding HasFlags}">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
@@ -63,13 +98,13 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
               </DockPanel>
-              <ItemsControl ItemsSource="{Binding Rows}">
+              <ItemsControl ItemsSource="{Binding Rows}" Classes.volume="{Binding HasVolume}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate DataType="vm:DetailRow">
-                    <Grid ColumnDefinitions="110,*" Margin="0,2">
-                      <TextBlock Text="{Binding Label}" Classes="muted" />
+                    <Grid ColumnDefinitions="Auto,*" Margin="0,2">
+                      <TextBlock Text="{Binding Label}" Classes="muted row-label" />
                       <StackPanel Grid.Column="1" Spacing="4">
-                        <SelectableTextBlock Text="{Binding Value}" TextWrapping="Wrap" Classes.mono="{Binding Mono}" IsVisible="{Binding !Link}" />
+                        <SelectableTextBlock Text="{Binding Value}" TextWrapping="Wrap" Classes.mono="{Binding Mono}" Classes.muted="{Binding Muted}" IsVisible="{Binding !Link}" />
                         <Button Classes="link in" Padding="0" FontSize="{DynamicResource CmFontSizeBody}" HorizontalAlignment="Left" Content="{Binding Value}" IsVisible="{Binding Link}"
                                 Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).DetailsActions.GoToInCommand, FallbackValue={x:Null}}"
                                 ToolTip.Tip="Select it in the tree" />

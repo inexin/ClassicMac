@@ -13,10 +13,26 @@ namespace ClassicMac.App.ViewModels;
 /// <summary>One line of the details panel: mono for codes, paths, sizes and dates; a fork's bar (0–1) relative to the larger fork.</summary>
 public sealed record DetailRow(string Label, string Value, bool Mono = false, double? Bar = null)
 {
+    /// <summary>Whether the value is an absence ("Never"), shown muted.</summary>
+    public bool Muted { get; init; }
+
     /// <summary>Whether the value is a link (the File card's "In", to the folder holding the file).</summary>
     public bool Link { get; init; }
 
     public bool HasBar => Bar is not null;
+}
+
+/// <summary>
+/// The Volume card's head (design/boards/volume-tools.md §6): the size, format and block size, and free space over a used
+/// bar; for an HFS volume, its allocation map and the free runs in words.
+/// </summary>
+public sealed record VolumeCard(string Size, string Kind, string FreeText, double UsedShare, VolumeLayout? Layout, string? RunsText)
+{
+    /// <summary>The used bar's accessible name ("99.8% used").</summary>
+    public string UsedLabel => (UsedShare * 100).ToString("0.0", CultureInfo.InvariantCulture) + "% used";
+
+    /// <summary>Whether Defragment has something to gain: a file in pieces, or the free space in more than one run.</summary>
+    public bool CanDefragment => Layout?.CanDefragment == true;
 }
 
 /// <summary>A Finder flag as a chip: set ones filled, unset ones dashed and muted.</summary>
@@ -31,6 +47,13 @@ public sealed record DetailGroup(string Title, IReadOnlyList<DetailRow> Rows, bo
     public IReadOnlyList<FinderFlagChip> Flags { get; init; } = [];
 
     public IReadOnlyList<ReadStep> Chain { get; init; } = [];
+
+    /// <summary>The Volume card's used bar and allocation map, or null.</summary>
+    public VolumeCard? Volume { get; init; }
+
+    public bool HasVolume => Volume is not null;
+
+    public bool HasMap => Volume?.Layout is not null;
 
     /// <summary>A note under the rows (the dates' time zone), or null.</summary>
     public string? Note { get; init; }
@@ -371,36 +394,48 @@ public sealed class DetailsViewModel
     }
 
     /// <summary>
-    /// The Volume card: the volume's format, its block size, size and free space, its files and folders, an HFS
-    /// volume's fragmentation (hfs.md §5.7), and its dates — creation as stored (local time on every Mac volume), the
-    /// others in local time on HFS and MFS and in UTC, shown in local time, on HFS Plus; MFS has no modification date.
+    /// The Volume card (design/boards/volume-tools.md §6): its used bar's line (size, format and block size, free space)
+    /// and, for an HFS volume, its allocation map's line; rows for the size, free space, files and folders, split files
+    /// and the dates — creation as stored (local time on every Mac volume), the others in local time on HFS and MFS and
+    /// in UTC, shown in local time, on HFS Plus; MFS has no modification date.
     /// </summary>
     public static DetailGroup VolumeGroup(VolumeInfo volume, VolumeLayout? layout = null)
     {
         ArgumentNullException.ThrowIfNull(volume);
         var utc = volume.UtcAfterCreation;
-        var rows = new List<DetailRow> { new("Format", $"{volume.Format} volume") };
+        static string N(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
+        static string Plural(long count, string one, string many) => count == 1 ? one : many;
+        var rows = new List<DetailRow>();
+        VolumeCard? card = null;
         if (volume.BlockSize > 0)
         {
-            static string N(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
-            rows.Add(new("Block size", $"{N(volume.BlockSize)} bytes", Mono: true));
-            rows.Add(new("Size", $"{N(volume.TotalBytes)} bytes in {N(volume.TotalBlocks)} blocks", Mono: true));
-            rows.Add(new("Free", $"{N(volume.FreeBytes)} bytes in {N(volume.FreeBlocks)} blocks", Mono: true));
+            card = new VolumeCard(
+                ShortSize(volume.TotalBytes),
+                $"{volume.Format} volume · {N(volume.BlockSize)}-byte blocks",
+                $"{ShortSize(volume.FreeBytes)} free",
+                volume.TotalBlocks == 0 ? 0 : (double)(volume.TotalBlocks - volume.FreeBlocks) / volume.TotalBlocks,
+                layout,
+                layout is { } map
+                    ? $"{N(map.FreeRuns.Count)} {Plural(map.FreeRuns.Count, "run", "runs")} · largest {N(map.LargestFreeRun)} {Plural(map.LargestFreeRun, "block", "blocks")}"
+                    : null);
+            rows.Add(new("Size", $"{N(volume.TotalBytes)} bytes · {N(volume.TotalBlocks)} {Plural(volume.TotalBlocks, "block", "blocks")}", Mono: true));
+            rows.Add(new("Free", $"{N(volume.FreeBytes)} bytes · {N(volume.FreeBlocks)} {Plural(volume.FreeBlocks, "block", "blocks")}", Mono: true));
+        }
+        else
+        {
+            rows.Add(new("Format", $"{volume.Format} volume"));
         }
 
         if (volume.Files is { } files)
         {
-            rows.Add(volume.Folders is { } folders
-                ? new("Files / folders", string.Create(CultureInfo.InvariantCulture, $"{files:N0} / {folders:N0}"), Mono: true)
-                : new("Files", files.ToString("N0", CultureInfo.InvariantCulture), Mono: true));
+            rows.Add(new(volume.Folders is null ? "Files" : "Files, folders",
+                $"{N(files)} {Plural(files, "file", "files")}" + (volume.Folders is { } folders ? $" · {N(folders)} {Plural(folders, "folder", "folders")}" : "")));
         }
 
         if (layout is { } pieces)
         {
-            rows.Add(new("Fragmented files", string.Create(CultureInfo.InvariantCulture,
-                $"{pieces.SplitFiles:N0} of {pieces.Files:N0}{(pieces.SplitFiles > 0 ? $" (at most {pieces.MostExtents:N0} extents)" : "")}"), Mono: true));
-            rows.Add(new("Free space", string.Create(CultureInfo.InvariantCulture,
-                $"{pieces.FreeRuns.Count:N0} {(pieces.FreeRuns.Count == 1 ? "run" : "runs")}, the largest {pieces.LargestFreeRun:N0} blocks"), Mono: true));
+            rows.Add(new("Split files", pieces.SplitFiles == 0 ? "None"
+                : $"{N(pieces.SplitFiles)} of {N(pieces.Files)} · up to {N(pieces.MostExtents)} pieces"));
         }
 
         rows.Add(new("Created", DisplayDate(volume.Created, utc: false), Mono: true));
@@ -409,12 +444,22 @@ public sealed class DetailsViewModel
             rows.Add(new("Modified", DisplayDate(volume.Modified, utc), Mono: true));
         }
 
-        rows.Add(volume.BackedUp is { } backup ? new("Backed up", DisplayDate(backup, utc), Mono: true) : new("Backed up", "never"));
+        rows.Add(volume.BackedUp is { } backup ? new("Backed up", DisplayDate(backup, utc), Mono: true) : new("Backed up", "Never") { Muted = true });
         return new("Volume", rows)
         {
+            Volume = card,
             Note = utc ? "Created in Mac local time, as stored; the others stored in UTC, shown in your time zone." : LocalNote,
         };
     }
+
+    // A size as the used bar's line gives it: whole KB below a megabyte, one decimal MB or GB above.
+    internal static string ShortSize(long bytes) => bytes switch
+    {
+        < 1024 => string.Create(CultureInfo.InvariantCulture, $"{bytes} bytes"),
+        < 1024 * 1024 => string.Create(CultureInfo.InvariantCulture, $"{bytes / 1024.0:0} KB"),
+        < 1024L * 1024 * 1024 => string.Create(CultureInfo.InvariantCulture, $"{bytes / (1024.0 * 1024):0.0} MB"),
+        _ => string.Create(CultureInfo.InvariantCulture, $"{bytes / (1024.0 * 1024 * 1024):0.0} GB"),
+    };
 
     /// <summary>A date as <c>yyyy-MM-dd HH:mm:ss</c>: as stored, or, when it is stored in UTC, in this computer's time zone; "—" for none.</summary>
     public static string DisplayDate(MacDate? date, bool utc)

@@ -626,6 +626,48 @@
     <Setter Property="Track" Value="{DynamicResource CmSegmentTrack}" />
     <Setter Property="Fill" Value="{DynamicResource CmAccent}" />
   </Style>
+  <!-- A card row's label column: 110, and 112 on the Volume card, whose labels are longer (volume-tools.md §6). -->
+  <Style Selector="Border.detail-card TextBlock.row-label">
+    <Setter Property="Width" Value="110" />
+  </Style>
+  <Style Selector="Border.detail-card ItemsControl.volume TextBlock.row-label">
+    <Setter Property="Width" Value="112" />
+  </Style>
+  <!-- The Volume card (boards/volume-tools.md §6): the used bar, the allocation map and its legend. -->
+  <Style Selector="controls|ShareBar.volume-bar">
+    <Setter Property="Height" Value="8" />
+    <Setter Property="Track" Value="{DynamicResource CmSegmentTrack}" />
+    <Setter Property="Fill" Value="{DynamicResource CmAccent}" />
+  </Style>
+  <Style Selector="controls|AllocationMap.volume-map">
+    <Setter Property="Height" Value="14" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusSmall}" />
+    <Setter Property="Used" Value="{DynamicResource CmAccent}" />
+    <Setter Property="Split" Value="{DynamicResource CmWarning}" />
+    <Setter Property="Partial" Value="{DynamicResource CmMapPartial}" />
+    <Setter Property="Free" Value="{DynamicResource CmSegmentTrack}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
+  </Style>
+  <Style Selector="WrapPanel.map-legend > StackPanel">
+    <Setter Property="Spacing" Value="5" />
+    <Setter Property="Margin" Value="0,0,12,0" />
+  </Style>
+  <Style Selector="WrapPanel.map-legend TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+  </Style>
+  <Style Selector="WrapPanel.map-legend Border.swatch">
+    <Setter Property="Width" Value="10" />
+    <Setter Property="Height" Value="10" />
+    <Setter Property="CornerRadius" Value="2" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="WrapPanel.map-legend Border.swatch.used"><Setter Property="Background" Value="{DynamicResource CmAccent}" /></Style>
+  <Style Selector="WrapPanel.map-legend Border.swatch.split"><Setter Property="Background" Value="{DynamicResource CmWarning}" /></Style>
+  <Style Selector="WrapPanel.map-legend Border.swatch.partial"><Setter Property="Background" Value="{DynamicResource CmMapPartial}" /></Style>
+  <Style Selector="WrapPanel.map-legend Border.swatch.free"><Setter Property="Background" Value="{DynamicResource CmSegmentTrack}" /></Style>
   <Style Selector="Panel.chip">
     <Setter Property="Margin" Value="0,0,6,6" />
   </Style>

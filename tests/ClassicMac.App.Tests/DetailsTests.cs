@@ -7,6 +7,7 @@ using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 using ClassicMac.Core;
 using ClassicMac.Files;
+using ClassicMac.Files.Hfs;
 using ClassicMac.Files.Tests;
 using ClassicMac.Resources;
 
@@ -180,25 +181,43 @@ public sealed class DetailsTests : IDisposable
         Assert.Equal("—", DetailsViewModel.DisplayDate(null, utc: true));
     }
 
-    // The Volume card's space: block size, size and free space, the counts, and an HFS volume's fragmentation.
+    // The Volume card (volume-tools.md §6): the used bar's line, the map's line, and short rows.
     [Fact]
-    public void A_volume_card_shows_its_blocks_space_and_fragmentation()
+    public void A_volume_card_shows_its_used_bar_map_and_short_rows()
     {
         var volume = new VolumeInfo("HFS", new MacDate(3_000_000_000), null, null)
         {
             BlockSize = 2048, TotalBlocks = 1000, FreeBlocks = 250, Files = 42, Folders = 7,
         };
         BlockRange[] free = [new(0, 120), new(200, 30), new(300, 50), new(400, 25), new(600, 25)];
-        var layout = new VolumeLayout(1000, 2048, 42, 3, 4, 9, free, [], 0, 0);
+        var layout = new VolumeLayout(1000, 2048, 42, 3, 4, 9, free, [new(130, 10)], 0, 0);
 
         var group = DetailsViewModel.VolumeGroup(volume, layout);
 
-        Assert.Equal("2,048 bytes", Value(group, "Block size"));
-        Assert.Equal("2,048,000 bytes in 1,000 blocks", Value(group, "Size"));
-        Assert.Equal("512,000 bytes in 250 blocks", Value(group, "Free"));
-        Assert.Equal("42 / 7", Value(group, "Files / folders"));
-        Assert.Equal("3 of 42 (at most 9 extents)", Value(group, "Fragmented files"));
-        Assert.Equal("5 runs, the largest 120 blocks", Value(group, "Free space"));
+        var card = group.Volume!;
+        Assert.Equal(("2.0 MB", "HFS volume · 2,048-byte blocks", "500 KB free"), (card.Size, card.Kind, card.FreeText));
+        Assert.Equal((0.75, "75.0% used"), (card.UsedShare, card.UsedLabel));
+        Assert.Equal("5 runs · largest 120 blocks", card.RunsText);
+        Assert.Same(layout, card.Layout);
+        Assert.True(card.CanDefragment);
+        Assert.Equal(["Size", "Free", "Files, folders", "Split files", "Created", "Modified", "Backed up"], group.Rows.Select(r => r.Label));
+        Assert.Equal("2,048,000 bytes · 1,000 blocks", Value(group, "Size"));
+        Assert.Equal("512,000 bytes · 250 blocks", Value(group, "Free"));
+        Assert.Equal("42 files · 7 folders", Value(group, "Files, folders"));
+        Assert.Equal("3 of 42 · up to 9 pieces", Value(group, "Split files"));
+        Assert.Equal("Never", Value(group, "Backed up"));
+    }
+
+    [Fact]
+    public void A_volume_in_order_offers_no_defragmentation()
+    {
+        var volume = new VolumeInfo("HFS", new MacDate(3_000_000_000), null, null) { BlockSize = 512, TotalBlocks = 100, FreeBlocks = 10, Files = 3, Folders = 0 };
+        var layout = new VolumeLayout(100, 512, 3, 0, 0, 1, [new(90, 10)], [], 0, 0);
+
+        var card = DetailsViewModel.VolumeGroup(volume, layout).Volume!;
+
+        Assert.False(card.CanDefragment);
+        Assert.Equal("1 run · largest 10 blocks", card.RunsText);
     }
 
     [Theory]
@@ -215,15 +234,70 @@ public sealed class DetailsTests : IDisposable
         Assert.Equal(["Format", .. labels.Split('|')], group.Rows.Select(r => r.Label));
         Assert.Equal($"{format} volume", Value(group, "Format"));
         Assert.Equal(DetailsViewModel.DisplayDate(created, utc: false), Value(group, "Created"));      // creation: always as stored
-        Assert.Equal("never", Value(group, "Backed up"));
+        Assert.Equal("Never", Value(group, "Backed up"));
         if (format != "MFS")
         {
             Assert.Equal(DetailsViewModel.DisplayDate(modified, utc: format == "HFS Plus"), Value(group, "Modified"));
         }
 
-        Assert.All(group.Rows.Skip(1).Where(r => r.Value != "never"), r => Assert.True(r.Mono));
+        Assert.All(group.Rows.Skip(1).Where(r => r.Value != "Never"), r => Assert.True(r.Mono));
         Assert.Equal(note, group.Note);
     }
+
+    // The Volume card drawn (volume-tools.md §6): the used bar, the allocation map sized to its width, the legend, the
+    // short rows and the header's links, in light, dark and at 150%.
+    [Fact]
+    public void The_volume_card_draws_its_bar_and_map() => Headless.OnUiThread(() =>
+    {
+        // 80 small files, every third deleted, a file spread over those gaps and on, then more gaps: every kind of segment.
+        var image = HfsWriter.Format(800 * 1024, "Floppy", new MacDate(3_100_000_000));
+        for (var i = 0; i < 80; i++)
+        {
+            image = HfsWriter.CreateFile(ForkData.FromBytes(image), $"Pad {i:D2}", new byte[2048], Array.Empty<byte>(), FinderInfo.Empty, new MacDate(3_100_000_000), new MacDate(3_100_000_000));
+        }
+
+        for (var i = 0; i < 80; i += 3)
+        {
+            image = HfsWriter.DeleteFile(ForkData.FromBytes(image), $"Pad {i:D2}");
+        }
+
+        // The end filled for a moment, so the spread file takes the gaps; then the end freed and a few more files.
+        var free = new BigEndianReader(image).ReadUInt16At(1024 + 0x22);
+        image = HfsWriter.CreateFile(ForkData.FromBytes(image), "Filler", new byte[(free - 27 * 4) * 512], Array.Empty<byte>(), FinderInfo.Empty);
+        image = HfsWriter.CreateFile(ForkData.FromBytes(image), "Spread", new byte[60 * 512], Array.Empty<byte>(), FinderInfo.Empty,
+            new MacDate(3_100_000_000), new MacDate(3_100_000_000));
+        image = HfsWriter.DeleteFile(ForkData.FromBytes(image), "Filler");
+        for (var i = 50; i < 70; i++)
+        {
+            if (i % 3 != 0)
+            {
+                image = HfsWriter.DeleteFile(ForkData.FromBytes(image), $"Pad {i:D2}");
+            }
+        }
+
+        // In a Disk Copy image, so the card shown is the disk's (no host path, which differs per run).
+        var path = Path.Combine(folder, "Floppy.image");
+        File.WriteAllBytes(path, Fixtures.DiskCopy42("Floppy", image));
+        var model = new MainViewModel();
+        var open = model.OpenAsync(path);
+        Headless.Pump(open);
+        var window = new MainWindow { DataContext = model, Width = 1200, Height = 1280 };               // the disk's cards down to Volume
+        window.Show();
+        model.Selected = open.Result!.Children.OfType<ContainerFileNode>().Single();
+        Headless.Pump(model.PreviewTask);
+        model.SelectedTab = 0;
+        model.DiagnosticsPanel.IsExpanded = false;
+        Dispatcher.UIThread.RunJobs();
+
+        var map = window.GetVisualDescendants().OfType<AllocationMap>().Single(m => m.IsEffectivelyVisible);
+        Assert.Equal(14, map.Bounds.Height);
+        Assert.Contains("; 1 file in pieces; free space in ", Avalonia.Automation.AutomationProperties.GetName(map), StringComparison.Ordinal);
+        Assert.Contains(window.GetVisualDescendants().OfType<Button>(), b => b.Content is "Defragment…" && b.IsEffectivelyVisible);
+        var baselines = new List<string>();
+        Baselines.Check(window, "volume-card", baselines, Baselines.All);
+        Baselines.Verify(baselines);
+        window.Close();
+    });
 
     [Fact]
     public async Task A_disk_image_shows_its_volume_card()
@@ -232,8 +306,9 @@ public sealed class DetailsTests : IDisposable
         model.Selected = input;
         Assert.Equal(["Input", "Volume", "How it was read"], model.Details.Groups.Select(g => g.Title));
         var volume = Group(model.Details, "Volume");
-        Assert.Equal(("HFS volume", "1984-01-24 00:00:00"), (Value(volume, "Format"), Value(volume, "Created")));
-        Assert.Contains("Format: HFS volume", model.Details.CopyText, StringComparison.Ordinal);
+        Assert.Equal("1984-01-24 00:00:00", Value(volume, "Created"));
+        Assert.Contains("HFS volume · ", volume.Volume!.Kind, StringComparison.Ordinal);
+        Assert.NotNull(volume.Volume.Layout);                                            // the allocation map's
     }
 
     [Fact]
@@ -365,7 +440,7 @@ public sealed class DetailsTests : IDisposable
         Assert.Contains(wide.GetVisualDescendants().OfType<TextBlock>(), t => t.Classes.Contains("problems") && t.IsVisible && t.Text == "No problems found in this file");
 
         // Fork bars, mono values, the dates' note.
-        var bars = cards.GetVisualDescendants().OfType<ShareBar>().Where(b => b.IsVisible).ToList();
+        var bars = cards.GetVisualDescendants().OfType<ShareBar>().Where(b => b.Classes.Contains("fork-bar") && b.IsVisible).ToList();
         Assert.Equal(2, bars.Count);
         Assert.All(bars, b => Assert.Equal(6, b.Bounds.Height));
         Assert.Contains(cards.GetVisualDescendants().OfType<SelectableTextBlock>(), t => t.Text == "'APPL' / 'RLMZ'" && t.Classes.Contains("mono"));
