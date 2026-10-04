@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using static ClassicMac.Files.Hfs.HfsPlusUnicodeData;
 
 namespace ClassicMac.Files.Hfs;
 
 /// <summary>Validates HFS Plus names using the fixed Unicode 3.2 decomposition rules.</summary>
-internal static partial class HfsPlusUnicodeNormalization
+internal static class HfsPlusUnicodeNormalization
 {
     public static bool IsCanonical(ReadOnlySpan<byte> bigEndianName, bool usePostJaguarFixups = false)
     {

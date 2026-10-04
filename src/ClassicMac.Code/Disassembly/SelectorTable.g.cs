@@ -6,10 +6,11 @@
 
 namespace ClassicMac.Code.Disassembly;
 
-public static partial class SelectorNames
+// SelectorNames's table.
+internal static class SelectorTable
 {
     // Dispatcher trap -> name, where the selector is, its width and the mask applied before lookup.
-    private static readonly (ushort Trap, string Name, SelectorLocation Location, SelectorWidth Width, uint Mask)[] Dispatchers =
+    internal static readonly (ushort Trap, string Name, SelectorLocation Location, SelectorWidth Width, uint Mask)[] Dispatchers =
     [
         (0xA060, "FSDispatch", SelectorLocation.D0, SelectorWidth.Word, 0xFFFF),
         (0xA1AD, "Gestalt", SelectorLocation.D0, SelectorWidth.OSType, 0xFFFFFFFF),
@@ -53,7 +54,7 @@ public static partial class SelectorNames
     ];
 
     // Dispatcher trap -> selector -> routine name.
-    private static readonly (ushort Trap, uint Selector, string Name)[] Table =
+    internal static readonly (ushort Trap, uint Selector, string Name)[] Table =
     [
         (0xA060, 0x1A, "PBOpenDF"),
         (0xA060, 0x20, "PBDTGetPath"),

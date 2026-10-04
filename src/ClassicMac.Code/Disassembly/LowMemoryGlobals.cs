@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using static ClassicMac.Code.Disassembly.LowMemoryTable;
 
 namespace ClassicMac.Code.Disassembly;
 
@@ -15,7 +16,7 @@ public readonly record struct LowMemoryGlobal(uint Address, string Name, int Siz
 /// The low-memory globals [Doc: Inside Macintosh, the global-variable summaries of each manager], from Multiversal
 /// Interfaces (tools/TrapTables), for naming absolute addresses in disassembly.
 /// </summary>
-public static partial class LowMemoryGlobals
+public static class LowMemoryGlobals
 {
     // In a nested class so that the generated table is initialized first.
     private static class Index

@@ -17,7 +17,7 @@ namespace ClassicMac.Cli;
 /// <c>rm</c>, <c>rename</c>, <c>set</c>, <c>res-add</c>, <c>res-rm</c>) and <c>mcp</c>, the MCP server (docs/cli.md). Every limit option maps onto <see cref="ReadOptions"/> or
 /// <see cref="ContainerReadOptions"/>. <paramref name="binary"/> takes <c>cat --raw</c>'s bytes (standard output).
 /// </summary>
-internal sealed partial class CommandLine(TextWriter output, TextWriter error, Stream? binary = null)
+internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? binary = null)
 {
     internal enum ListFormat
     {
@@ -118,7 +118,7 @@ internal sealed partial class CommandLine(TextWriter output, TextWriter error, S
         root.Subcommands.Add(FindCommand());
         root.Subcommands.Add(GetCommand());
         root.Subcommands.Add(CheckCommand());
-        foreach (var write in WriteCommands())
+        foreach (var write in new WriteCommands(output, error, this).Commands())
         {
             root.Subcommands.Add(write);
         }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using static ClassicMac.Code.Disassembly.SelectorTable;
 
 namespace ClassicMac.Code.Disassembly;
 
@@ -36,7 +37,7 @@ public readonly record struct SelectorConvention(ushort Trap, string Name, Selec
 /// _Gestalt ...), from Multiversal Interfaces (tools/TrapTables). Where the selector sits, and its width, are per
 /// dispatcher [Doc: each manager's chapter of Inside Macintosh; checked against the inline code of 68k applications].
 /// </summary>
-public static partial class SelectorNames
+public static class SelectorNames
 {
     // In a nested class so that the generated tables are initialized first.
     private static class Index

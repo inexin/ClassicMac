@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using static ClassicMac.Code.Disassembly.TrapTable;
 
 namespace ClassicMac.Code.Disassembly;
 
@@ -26,7 +27,7 @@ public readonly record struct TrapInfo(ushort Word, string? Name, bool IsToolbox
 /// which ClassicMac writes HFS). The names come from Multiversal Interfaces with Apple's trap-macro names
 /// supplemented (tools/TrapTables). docs/formats/output/disassembly.md §2.4.
 /// </summary>
-public static partial class TrapNames
+public static class TrapNames
 {
     // In a nested class so that Table (in the generated part) is initialized first.
     private static class Index

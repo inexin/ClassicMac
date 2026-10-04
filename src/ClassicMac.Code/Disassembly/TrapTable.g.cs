@@ -6,10 +6,11 @@
 
 namespace ClassicMac.Code.Disassembly;
 
-public static partial class TrapNames
+// TrapNames's table.
+internal static class TrapTable
 {
     // Trap word as Multiversal defines it (its canonical modifier bits included) -> name and modifier kind.
-    private static readonly (ushort Word, string Name, TrapModifierKind Kind)[] Table =
+    internal static readonly (ushort Word, string Name, TrapModifierKind Kind)[] Table =
     [
         (0xA000, "Open", TrapModifierKind.File),
         (0xA001, "Close", TrapModifierKind.Device),

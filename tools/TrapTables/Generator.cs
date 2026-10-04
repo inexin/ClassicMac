@@ -6,7 +6,7 @@ namespace TrapTables;
 /// <summary>Reads Multiversal's defs/*.yaml and writes the three generated tables.</summary>
 public static class TrapTablesGenerator
 {
-    /// <summary>Generates TrapNames.g.cs, SelectorNames.g.cs and LowMemoryGlobals.g.cs into <paramref name="outDir"/>.</summary>
+    /// <summary>Generates TrapTable.g.cs, SelectorTable.g.cs and LowMemoryTable.g.cs (the tables of TrapNames, SelectorNames and LowMemoryGlobals) into <paramref name="outDir"/>.</summary>
     /// <returns>A one-line summary of the counts.</returns>
     public static string Generate(string multiversal, string outDir)
     {
@@ -241,10 +241,11 @@ public static class TrapTablesGenerator
             """;
 
         var sb = new StringBuilder(Header).AppendLine();
-        sb.AppendLine("public static partial class TrapNames");
+        sb.AppendLine("// TrapNames's table.");
+        sb.AppendLine("internal static class TrapTable");
         sb.AppendLine("{");
         sb.AppendLine("    // Trap word as Multiversal defines it (its canonical modifier bits included) -> name and modifier kind.");
-        sb.AppendLine("    private static readonly (ushort Word, string Name, TrapModifierKind Kind)[] Table =");
+        sb.AppendLine("    internal static readonly (ushort Word, string Name, TrapModifierKind Kind)[] Table =");
         sb.AppendLine("    [");
         foreach (var (word, (name, kind)) in traps)
         {
@@ -253,13 +254,14 @@ public static class TrapTablesGenerator
 
         sb.AppendLine("    ];");
         sb.AppendLine("}");
-        Write("TrapNames.g.cs", sb);
+        Write("TrapTable.g.cs", sb);
 
         sb = new StringBuilder(Header).AppendLine();
-        sb.AppendLine("public static partial class SelectorNames");
+        sb.AppendLine("// SelectorNames's table.");
+        sb.AppendLine("internal static class SelectorTable");
         sb.AppendLine("{");
         sb.AppendLine("    // Dispatcher trap -> name, where the selector is, its width and the mask applied before lookup.");
-        sb.AppendLine("    private static readonly (ushort Trap, string Name, SelectorLocation Location, SelectorWidth Width, uint Mask)[] Dispatchers =");
+        sb.AppendLine("    internal static readonly (ushort Trap, string Name, SelectorLocation Location, SelectorWidth Width, uint Mask)[] Dispatchers =");
         sb.AppendLine("    [");
         foreach (var (trap, (name, location, width, mask)) in conventions)
         {
@@ -269,7 +271,7 @@ public static class TrapTablesGenerator
         sb.AppendLine("    ];");
         sb.AppendLine();
         sb.AppendLine("    // Dispatcher trap -> selector -> routine name.");
-        sb.AppendLine("    private static readonly (ushort Trap, uint Selector, string Name)[] Table =");
+        sb.AppendLine("    internal static readonly (ushort Trap, uint Selector, string Name)[] Table =");
         sb.AppendLine("    [");
         foreach (var (trap, table) in selectors)
         {
@@ -281,13 +283,14 @@ public static class TrapTablesGenerator
 
         sb.AppendLine("    ];");
         sb.AppendLine("}");
-        Write("SelectorNames.g.cs", sb);
+        Write("SelectorTable.g.cs", sb);
 
         sb = new StringBuilder(Header).AppendLine();
-        sb.AppendLine("public static partial class LowMemoryGlobals");
+        sb.AppendLine("// LowMemoryGlobals's table.");
+        sb.AppendLine("internal static class LowMemoryTable");
         sb.AppendLine("{");
         sb.AppendLine("    // Address -> name, size in bytes and Multiversal's type.");
-        sb.AppendLine("    private static readonly (uint Address, string Name, int Size, string Type)[] Table =");
+        sb.AppendLine("    internal static readonly (uint Address, string Name, int Size, string Type)[] Table =");
         sb.AppendLine("    [");
         foreach (var (address, (name, size, type)) in lowmem)
         {
@@ -296,7 +299,7 @@ public static class TrapTablesGenerator
 
         sb.AppendLine("    ];");
         sb.AppendLine("}");
-        Write("LowMemoryGlobals.g.cs", sb);
+        Write("LowMemoryTable.g.cs", sb);
 
         return ($"{traps.Count} traps, {conventions.Count} dispatchers, {selectors.Values.Sum(s => s.Count)} selectors, {lowmem.Count} low-memory globals");
 

@@ -15,7 +15,7 @@ namespace ClassicMac.Cli;
 // The write commands on Mac paths (docs/cli.md §3): put, mkdir, rm, rename, set, res-add and res-rm. Each opens the
 // host file the path starts with in an InputEditSession, makes one change, prints the planned changes, and writes a
 // new file (-o) or, only with --in-place, the input itself; --dry-run writes nothing.
-internal sealed partial class CommandLine
+internal sealed class WriteCommands(TextWriter output, TextWriter error, CommandLine cli)
 {
     private sealed record WriteOptions(Option<FileInfo> Output, Option<bool> InPlace, Option<bool> DryRun, Option<bool> Json);
 
@@ -33,7 +33,7 @@ internal sealed partial class CommandLine
         command.Options.Add(options.Json);
     }
 
-    private IEnumerable<Command> WriteCommands()
+    public IEnumerable<Command> Commands()
     {
         yield return PutCommand();
         yield return MkdirCommand();
@@ -67,7 +67,7 @@ internal sealed partial class CommandLine
         var command = new Command("put", "Add a host file to a volume image") { source, destination, name, type, creator, text };
         AddWriteOptions(command, options);
         command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(destination), (_, tree, rest) =>
-            MacEdits.Put(tree, rest, MacEdits.Import(result.GetRequiredValue(source).FullName, result.GetValue(text), ContainerOptionsFrom(result)),
+            MacEdits.Put(tree, rest, MacEdits.Import(result.GetRequiredValue(source).FullName, result.GetValue(text), cli.ContainerOptionsFrom(result)),
                 result.GetValue(name), result.GetValue(type), result.GetValue(creator))));
         return command;
     }
@@ -166,7 +166,7 @@ internal sealed partial class CommandLine
         {
             Description = "Its size: bytes, or with K/KiB, M/MiB, G/GiB (400K to 2T, whole 512-byte blocks)",
             Required = true,
-            CustomParser = ParseSize,
+            CustomParser = CommandLine.ParseSize,
         };
         var name = new Option<string>("--name") { Description = "The volume's name (1 to 27 characters, no colon)", DefaultValueFactory = _ => "Untitled" };
         var overwrite = new Option<bool>("--overwrite") { Description = "Replace an existing file" };
@@ -228,7 +228,7 @@ internal sealed partial class CommandLine
         {
             Description = "Its new size: bytes, or with K/KiB, M/MiB, G/GiB (larger; within 65,535 allocation blocks of its size)",
             Required = true,
-            CustomParser = ParseSize,
+            CustomParser = CommandLine.ParseSize,
         };
         var options = NewWriteOptions();
         var command = new Command("resize", "Grow a plain HFS volume image") { path, size };
@@ -313,8 +313,8 @@ internal sealed partial class CommandLine
         IReadOnlyList<string> written = [];
         try
         {
-            using var tree = MacPathTree.Open(host, ContainerOptionsFrom(result), ReadOptionsFrom(result), diagnostics);
-            session = InputEditSession.Open(host, ContainerOptionsFrom(result), ReadOptionsFrom(result), diagnostics);
+            using var tree = MacPathTree.Open(host, cli.ContainerOptionsFrom(result), cli.ReadOptionsFrom(result), diagnostics);
+            session = InputEditSession.Open(host, cli.ContainerOptionsFrom(result), cli.ReadOptionsFrom(result), diagnostics);
             var change = plan(session.Kind, tree, rest);
             if (session.Kind == InputEditKind.ReadOnly)
             {

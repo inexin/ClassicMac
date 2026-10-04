@@ -162,6 +162,10 @@ checks subtract-first (`offset > length - size`), as the Mac OS code does.
 ## Conventions
 
 - Work on `main` (no feature branches).
+- No partial classes: a class lives in one file. Split a large class into separate classes with their own names (use
+  `using static` where call sites should stay short), never into partial files. `partial` is only for types a tool
+  requires it on (Avalonia code-behind, CommunityToolkit.Mvvm view models, `[GeneratedRegex]`, JSON source generation),
+  and then the hand-written part is still one file; generated tables go in classes of their own.
 - Every `if`/`else`/loop body has braces, one statement per line (`.editorconfig`); the build enforces the style
   (`EnforceCodeStyleInBuild`, warnings are errors). `dotnet format style --diagnostics IDE0011` fixes braces.
 - A change to how a format is read or written updates its document in `docs/formats/<category>/` in the same commit;

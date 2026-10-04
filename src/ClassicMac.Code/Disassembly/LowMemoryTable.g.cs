@@ -6,10 +6,11 @@
 
 namespace ClassicMac.Code.Disassembly;
 
-public static partial class LowMemoryGlobals
+// LowMemoryGlobals's table.
+internal static class LowMemoryTable
 {
     // Address -> name, size in bytes and Multiversal's type.
-    private static readonly (uint Address, string Name, int Size, string Type)[] Table =
+    internal static readonly (uint Address, string Name, int Size, string Type)[] Table =
     [
         (0x0102, "ScrVRes", 2, "INTEGER"),
         (0x0104, "ScrHRes", 2, "INTEGER"),

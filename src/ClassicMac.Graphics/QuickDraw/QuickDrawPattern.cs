@@ -8,7 +8,7 @@ namespace ClassicMac.Graphics.QuickDraw;
 /// </summary>
 // A PixPat replaces the 1-bit pattern: type 1 is a full PixMap pattern, type 2 (ditherPat) a solid RGB color.
 // Operand layout: Inside Macintosh: Imaging With QuickDraw, Appendix A, Listing A-1.
-public sealed partial class QuickDrawPattern
+public sealed class QuickDrawPattern
 {
     internal byte[] Mono = new byte[8];
     internal PixMap? Pixels;          // PixPat type 1
