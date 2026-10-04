@@ -54,7 +54,7 @@ public sealed class CardViewTests
             Assert.Contains("Stagger on parent window’s screen", Shown(cards));
             Assert.Contains("Bounds on a 512 × 342 screen", Shown(cards));
             Assert.True(cards.GetVisualDescendants().OfType<ScreenBoundsView>().Single().IsEffectivelyVisible);
-            Assert.DoesNotContain(cards.GetVisualDescendants().OfType<ComboBox>(), c => c.IsEffectivelyVisible && c.ItemsSource == ((WindowForm)model.Form!).Definitions);
+            Assert.DoesNotContain(cards.GetVisualDescendants().OfType<ComboBox>(), c => c.IsEffectivelyVisible && c.ItemsSource == ((WindowForm)model.Forms.Form!).Definitions);
             model.FormEditing.EditFormCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
             Assert.Contains(cards.GetVisualDescendants().OfType<ComboBox>(), c => c.IsEffectivelyVisible && c.SelectedItem is DefinitionChoice { Value: 0 });

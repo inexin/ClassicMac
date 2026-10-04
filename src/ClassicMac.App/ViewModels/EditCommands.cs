@@ -249,7 +249,7 @@ public sealed partial class MainViewModel
     private void OnSelectedChanged(NodeViewModel? oldValue, NodeViewModel? newValue)
     {
         NotifyEditCommands();
-        UpdateForm(newValue);
+        Forms.UpdateForm(newValue);
     }
 
     // Makes an edit in the selection's file and selects the resource it concerns.

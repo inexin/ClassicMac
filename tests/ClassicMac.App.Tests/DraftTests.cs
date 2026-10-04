@@ -14,7 +14,7 @@ public sealed class DraftTests : EditTestsBase
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
         await model.PreviewTask;                                            // its preview done, so only the refusal could change it
-        var form = Assert.IsType<StringForm>(model.Form);
+        var form = Assert.IsType<StringForm>(model.Forms.Form);
         var details = model.Details;
         Assert.False(model.Drafts.HasDraft);
         form.Text = "edited";
@@ -27,9 +27,9 @@ public sealed class DraftTests : EditTestsBase
         // Not answered yet: nothing moved or rebuilt.
         Assert.Equal([("'STR ' 128", (string?)null)], dialogs.DraftAsked);
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
-        Assert.Same(form, model.Form);
+        Assert.Same(form, model.Forms.Form);
         Assert.Same(details, model.Details);
-        Assert.DoesNotContain(nameof(MainViewModel.Form), changes);
+        Assert.DoesNotContain(nameof(Forms.Form), changes);
         Assert.DoesNotContain(nameof(MainViewModel.Preview), changes);
         Assert.Contains(nameof(MainViewModel.Selected), changes);           // the tree is told to show the old node again
         model.Selected = Resource(file, 129);                               // asked once
@@ -38,7 +38,7 @@ public sealed class DraftTests : EditTestsBase
         dialogs.Pending.SetResult(DraftChoice.Cancel);
         await model.DraftTask;
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
-        Assert.Same(form, model.Form);
+        Assert.Same(form, model.Forms.Form);
         Assert.Equal("edited", form.Text);
         Assert.True(model.Drafts.HasDraft);
         Assert.Equal("hello"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
@@ -49,12 +49,12 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
         dialogs.Draft = DraftChoice.Discard;
         model.Selected = Resource(file, 129);
         await model.DraftTask;
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
-        Assert.Equal("hi", Assert.IsType<StringForm>(model.Form).Text);
+        Assert.Equal("hi", Assert.IsType<StringForm>(model.Forms.Form).Text);
         Assert.False(model.Drafts.HasDraft);
         Assert.Equal("hello"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
         Assert.False(model.HasUnsavedChanges);
@@ -65,7 +65,7 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
         dialogs.Draft = DraftChoice.Apply;
         var target = Resource(file, 129);
         model.Selected = target;
@@ -73,14 +73,14 @@ public sealed class DraftTests : EditTestsBase
         Assert.Equal("edited"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
         // The type's nodes were rebuilt by the edit: the clicked resource is selected in the new ones.
         Assert.Same(Resource(file, 129), model.Selected);
-        Assert.Equal("hi", Assert.IsType<StringForm>(model.Form).Text);
+        Assert.Equal("hi", Assert.IsType<StringForm>(model.Forms.Form).Text);
         Assert.Equal("_Undo Edit 'STR ' 128 \"greeting\"", model.UndoTitle);
         Assert.True(model.HasUnsavedChanges);
 
         // Applied but unsaved: moving on does not ask.
         model.Selected = Resource(file, 128);
         Assert.Single(dialogs.DraftAsked);
-        Assert.Equal("edited", Assert.IsType<StringForm>(model.Form).Text);
+        Assert.Equal("edited", Assert.IsType<StringForm>(model.Forms.Form).Text);
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
-        var form = Assert.IsType<StringForm>(model.Form);
+        var form = Assert.IsType<StringForm>(model.Forms.Form);
         form.Text = "edited";
         form.Text = "hello";
         Assert.False(model.Drafts.HasDraft);
@@ -97,8 +97,8 @@ public sealed class DraftTests : EditTestsBase
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
 
         // The Apply button applies the draft: the form is clean again.
-        Assert.IsType<StringForm>(model.Form).Text = "ho";
-        model.ApplyFormCommand.Execute(null);
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "ho";
+        model.Forms.ApplyFormCommand.Execute(null);
         Assert.False(model.Drafts.HasDraft);
         model.Selected = file;
         Assert.Empty(dialogs.DraftAsked);
@@ -109,7 +109,7 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "日本";               // not Mac OS Roman
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "日本";               // not Mac OS Roman
         dialogs.Draft = DraftChoice.Apply;                                  // the dialog offers no Apply: treated as Cancel
         model.Selected = Resource(file, 129);
         await model.DraftTask;
@@ -141,7 +141,7 @@ public sealed class DraftTests : EditTestsBase
         await input.EnsureLoadedAsync();
         NodeViewModel Node(int i) => input.Children.OfType<ResourceTypeNode>().Single().Children[i];
         model.Selected = Node(0);
-        var form = Assert.IsType<WindowForm>(model.Form);
+        var form = Assert.IsType<WindowForm>(model.Forms.Form);
         form.Title = "Other";
         Assert.True(model.Drafts.HasDraft);
         form.Title = "日本";                                                 // not Mac OS Roman: the form's error is the draft's
@@ -190,7 +190,7 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
         dialogs.Draft = DraftChoice.Cancel;
         model.SelectedDiagnostic = new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Warning, "test", "a warning"), "Prefs", Resource(file, 129));
         await model.DraftTask;
@@ -219,7 +219,7 @@ public sealed class DraftTests : EditTestsBase
 
         model.Selected = Resource(file, 128);
         target.Parent!.IsExpanded = false;
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
         dialogs.Draft = DraftChoice.Cancel;
         await model.ShowItemCommand.ExecuteAsync(entry);
         Assert.Single(dialogs.DraftAsked);
@@ -242,7 +242,7 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
         dialogs.Draft = DraftChoice.Cancel;
         var other = Path.Combine(folder, "Other.rsrc");
         File.WriteAllBytes(other, new ResourceFork().ToArray());
@@ -261,7 +261,7 @@ public sealed class DraftTests : EditTestsBase
         model.Selected = Resource(file, 129);
         model.DuplicateResourceCommand.Execute(null);                       // 'STR ' 130
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
 
         dialogs.Draft = DraftChoice.Cancel;
         await model.UndoCommand.ExecuteAsync(null);
@@ -280,7 +280,7 @@ public sealed class DraftTests : EditTestsBase
         Assert.Equal("_Redo Edit 'STR ' 128 \"greeting\"", model.RedoTitle);
 
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
         dialogs.Draft = DraftChoice.Discard;
         await model.DeleteResourceCommand.ExecuteAsync(null);
         Assert.Null(file.Resources.Fork.Find(Str, 128));
@@ -292,7 +292,7 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
 
         dialogs.Draft = DraftChoice.Cancel;
         await model.CloseCommand.ExecuteAsync(null);
@@ -313,7 +313,7 @@ public sealed class DraftTests : EditTestsBase
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
         Assert.False(model.HasUnsavedChanges);
         Assert.True(model.Drafts.HasDraft);
 
@@ -330,7 +330,7 @@ public sealed class DraftTests : EditTestsBase
         var (model, file, _, _, _) = await Open();
         model.EditDialogs = null;
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
         model.Selected = Resource(file, 129);
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
         Assert.Equal("hello"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
@@ -350,41 +350,41 @@ public sealed class DraftTests : EditTestsBase
         await input.EnsureLoadedAsync();
         ResourceNode Node() => (ResourceNode)input.Children.OfType<ResourceTypeNode>().Single(t => t.Type == Str).Children[0];
         model.Selected = Node();
-        var form = Assert.IsType<StringForm>(model.Form);
+        var form = Assert.IsType<StringForm>(model.Forms.Form);
         form.Text = "edited";
 
         dialogs.Pending = new TaskCompletionSource<DraftChoice>();
         var changes = new System.Collections.Concurrent.ConcurrentQueue<string?>();  // background preview tasks raise on the thread pool
         model.PropertyChanged += (_, e) => changes.Enqueue(e.PropertyName);
-        model.UseTemplate = true;
-        Assert.False(model.UseTemplate);                                    // not until answered
-        Assert.Same(form, model.Form);
-        Assert.Contains(nameof(MainViewModel.UseTemplate), changes);        // the check box is told to show it unchecked
+        model.Forms.UseTemplate = true;
+        Assert.False(model.Forms.UseTemplate);                                    // not until answered
+        Assert.Same(form, model.Forms.Form);
+        Assert.Contains(nameof(Forms.UseTemplate), changes);        // the check box is told to show it unchecked
         dialogs.Pending.SetResult(DraftChoice.Cancel);
         await model.DraftTask;
-        Assert.False(model.UseTemplate);
-        Assert.Same(form, model.Form);
+        Assert.False(model.Forms.UseTemplate);
+        Assert.Same(form, model.Forms.Form);
         Assert.Equal("edited", form.Text);
         dialogs.Pending = null;
 
         dialogs.Draft = DraftChoice.Discard;
-        model.UseTemplate = true;
+        model.Forms.UseTemplate = true;
         await model.DraftTask;
-        Assert.True(model.UseTemplate);
-        Assert.Equal("hi", Assert.IsType<TemplateScalarRow>(Assert.IsType<TemplateForm>(model.Form).Fields[0]).Text);
+        Assert.True(model.Forms.UseTemplate);
+        Assert.Equal("hi", Assert.IsType<TemplateScalarRow>(Assert.IsType<TemplateForm>(model.Forms.Form).Fields[0]).Text);
         Assert.Equal(2, dialogs.DraftAsked.Count);
 
-        ((TemplateScalarRow)((TemplateForm)model.Form!).Fields[0]).Text = "yo";
+        ((TemplateScalarRow)((TemplateForm)model.Forms.Form!).Fields[0]).Text = "yo";
         dialogs.Draft = DraftChoice.Apply;
-        model.UseTemplate = false;
+        model.Forms.UseTemplate = false;
         await model.DraftTask;
-        Assert.False(model.UseTemplate);
-        Assert.Equal("yo", Assert.IsType<StringForm>(model.Form).Text);
+        Assert.False(model.Forms.UseTemplate);
+        Assert.Equal("yo", Assert.IsType<StringForm>(model.Forms.Form).Text);
         Assert.Equal("yo"u8.ToArray(), Node().Resource.GetData().ToArray());
 
-        model.UseTemplate = true;                                           // no draft: no question
+        model.Forms.UseTemplate = true;                                           // no draft: no question
         Assert.Equal(3, dialogs.DraftAsked.Count);
-        Assert.True(model.UseTemplate);
+        Assert.True(model.Forms.UseTemplate);
     }
 
     [Fact]
@@ -393,7 +393,7 @@ public sealed class DraftTests : EditTestsBase
         var (model, file, dialogs, _, path) = await Open();
         model.Selected = Resource(file, 128);
         Assert.False(model.SaveCommand.CanExecute(null));
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
         Assert.True(model.SaveCommand.CanExecute(null));                    // a draft alone can be saved
 
         dialogs.Draft = DraftChoice.Cancel;
@@ -416,14 +416,14 @@ public sealed class DraftTests : EditTestsBase
         model.Selected = Resource(file, 129);
         await model.DeleteResourceCommand.ExecuteAsync(null);
         model.Selected = Resource(file, 128);
-        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
 
         dialogs.Draft = DraftChoice.Discard;
         await model.SaveCommand.ExecuteAsync(null);
         var saved = Saved(path);
         Assert.Null(saved.Find(Str, 129));
         Assert.Equal("hello"u8.ToArray(), saved.Find(Str, 128)!.GetData().ToArray());
-        Assert.Equal("hello", Assert.IsType<StringForm>(model.Form).Text);
+        Assert.Equal("hello", Assert.IsType<StringForm>(model.Forms.Form).Text);
         Assert.False(model.Drafts.HasDraft);
     }
 
@@ -446,7 +446,7 @@ public sealed class DraftTests : EditTestsBase
         var input = (await model.OpenAsync(path))!;
         await input.EnsureLoadedAsync();
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single().Children[0];
-        var form = Assert.IsType<StringListForm>(model.Form);
+        var form = Assert.IsType<StringListForm>(model.Forms.Form);
         var edited = 0;
         form.Edited += (_, _) => edited++;
         var changes = Watch(model.SaveCommand);
@@ -481,7 +481,7 @@ public sealed class DraftTests : EditTestsBase
         var input = (await model.OpenAsync(path))!;
         await input.EnsureLoadedAsync();
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type == rsrc).Children[0];
-        var form = Assert.IsType<TemplateForm>(model.Form);
+        var form = Assert.IsType<TemplateForm>(model.Forms.Form);
         var changes = Watch(model.SaveCommand);
         var list = (TemplateListRow)form.Fields[2];
 

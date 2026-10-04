@@ -110,7 +110,7 @@ public sealed class DialogItemsFormTests : IDisposable
     public async Task The_preview_is_the_dialog_that_uses_the_list_and_follows_each_change()
     {
         var (model, node) = await Open(withDialog: true);
-        var form = Assert.IsType<DialogItemsForm>(model.Form);
+        var form = Assert.IsType<DialogItemsForm>(model.Forms.Form);
         Assert.Equal("'DLOG' 128", form.UsedBy);
         var preview = Assert.IsType<DialogPreview>(model.FormLivePreview.FormDialog);
         Assert.Equal(("Find", 300, 106), (preview.Drawing.Title, preview.Drawing.Width, preview.Drawing.Height));
@@ -133,7 +133,7 @@ public sealed class DialogItemsFormTests : IDisposable
     public async Task A_list_no_dialog_uses_is_drawn_on_its_own()
     {
         var (model, _) = await Open(withDialog: false);
-        var form = Assert.IsType<DialogItemsForm>(model.Form);
+        var form = Assert.IsType<DialogItemsForm>(model.Forms.Form);
         Assert.Null(form.UsedBy);
         Assert.Equal(2, model.FormLivePreview.FormDialog!.Drawing.Definition);             // a plain box around the items
         Assert.Equal($"Drawn on its own · {model.FormLivePreview.FormDialog.Drawing.Width} × {model.FormLivePreview.FormDialog.Drawing.Height}", model.FormLivePreview.FormDialogNote);

@@ -312,13 +312,13 @@ public sealed partial class FormLivePreview(MainViewModel main) : ObservableObje
     private string? formDialogNote;
 
     /// <summary>Whether the host shows the form's dialog beside it (an item list's form has a preview panel of its own).</summary>
-    public bool ShowsHostDialog => FormDialog is not null && main.Form is not DialogItemsForm;
+    public bool ShowsHostDialog => FormDialog is not null && main.Forms.Form is not DialogItemsForm;
 
     /// <summary>Why the form's values cannot be written, or null (the host's error line; Apply waits for it to go).</summary>
     [ObservableProperty]
     private string? formError;
 
-    partial void OnFormErrorChanged(string? value) => main.ApplyFormCommand.NotifyCanExecuteChanged();
+    partial void OnFormErrorChanged(string? value) => main.Forms.ApplyFormCommand.NotifyCanExecuteChanged();
 
     // The form's error follows its values; a dialog, alert or item list also gets a live preview of the dialog.
     internal void WatchForm(ResourceForm? form, ResourceNode? node)

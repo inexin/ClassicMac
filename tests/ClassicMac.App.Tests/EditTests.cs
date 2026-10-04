@@ -302,13 +302,13 @@ public sealed class EditTests : EditTestsBase
         await input.EnsureLoadedAsync();
         ResourceNode Node() => (ResourceNode)input.Children.OfType<ResourceTypeNode>().Single(t => t.Type == rsrc).Children[0];
         model.Selected = Node();
-        Assert.Null(model.Form);                                                             // no template open yet
+        Assert.Null(model.Forms.Form);                                                             // no template open yet
 
         // A template in another open file is used, as ResEdit uses templates in any open file.
         await (await model.OpenAsync(templates))!.EnsureLoadedAsync();
         model.Selected = null;
         model.Selected = Node();
-        var form = Assert.IsType<TemplateForm>(model.Form);
+        var form = Assert.IsType<TemplateForm>(model.Forms.Form);
         Assert.Contains("TMPL 1000", form.Source);
         var id = Assert.IsType<TemplateScalarRow>(form.Fields[0]);
         var count = Assert.IsType<TemplateScalarRow>(form.Fields[1]);
@@ -321,12 +321,12 @@ public sealed class EditTests : EditTestsBase
         Assert.Equal("2", count.Text);                                                       // kept in step
         ((TemplateScalarRow)list.Items[2].Fields[0]).Text = "$ABCD";
         list.RemoveCommand.Execute(list.Items[0]);
-        model.ApplyFormCommand.Execute(null);
+        model.Forms.ApplyFormCommand.Execute(null);
         Assert.Equal(new byte[] { 0, 16, 0, 1, 0, 0, 0xAB, 0xCD }, Node().Resource.GetData().ToArray());
 
-        var edited = Assert.IsType<TemplateForm>(model.Form);
+        var edited = Assert.IsType<TemplateForm>(model.Forms.Form);
         ((TemplateScalarRow)edited.Fields[0]).Text = "70000";
-        model.ApplyFormCommand.Execute(null);
+        model.Forms.ApplyFormCommand.Execute(null);
         Assert.Contains("does not fit", model.Status);
         model.UndoCommand.Execute(null);
         Assert.Equal(8, Node().Resource.Length);
@@ -346,13 +346,13 @@ public sealed class EditTests : EditTestsBase
         var input = (await model.OpenAsync(path))!;
         await input.EnsureLoadedAsync();
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type == str).Children[0];
-        Assert.IsType<StringForm>(model.Form);
-        Assert.True(model.HasTemplateChoice);
+        Assert.IsType<StringForm>(model.Forms.Form);
+        Assert.True(model.Forms.HasTemplateChoice);
 
-        model.UseTemplate = true;
-        Assert.IsType<TemplateForm>(model.Form);
-        model.UseTemplate = false;
-        Assert.IsType<StringForm>(model.Form);
+        model.Forms.UseTemplate = true;
+        Assert.IsType<TemplateForm>(model.Forms.Form);
+        model.Forms.UseTemplate = false;
+        Assert.IsType<StringForm>(model.Forms.Form);
     }
 
     [Fact]
@@ -703,21 +703,21 @@ public sealed class EditTests : EditTestsBase
     {
         var (model, file, _, _, path) = await Open();
         model.Selected = Resource(file, 128);
-        var form = Assert.IsType<StringForm>(model.Form);
+        var form = Assert.IsType<StringForm>(model.Forms.Form);
         Assert.Equal("hello", form.Text);
 
         form.Text = "hello, world";
-        model.ApplyFormCommand.Execute(null);
+        model.Forms.ApplyFormCommand.Execute(null);
         Assert.Equal("hello, world"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
-        Assert.Equal("hello, world", Assert.IsType<StringForm>(model.Form).Text);   // the form reads the new data
+        Assert.Equal("hello, world", Assert.IsType<StringForm>(model.Forms.Form).Text);   // the form reads the new data
 
-        Assert.IsType<StringForm>(model.Form).Text = "日本";               // not Mac OS Roman: refused
-        model.ApplyFormCommand.Execute(null);
+        Assert.IsType<StringForm>(model.Forms.Form).Text = "日本";               // not Mac OS Roman: refused
+        model.Forms.ApplyFormCommand.Execute(null);
         Assert.Contains("Mac OS Roman", model.Status);
 
         model.UndoCommand.Execute(null);
         model.Selected = Resource(file, 128);
-        Assert.Equal("hello", Assert.IsType<StringForm>(model.Form).Text);
+        Assert.Equal("hello", Assert.IsType<StringForm>(model.Forms.Form).Text);
         Assert.False(model.HasUnsavedChanges);
         await Task.CompletedTask;
         _ = path;

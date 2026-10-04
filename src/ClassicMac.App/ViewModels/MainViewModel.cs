@@ -68,6 +68,11 @@ public interface IFilePicker
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    private Forms? forms;
+
+    /// <summary>The selection's form: the typed or template editor, Apply, and the template switch.</summary>
+    public Forms Forms => forms ??= new(this);
+
     private TemplateFinder? templateFinder;
 
     /// <summary>The TMPL for a resource, as ResEdit finds one, and the template form made from it.</summary>
@@ -357,7 +362,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>The last selection or template switch made after asking about a draft (tests wait for it).</summary>
-    internal Task DraftTask { get; private set; } = Task.CompletedTask;
+    internal Task DraftTask { get; set; } = Task.CompletedTask;
 
     [ObservableProperty]
     private DetailsViewModel details = DetailsViewModel.Empty;

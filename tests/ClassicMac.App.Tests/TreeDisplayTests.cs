@@ -126,7 +126,7 @@ public sealed class TreeDisplayTests : IDisposable
         var str = (ResourceNode)tab.Children.Single().Children.Single();
         model.Selected = str;
         await model.PreviewTask;
-        Assert.Equal("tab", Assert.IsType<StringForm>(model.Form).Text);
+        Assert.Equal("tab", Assert.IsType<StringForm>(model.Forms.Form).Text);
 
         // The group row previews its folder.
         model.Selected = group;

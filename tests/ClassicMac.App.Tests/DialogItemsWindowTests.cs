@@ -35,7 +35,7 @@ public sealed class DialogItemsWindowTests : IDisposable
         model.Selected = type.Children[0];
         Pump(model.PreviewTask);
         Dispatcher.UIThread.RunJobs();
-        return (window, model, Assert.IsType<DialogItemsForm>(model.Form));
+        return (window, model, Assert.IsType<DialogItemsForm>(model.Forms.Form));
     }
 
     private static List<Border> Rows(Window window) =>

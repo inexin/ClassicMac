@@ -22,7 +22,7 @@ internal sealed partial class MainWindow
     // A click on a "form-row", or the focus going into one of its inputs, selects its row (and its item in the preview).
     private void SelectFormRow(object? source)
     {
-        if (DataContext is MainViewModel { Form: { } form } && FormRow(source) is { DataContext: { } item })
+        if (DataContext is MainViewModel { Forms.Form: { } form } && FormRow(source) is { DataContext: { } item })
         {
             form.SelectRow(item);
         }
@@ -54,9 +54,9 @@ internal sealed partial class MainWindow
         else if (e.Key is Key.Enter or Key.Return && e.KeyModifiers == KeyModifiers.Control)
         {
             // Handled either way, so a text box does not take Ctrl+Enter as a line break.
-            if (model.ApplyFormCommand.CanExecute(null))
+            if (model.Forms.ApplyFormCommand.CanExecute(null))
             {
-                model.ApplyFormCommand.Execute(null);
+                model.Forms.ApplyFormCommand.Execute(null);
             }
 
             e.Handled = true;

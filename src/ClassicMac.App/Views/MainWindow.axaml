@@ -1300,7 +1300,7 @@
               <!-- A sound's actions (boards/sound.md): replaced, not edited. -->
               <Button x:Name="SaveAsWavButton" Content="Save as WAV…" Command="{Binding SoundHeaderActions.SaveAsWavCommand}" IsVisible="{Binding SoundHeaderActions.IsSoundResource}" />
               <Button x:Name="ReplaceFromWavButton" Content="Replace from WAV…" Command="{Binding SoundHeaderActions.ReplaceFromWavCommand}" IsVisible="{Binding SoundHeaderActions.IsSoundResource}" />
-              <Panel IsVisible="{Binding HasForm}">
+              <Panel IsVisible="{Binding Forms.HasForm}">
                 <Button Classes="accent" Content="Edit" Command="{Binding FormEditing.EditFormCommand}" IsVisible="{Binding !FormEditing.IsEditingForm}" />
                 <Border Classes="editing-badge" IsVisible="{Binding FormEditing.IsEditingForm}" VerticalAlignment="Center">
                   <TextBlock Text="Editing" />
@@ -1983,12 +1983,12 @@
                     <DockPanel x:Name="EditingFooter" IsVisible="{Binding FormEditing.IsEditingForm}">
                       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
                         <Button Content="Cancel" Command="{Binding FormEditing.CancelFormCommand}" ToolTip.Tip="Esc" />
-                        <Button Classes="accent" Content="Apply" Command="{Binding ApplyFormCommand}" IsDefault="False" ToolTip.Tip="Ctrl+Enter" />
+                        <Button Classes="accent" Content="Apply" Command="{Binding Forms.ApplyFormCommand}" IsDefault="False" ToolTip.Tip="Ctrl+Enter" />
                       </StackPanel>
                       <StackPanel Spacing="2" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="12">
                           <TextBlock Text="{Binding FormEditing.FormHint}" Classes="muted" VerticalAlignment="Center" />
-                          <CheckBox x:Name="TemplateBox" Content="Edit with template" IsChecked="{Binding UseTemplate}" IsVisible="{Binding HasTemplateChoice}" />
+                          <CheckBox x:Name="TemplateBox" Content="Edit with template" IsChecked="{Binding Forms.UseTemplate}" IsVisible="{Binding Forms.HasTemplateChoice}" />
                         </StackPanel>
                         <StackPanel x:Name="FormErrorLine" Orientation="Horizontal" Spacing="6"
                                     IsVisible="{Binding FormLivePreview.FormError, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -2005,7 +2005,7 @@
                               IsVisible="{Binding FormLivePreview.ShowsHostDialog}">
                   <views:DialogView Dialog="{Binding FormLivePreview.FormDialog}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
-                <ContentControl Classes="form-content" Content="{Binding Form}">
+                <ContentControl Classes="form-content" Content="{Binding Forms.Form}">
                   <ContentControl.DataTemplates>
                     <!-- Strings, string lists, text and version (boards/read-then-edit.md, E5): read as text (a double-click
                          anywhere on it edits), edited with the inputs. -->

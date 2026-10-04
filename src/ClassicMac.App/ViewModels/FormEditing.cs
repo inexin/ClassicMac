@@ -37,7 +37,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
     private string? lastApplied;
 
     /// <summary>Whether the Preview tab shows the host (the form) rather than the resource's plain preview.</summary>
-    public bool ShowsForm => main.Form is { } form && (IsEditingForm || form.HasReadOnlyView);
+    public bool ShowsForm => main.Forms.Form is { } form && (IsEditingForm || form.HasReadOnlyView);
 
     /// <summary>The preview panel's title: "Preview", or "Live preview · unapplied changes" while editing.</summary>
     public string FormPreviewTitle => IsEditingForm ? "Live preview · unapplied changes" : "Preview";
@@ -46,9 +46,9 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
     public string FormReadOnlyNote => "Read only. Press Edit or double-click a row to change it.";
 
     /// <summary>The editing footer's hint: the form's own.</summary>
-    public string FormHint => main.Form?.EditHint ?? "";
+    public string FormHint => main.Forms.Form?.EditHint ?? "";
 
-    private bool CanEditForm(object? row) => main.Form is not null && main.Selected is ResourceNode && !IsEditingForm;
+    private bool CanEditForm(object? row) => main.Forms.Form is not null && main.Selected is ResourceNode && !IsEditingForm;
 
     /// <summary>Opens the selection's form for editing in the Preview tab; with a row (a double-click), that row selected.</summary>
     [RelayCommand(CanExecute = nameof(CanEditForm))]
@@ -59,7 +59,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
             return;
         }
 
-        main.Form!.SelectRow(row);
+        main.Forms.Form!.SelectRow(row);
         IsEditingForm = true;
         LastApplied = null;
         main.SelectedTab = 1;
@@ -75,7 +75,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
 
     partial void OnIsEditingFormChanged(bool value)
     {
-        if (main.Form is { } form)
+        if (main.Forms.Form is { } form)
         {
             form.IsEditing = value;
         }

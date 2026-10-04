@@ -235,14 +235,14 @@ public sealed partial class InspectorActions(MainViewModel main) : ObservableObj
     {
         get
         {
-            var header = InspectorHeader.For(main.Selected, main.FormEditing.IsEditingForm ? main.Form?.DraftLength : null);
+            var header = InspectorHeader.For(main.Selected, main.FormEditing.IsEditingForm ? main.Forms.Form?.DraftLength : null);
             if (header is not null && main.AliasActions.SelectedAlias is { } alias && ReferenceEquals(alias.Alias, main.Selected))
             {
                 header = header with { Kind = InspectorHeader.AliasKind(alias), Original = alias.Path };
             }
 
             // A resource shown through a template says which (boards/template-form.md).
-            return header is not null && main.Form is TemplateForm { ShownThrough: { } through }
+            return header is not null && main.Forms.Form is TemplateForm { ShownThrough: { } through }
                 ? header with { Facts = [.. header.Facts, new InspectorFact("Shown through", through, false)] }
                 : header;
         }

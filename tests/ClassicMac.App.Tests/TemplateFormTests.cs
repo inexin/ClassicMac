@@ -174,7 +174,7 @@ public sealed class TemplateFormTests : IDisposable
         await input.EnsureLoadedAsync();
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "BNDL").Children[0];
         await model.PreviewTask;
-        var form = Assert.IsType<TemplateForm>(model.Form);
+        var form = Assert.IsType<TemplateForm>(model.Forms.Form);
         Assert.True(model.FormEditing.ShowsForm);
         string Size() => model.InspectorActions.Header!.Facts.Single(f => f.Label == "Size").Value;
         Assert.Equal(new InspectorFact("Shown through", "'TMPL' 1000 “BNDL” in Bundle.rsrc", false), model.InspectorActions.Header!.Facts.Single(f => f.Label == "Shown through"));

@@ -11,7 +11,7 @@ public sealed class Drafts(MainViewModel main)
     internal bool askingDraft;
 
     /// <summary>
-    /// Raised with the property's name when a change to <see cref="Selected"/> or <see cref="UseTemplate"/> is refused
+    /// Raised with the property's name when a change to <see cref="MainViewModel.Selected"/> or <see cref="Forms.UseTemplate"/> is refused
     /// while a draft is asked about; the view sets its control back once it is done changing.
     /// </summary>
     public event EventHandler<string>? ChangeRefused;
@@ -35,7 +35,7 @@ public sealed class Drafts(MainViewModel main)
                 return (Name(target.Resource), null);
             }
 
-            if (main.Form is { } form && form.Draft is (true, var error))
+            if (main.Forms.Form is { } form && form.Draft is (true, var error))
             {
                 return (Name(form.Resource), error);
             }
@@ -85,7 +85,7 @@ public sealed class Drafts(MainViewModel main)
                 }
                 else
                 {
-                    main.ApplyForm();
+                    main.Forms.ApplyForm();
                 }
 
                 return !HasDraft;
@@ -104,9 +104,9 @@ public sealed class Drafts(MainViewModel main)
         {
             main.DiscardHexEdit();
         }
-        else if (main.Form is { Draft.IsDraft: true })
+        else if (main.Forms.Form is { Draft.IsDraft: true })
         {
-            main.UpdateForm(main.Selected);
+            main.Forms.UpdateForm(main.Selected);
         }
     }
 

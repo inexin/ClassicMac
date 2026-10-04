@@ -340,7 +340,7 @@ public class WindowTests
             {
                 model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == type).Children[0];
                 Pump(model.PreviewTask);
-                Assert.IsType(form, model.Form);
+                Assert.IsType(form, model.Forms.Form);
                 model.FormEditing.EditFormCommand.Execute(null);
                 Dispatcher.UIThread.RunJobs();
                 Capture(window, "edit-" + type.TrimEnd('#'), type is "DITL" or "Rsrc" ? baselines : null);
@@ -354,7 +354,7 @@ public class WindowTests
             // The item list's preview follows its form before Apply.
             model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "DITL").Children[0];
             Pump(model.PreviewTask);
-            var ditl = Assert.IsType<DialogItemsForm>(model.Form);
+            var ditl = Assert.IsType<DialogItemsForm>(model.Forms.Form);
             ditl.Items[1].Text = "Changed";
             Assert.Equal("Changed", model.FormLivePreview.FormDialog!.Drawing.Items[1].Item.Text);
             ditl.Items[0].Text = "日本";
@@ -492,7 +492,7 @@ public class WindowTests
             Dispatcher.UIThread.RunJobs();
             var tree = window.FindControl<BrowseTree>("Tree")!;
             Assert.Same(type.Children[0], tree.SelectedItem);
-            var form = Assert.IsType<StringForm>(model.Form);
+            var form = Assert.IsType<StringForm>(model.Forms.Form);
             form.Text = "edited";
             var details = model.Details;
 
@@ -506,7 +506,7 @@ public class WindowTests
             Assert.Equal(1, dialogs.Asked);
             Assert.Same(type.Children[0], model.Selected);
             Assert.Same(type.Children[0], tree.SelectedItem);
-            Assert.Same(form, model.Form);
+            Assert.Same(form, model.Forms.Form);
             Assert.Same(details, model.Details);
             dialogs.Pending.SetResult(DraftChoice.Cancel);
             Pump(model.DraftTask);
@@ -526,7 +526,7 @@ public class WindowTests
             Pump(model.DraftTask);
             Assert.Same(type.Children[1], model.Selected);
             Assert.Same(type.Children[1], tree.SelectedItem);
-            Assert.Equal("hi", Assert.IsType<StringForm>(model.Form).Text);
+            Assert.Equal("hi", Assert.IsType<StringForm>(model.Forms.Form).Text);
             window.Close();
         }
         finally
@@ -780,7 +780,7 @@ public class WindowTests
             model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single().Children[0];
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
-            var menu = Assert.IsType<MenuForm>(model.Form);
+            var menu = Assert.IsType<MenuForm>(model.Forms.Form);
             var host = window.FindControl<DockPanel>("FormHost")!;
             Assert.True(host.IsEffectivelyVisible);
             Assert.True(window.FindControl<StackPanel>("ReadOnlyFooter")!.IsEffectivelyVisible);
@@ -865,7 +865,7 @@ public class WindowTests
             // Edit again, change the title, Ctrl+Enter applies one undoable edit.
             model.FormEditing.EditFormCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
-            Assert.IsType<MenuForm>(model.Form).Title = "Fichier";
+            Assert.IsType<MenuForm>(model.Forms.Form).Title = "Fichier";
             text = host.GetVisualDescendants().OfType<TextBox>().First(t => t.IsEffectivelyVisible);
             text.RaiseEvent(new Avalonia.Input.KeyEventArgs
             {
@@ -930,7 +930,7 @@ public class WindowTests
                 .RaiseEvent(new Avalonia.Input.TappedEventArgs(Avalonia.Input.InputElement.DoubleTappedEvent, null!));
             Dispatcher.UIThread.RunJobs();
             Assert.True(model.FormEditing.IsEditingForm);
-            var list = Assert.IsType<StringListForm>(model.Form);
+            var list = Assert.IsType<StringListForm>(model.Forms.Form);
             Assert.Same(list.Strings[1], list.SelectedItem);
             Assert.Contains(host.GetVisualDescendants().OfType<TextBox>(), t => t.Text == "two" && t.IsEffectivelyVisible);
             window.Close();
@@ -1108,18 +1108,18 @@ public class WindowTests
             Pump(model.PreviewTask);
             model.FormEditing.EditFormCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
-            Assert.IsType<StringForm>(model.Form).Text = "edited";
+            Assert.IsType<StringForm>(model.Forms.Form).Text = "edited";
             var box = window.GetVisualDescendants().OfType<CheckBox>().Single(c => c.Content as string == "Edit with template");
             box.IsChecked = true;                                           // as a click does
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(1, dialogs.Asked);
-            Assert.False(model.UseTemplate);
+            Assert.False(model.Forms.UseTemplate);
             Assert.False(box.IsChecked);
             dialogs.Pending.SetResult(DraftChoice.Discard);
             Pump(model.DraftTask);
-            Assert.True(model.UseTemplate);
+            Assert.True(model.Forms.UseTemplate);
             Assert.True(box.IsChecked);
-            Assert.IsType<TemplateForm>(model.Form);
+            Assert.IsType<TemplateForm>(model.Forms.Form);
             window.Close();
         }
         finally

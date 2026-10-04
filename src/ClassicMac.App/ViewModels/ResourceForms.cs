@@ -165,10 +165,7 @@ public abstract partial class ResourceForm : ObservableObject
             _ => null,
         };
     }
-}
 
-public abstract partial class ResourceForm
-{
     // An alert's item list from its fork: the DITL's name and its items' texts; null when it is missing or unreadable.
     private static ItemList? ItemListOf(ResourceFork fork, short id, ReadOptions readOptions)
     {
@@ -187,120 +184,5 @@ public abstract partial class ResourceForm
         {
             return null;
         }
-    }
-}
-
-
-public sealed partial class MainViewModel
-{
-    /// <summary>The typed editor for the selection, or null.</summary>
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ApplyFormCommand), nameof(SaveCommand))]
-    private ResourceForm? form;
-
-    public bool HasForm => Form is not null;
-
-    partial void OnFormChanged(ResourceForm? value)
-    {
-        FormEditing.EditFormCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(HasForm));
-        FormEditing.HostForm(value);
-    }
-
-    internal void UpdateForm(NodeViewModel? node)
-    {
-        ResourceForm? typed = null, template = null;
-        if (node is ResourceNode r && FileOwner(r) is { } owner)
-        {
-            typed = ResourceForm.For(r.Resource, r.Fork, ReadOptions);
-            template = TemplateFinder.TemplateFormFor(r, owner);
-        }
-        HasTemplateChoice = typed is not null && template is not null;
-        var form = UseTemplate ? template ?? typed : typed ?? template;
-        form?.MarkClean();
-        // A draft can be saved (Save applies it first): Save's state follows the form's values.
-        if (form is not null)
-        {
-            form.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
-        }
-
-        Form = form;
-        FormLivePreview.WatchForm(Form, node as ResourceNode);
-    }
-
-    private bool useTemplate;
-
-    /// <summary>
-    /// Whether the Edit tab shows a resource through its <c>TMPL</c> even when it has a form of its own. With an
-    /// unapplied draft, a change asks about it first and is made once it is applied or discarded.
-    /// </summary>
-    public bool UseTemplate
-    {
-        get => useTemplate;
-        set
-        {
-            if (useTemplate == value)
-            {
-                return;
-            }
-
-            if (Drafts.askingDraft || Drafts.HasDraft)
-            {
-                if (!Drafts.askingDraft)
-                {
-                    DraftTask = UseTemplateAfterDraftAsync(value);
-                }
-                // The check box (bound two-way) already shows the new value: told again, it shows the kept one.
-                if (useTemplate != value)
-                {
-                    Drafts.Refuse(nameof(UseTemplate));
-                }
-
-                return;
-            }
-            SetProperty(ref useTemplate, value);
-            UpdateForm(Selected);
-        }
-    }
-
-    private async Task UseTemplateAfterDraftAsync(bool value)
-    {
-        if (await Drafts.ResolveDraftAsync())
-        {
-            UseTemplate = value;
-        }
-    }
-
-    /// <summary>Whether the selection has both a form of its own and a template to choose between.</summary>
-    [ObservableProperty]
-    private bool hasTemplateChoice;
-
-
-    private bool CanApplyForm() => Form is not null && Selected is ResourceNode && FormLivePreview.FormError is null;
-
-    [RelayCommand(CanExecute = nameof(CanApplyForm))]
-    internal void ApplyForm()
-    {
-        if (Form is not { } form || Selected is not ResourceNode node || FileOwner(node) is not { } owner)
-        {
-            return;
-        }
-
-        IResourceEdit edit;
-        try
-        {
-            edit = form.BuildEdit(StateFor(owner).Session.Fork);
-        }
-        catch (ArgumentException e)
-        {
-            Status = e.Message;
-            return;
-        }
-        var resource = form.Resource;
-        // Applied: no longer a draft, so the selection the edit moves to is not refused.
-        form.MarkClean();
-        Execute(owner, edit, () => resource);
-        FormEditing.IsEditingForm = false;
-        FormEditing.LastApplied = $"Applied · {UndoTitle.Replace("_", "", StringComparison.Ordinal)} (Ctrl+Z)";
     }
 }

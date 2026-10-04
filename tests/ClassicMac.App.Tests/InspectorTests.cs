@@ -195,7 +195,7 @@ public sealed class InspectorTests : IDisposable
         Assert.Equal(1, model.SelectedTab);
         Assert.False(model.FormEditing.EditFormCommand.CanExecute(null));
         Assert.True(model.FormEditing.CancelFormCommand.CanExecute(null));
-        var form = Assert.IsType<StringListForm>(model.Form);
+        var form = Assert.IsType<StringListForm>(model.Forms.Form);
         form.Strings[0].Text = "uno";
         Assert.True(model.Drafts.HasDraft);
 
@@ -203,7 +203,7 @@ public sealed class InspectorTests : IDisposable
 
         Assert.False(model.FormEditing.IsEditingForm);
         Assert.False(model.Drafts.HasDraft);
-        Assert.Equal("one", Assert.IsType<StringListForm>(model.Form).Strings[0].Text);
+        Assert.Equal("one", Assert.IsType<StringListForm>(model.Forms.Form).Strings[0].Text);
         Assert.False(input.IsUnsaved);
     }
 
@@ -212,9 +212,9 @@ public sealed class InspectorTests : IDisposable
     {
         var (model, input, _) = await OpenForms(Forks());
         model.FormEditing.EditFormCommand.Execute(null);
-        Assert.IsType<StringListForm>(model.Form).Strings[0].Text = "uno";
+        Assert.IsType<StringListForm>(model.Forms.Form).Strings[0].Text = "uno";
 
-        model.ApplyFormCommand.Execute(null);
+        model.Forms.ApplyFormCommand.Execute(null);
 
         Assert.False(model.FormEditing.IsEditingForm);
         Assert.True(input.IsUnsaved);

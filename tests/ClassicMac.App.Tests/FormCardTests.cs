@@ -212,7 +212,7 @@ public sealed class FormCardTests : IDisposable
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "ALRT").Children[0];
         await model.PreviewTask;
 
-        var form = Assert.IsType<AlertForm>(model.Form);
+        var form = Assert.IsType<AlertForm>(model.Forms.Form);
         Assert.Equal("'DITL' 129 “Save Changes”", form.ItemsText);
         Assert.Equal(1, model.FormLivePreview.FormDialog!.Drawing.DefaultItem);
         form.SelectedStage = form.Stages[2];
