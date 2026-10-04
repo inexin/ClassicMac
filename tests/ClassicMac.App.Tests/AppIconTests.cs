@@ -51,7 +51,14 @@ public class AppIconTests
         var window = new MainWindow { DataContext = new MainViewModel() };
         window.Show();
         Assert.NotNull(window.Icon);
-        var icon = window.Named<Border>("TitleBar")!.GetVisualDescendants().OfType<AppIconView>().Single();
+        var titleBar = window.Named<Border>("TitleBar")!;
+        if (OperatingSystem.IsLinux())
+        {
+            Assert.False(titleBar.IsVisible);                                    // the system's title bar instead
+            Assert.Skip("Linux keeps the system's title bar; the custom one, with its icon, is hidden.");
+        }
+
+        var icon = titleBar.GetVisualDescendants().OfType<AppIconView>().Single();
         foreach (var (scaling, pixels) in new[] { (1.0, 16), (1.25, 20), (1.5, 24), (2.0, 32) })
         {
             window.SetRenderScaling(scaling);

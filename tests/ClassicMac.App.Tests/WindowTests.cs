@@ -650,7 +650,7 @@ public class WindowTests
             Assert.Equal(!OperatingSystem.IsLinux(), titleBar.IsVisible);
             Assert.Equal(Avalonia.Input.WindowDecorationsElementRole.TitleBar, Avalonia.Controls.Chrome.WindowDecorationProperties.GetElementRole(titleBar));
             Assert.Equal("Shell.rsrc — ClassicMac", window.Title);
-            Assert.Contains(titleBar.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Shell.rsrc" && t.IsEffectivelyVisible);
+            Assert.Contains(titleBar.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Shell.rsrc" && t.IsEffectivelyVisible == !OperatingSystem.IsLinux());
 
             // S2: each toolbar button runs its command and follows its enabled state.
             var tools = window.Named<Border>("Toolbar")!.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("tool"))

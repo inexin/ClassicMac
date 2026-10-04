@@ -47,7 +47,9 @@ internal static class Baselines
 
     public static string Folder { get; } = SourceFolder();
 
-    public static string FailureFolder { get; } = Path.Combine(Path.GetTempPath(), "classicmac-baselines");
+    // Where a mismatch's actual frame and diff go: CLASSICMAC_BASELINE_FAILURES (CI keeps it), else the temp folder.
+    public static string FailureFolder { get; } =
+        Environment.GetEnvironmentVariable("CLASSICMAC_BASELINE_FAILURES") ?? Path.Combine(Path.GetTempPath(), "classicmac-baselines");
 
     private static string SourceFolder([CallerFilePath] string source = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(source)!, "..", "golden", "app"));
@@ -183,6 +185,17 @@ internal static class Baselines
         {
             handle.Free();
         }
+
+        // A bitmap copies out in its own format: RGBA on macOS, where BGRA is wanted.
+        if (bitmap.Format == Avalonia.Platform.PixelFormat.Rgba8888)
+        {
+            for (var i = 0; i < pixels.Length; i++)
+            {
+                var p = pixels[i];
+                pixels[i] = (p & 0xFF00FF00) | (p >> 16 & 0xFF) | (p & 0xFF) << 16;
+            }
+        }
+
         return new Frame(size, pixels);
     }
 

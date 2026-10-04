@@ -19,3 +19,12 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet test --solution ClassicMac.slnx -c Release
+        env:
+          CLASSICMAC_BASELINE_FAILURES: ${{ runner.temp }}/classicmac-baselines
+      # A screenshot that differs from its baseline: the actual frame and the diff, to look at.
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-failures-${{ matrix.os }}
+          path: ${{ runner.temp }}/classicmac-baselines
+          if-no-files-found: ignore
