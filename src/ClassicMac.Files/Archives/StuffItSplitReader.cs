@@ -189,8 +189,9 @@ public sealed class StuffItSplitReader : IContainerReader
         ];
     }
 
-    private static bool TryReadHeader(ReadOnlySpan<byte> bytes, out SplitHeader? header)
+    private static bool TryReadHeader(ReadOnlyMemory<byte> data, out SplitHeader? header)
     {
+        var bytes = data.Span;
         header = null;
         // $B056 is SegmentIt's magic; $41A7 is StuffIt 1.5.1's own Segment command. Both use the same layout. The
         // 1.5.1 headers leave the bytes after the name and after the metadata (94–99) uninitialised, so only the
@@ -217,7 +218,7 @@ public sealed class StuffItSplitReader : IContainerReader
 
         byte[] metadata = bytes.Slice(SharedMetadataOffset, SharedMetadataLength).ToArray();
         var reader = new BigEndianReader(metadata);
-        header = new SplitHeader((ushort)(bytes[0] << 8 | bytes[1]), bytes[3], nameBytes.ToArray(), metadata,
+        header = new SplitHeader(new BigEndianReader(data).ReadUInt16At(0), bytes[3], nameBytes.ToArray(), metadata,
             reader.ReadUInt32At(18), reader.ReadUInt32At(22));
         return true;
     }

@@ -280,13 +280,13 @@ public sealed class CodeListing
                 if (tables.TryGetValue(at, out var table))
                 {
                     int end = (int)Math.Min(image.Length, (table.Offset + (long)table.Length + 3) & ~3L);
-                    w.PpcData(section, image.Span[at..end], at, "traceback table" + (table.Name is { } tn ? " " + tn : ""));
+                    w.PpcData(section, image[at..end], at, "traceback table" + (table.Name is { } tn ? " " + tn : ""));
                     at = end;
                     continue;
                 }
                 if (at > image.Length - 4)
                 {
-                    w.PpcData(section, image.Span[at..], at, null);
+                    w.PpcData(section, image[at..], at, null);
                     break;
                 }
                 var ins = PpcDisassembler.Decode(reader.ReadUInt32At(at), (uint)at);
@@ -451,13 +451,12 @@ public sealed class CodeListing
     private static List<CodeReference> WriteBody(ListingWriter w, M68kCodeMap map, M68kContext context)
     {
         var references = new List<CodeReference>();
-        var span = map.Code.Span;
         int d = 0;
         foreach (var (offset, ins) in map.Instructions)
         {
             for (; d < map.Data.Count && map.Data[d].Offset < offset; d++)
             {
-                w.M68kData(span, map.Data[d]);
+                w.M68kData(map.Code, map.Data[d]);
             }
 
             if (map.Functions.TryGetValue(offset, out var function))
@@ -481,7 +480,7 @@ public sealed class CodeListing
         }
         for (; d < map.Data.Count; d++)
         {
-            w.M68kData(span, map.Data[d]);
+            w.M68kData(map.Code, map.Data[d]);
         }
 
         return references;
@@ -531,8 +530,9 @@ public sealed class CodeListing
             body = true;
         }
 
-        public void M68kData(ReadOnlySpan<byte> code, M68kDataRegion region)
+        public void M68kData(ReadOnlyMemory<byte> code, M68kDataRegion region)
         {
+            var reader = new BigEndianReader(code);
             string? note = region.Kind switch
             {
                 M68kDataKind.MacsBugName => "MacsBug name " + region.Note,
@@ -559,7 +559,7 @@ public sealed class CodeListing
                     n &= ~1;
                 }
 
-                var bytes = code.Slice(at, n);
+                var bytes = code.Span.Slice(at, n);
                 string hex, text;
                 if (n == 1)
                 {
@@ -571,7 +571,7 @@ public sealed class CodeListing
                     var words = new List<string>();
                     for (int i = 0; i < n; i += 2)
                     {
-                        words.Add(((bytes[i] << 8) | bytes[i + 1]).ToString("X4", CultureInfo.InvariantCulture));
+                        words.Add(reader.ReadUInt16At(at + i).ToString("X4", CultureInfo.InvariantCulture));
                     }
 
                     hex = string.Join(" ", words);
@@ -584,8 +584,10 @@ public sealed class CodeListing
             }
         }
 
-        public void PpcData(int section, ReadOnlySpan<byte> bytes, int offset, string? note)
+        public void PpcData(int section, ReadOnlyMemory<byte> data, int offset, string? note)
         {
+            var reader = new BigEndianReader(data);
+            var bytes = data.Span;
             for (int i = 0; i < bytes.Length;)
             {
                 string address = $"{section}:{offset + i:X8}";
@@ -594,7 +596,7 @@ public sealed class CodeListing
                     var words = new List<string>();
                     for (; words.Count < WordsPerLine && bytes.Length - i >= 4; i += 4)
                     {
-                        words.Add(((uint)(bytes[i] << 24 | bytes[i + 1] << 16 | bytes[i + 2] << 8 | bytes[i + 3])).ToString("X8", CultureInfo.InvariantCulture));
+                        words.Add(reader.ReadUInt32At(i).ToString("X8", CultureInfo.InvariantCulture));
                     }
 
                     Line(address, string.Join(" ", words), "dc.l $" + string.Join(",$", words), note);

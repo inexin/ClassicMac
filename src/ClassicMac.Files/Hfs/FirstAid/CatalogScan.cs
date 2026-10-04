@@ -50,7 +50,7 @@ internal sealed class CatalogScan
         foreach (var (key, data, node) in records)
         {
             uint parent = KeyId(key);
-            int type = data.Length >= 2 ? data[0] << 8 | data[1] : -1;
+            int type = data.Length >= 2 ? RecordType(data) : -1;
             bool done = type switch
             {
                 FolderThread or FileThread => Thread(key, data, node, type == FolderThread),
@@ -293,5 +293,5 @@ internal sealed class CatalogScan
         return null;
     }
 
-    private static int Type(byte[] data) => data.Length >= 2 ? data[0] << 8 | data[1] : -1;
+    private static int Type(byte[] data) => data.Length >= 2 ? RecordType(data) : -1;
 }

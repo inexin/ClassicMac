@@ -69,7 +69,7 @@ internal static class PlusLinkCheck
         foreach (var (reference, count) in links)
         {
             var indirect = children.GetValueOrDefault(IndirectName(reference, folder));
-            if (indirect is null || PlusRecordType(indirect) != (folder ? Folder : File))
+            if (indirect is null || RecordType(indirect) != (folder ? Folder : File))
             {
                 run.Problem(folder ? "A directory hard link's folder is missing" : "A hard link's indirect file is missing", "firstaid.link-target-missing",
                     FirstAidRepairs.None);

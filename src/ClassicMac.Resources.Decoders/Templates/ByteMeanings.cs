@@ -25,7 +25,10 @@ public static class ByteMeanings
     /// <paramref name="data"/>; null outside the data, for types with no field map, and when the template cannot be
     /// used. <c>'STR '</c> and <c>'STR#'</c> are read as strings whatever the template.
     /// </summary>
-    public static ByteMeaning? MeaningAt(FourCC type, ReadOnlySpan<byte> data, int offset, ResourceTemplate? template)
+    public static ByteMeaning? MeaningAt(FourCC type, ReadOnlyMemory<byte> data, int offset, ResourceTemplate? template) =>
+        MeaningAt(type, new BigEndianReader(data), offset, template);
+
+    private static ByteMeaning? MeaningAt(FourCC type, BigEndianReader data, int offset, ResourceTemplate? template)
     {
         if (offset < 0 || offset >= data.Length)
         {
@@ -33,7 +36,7 @@ public static class ByteMeanings
         }
         return type.ToString() switch
         {
-            "STR " => InString(data, offset),
+            "STR " => InString(data.Source.Span, offset),
             "STR#" => InStringList(data, offset),
             _ => template is { Problems.Count: 0 } ? InTemplate(template, data, offset) : null,
         };
@@ -44,26 +47,27 @@ public static class ByteMeanings
     /// and for <c>'CODE'</c> its layout by ID (docs/formats/code/code-segments.md §1.2–§1.5): <c>'CODE'</c> 0's A5
     /// world and jump-table entries, another segment's near or far header, its code and far relocation lists.
     /// </summary>
-    public static ByteMeaning? MeaningAt(FourCC type, short id, ReadOnlySpan<byte> data, int offset, ResourceTemplate? template)
+    public static ByteMeaning? MeaningAt(FourCC type, short id, ReadOnlyMemory<byte> data, int offset, ResourceTemplate? template)
     {
         if (offset < 0 || offset >= data.Length)
         {
             return null;
         }
 
-        return type.ToString() == "CODE" ? (id == 0 ? InJumpTable(data, offset) : InSegment(data, offset)) : MeaningAt(type, data, offset, template);
+        var reader = new BigEndianReader(data);
+        return type.ToString() == "CODE" ? (id == 0 ? InJumpTable(reader, offset) : InSegment(reader, offset)) : MeaningAt(type, reader, offset, template);
     }
 
     private static string Hex(int word) => "$" + word.ToString("X4", CultureInfo.InvariantCulture);
 
-    private static int Word(ReadOnlySpan<byte> data, int at) => at + 2 <= data.Length ? data[at] << 8 | data[at + 1] : -1;
+    // A word or long at an offset; -1 past the end.
+    private static int Word(BigEndianReader data, int at) => data.TryReadUInt16At(at, out var word) ? word : -1;
 
-    private static long Long(ReadOnlySpan<byte> data, int at) =>
-        at + 4 <= data.Length ? (long)(uint)(data[at] << 24 | data[at + 1] << 16 | data[at + 2] << 8 | data[at + 3]) : -1;
+    private static long Long(BigEndianReader data, int at) => data.TryReadUInt32At(at, out var value) ? value : -1;
 
     // 'CODE' 0 (§1.2–§1.3): the four sizes, then 8-byte entries from +$10; entry 1 the far marker in a far table, whose
     // later entries are segment, _LoadSeg and a 4-byte offset; near entries offset, MOVE.W #segment, segment, _LoadSeg.
-    private static ByteMeaning? InJumpTable(ReadOnlySpan<byte> data, int offset)
+    private static ByteMeaning? InJumpTable(BigEndianReader data, int offset)
     {
         if (offset < 16)
         {
@@ -116,7 +120,7 @@ public static class ByteMeanings
     // A segment (§1.4–§1.5): the near header (first entry's offset, entry count) or the far one (marker $FFFF, the
     // near and far entries, the relocation lists' offsets and last relocations), then the code, then any far
     // relocation lists to the end.
-    private static ByteMeaning? InSegment(ReadOnlySpan<byte> data, int offset)
+    private static ByteMeaning? InSegment(BigEndianReader data, int offset)
     {
         static string Entry(long jtOffset) => $"(entry {jtOffset / 8})";
         if (Word(data, 0) != 0xFFFF)
@@ -208,9 +212,10 @@ public static class ByteMeanings
     }
 
     // 'STR#': a count word, then that many Pascal strings (strings.md §2).
-    private static ByteMeaning? InStringList(ReadOnlySpan<byte> data, int offset)
+    private static ByteMeaning? InStringList(BigEndianReader reader, int offset)
     {
-        int count = data.Length >= 2 ? data[0] << 8 | data[1] : data[0] << 8;
+        var data = reader.Source.Span;
+        int count = data.Length >= 2 ? reader.ReadUInt16At(0) : data[0] << 8;   // a lone byte is the count's high byte
         if (offset < 2)
         {
             return new ByteMeaning("Number of strings", 0, 2, Number(count));
@@ -233,8 +238,9 @@ public static class ByteMeanings
     }
 
     // A type a template describes: the field the byte is in, named by its label and the list items it is in.
-    private static ByteMeaning? InTemplate(ResourceTemplate template, ReadOnlySpan<byte> data, int offset)
+    private static ByteMeaning? InTemplate(ResourceTemplate template, BigEndianReader reader, int offset)
     {
+        var data = reader.Source.Span;
         var spans = template.Map(data);
         var here = spans.Where(s => offset >= s.Offset && offset - s.Offset < s.Length).ToList();
         if (here.Count == 0)
@@ -251,14 +257,15 @@ public static class ByteMeanings
             var text = $"Bits on: {List(named.Where(b => b.On).Select(b => b.Label))}; off: {List(named.Where(b => !b.On).Select(b => b.Label))}";
             return new ByteMeaning(text, here[0].Offset, 1, "$" + Convert.ToHexString(data.Slice(offset, 1)));
         }
-        return InField(here[0], data, offset);
+        return InField(here[0], reader, offset);
     }
 
     private static string NameOf(TemplateSpan span) =>
         span.Items.Count == 0 ? span.Node.Label : $"{span.Node.Label} of item {string.Join(".", span.Items)}";
 
-    private static ByteMeaning InField(TemplateSpan span, ReadOnlySpan<byte> data, int offset)
+    private static ByteMeaning InField(TemplateSpan span, BigEndianReader reader, int offset)
     {
+        var data = reader.Source.Span;
         var name = NameOf(span);
         int start = span.Offset;
         int end = Math.Min(span.Offset + span.Length, data.Length);
@@ -276,10 +283,10 @@ public static class ByteMeanings
             case "PSTR" or "ESTR" or "OSTR":
                 return InCountedText(data, offset, start, end, 1, data[start], name);
             case "WSTR":
-                return InCountedText(data, offset, start, end, 2, end - start >= 2 ? data[start] << 8 | data[start + 1] : 0, name);
+                return InCountedText(data, offset, start, end, 2, end - start >= 2 ? reader.ReadUInt16At(start) : 0, name);
             case "LSTR":
                 return InCountedText(data, offset, start, end, 4,
-                    end - start >= 4 ? (int)Math.Min(new BigEndianReader(data.Slice(start, 4).ToArray()).ReadUInt32(), int.MaxValue) : 0, name);
+                    end - start >= 4 ? (int)Math.Min(reader.ReadUInt32At(start), int.MaxValue) : 0, name);
             case "CSTR" or "ECST" or "OCST":
                 {
                     int nul = data[start..end].IndexOf((byte)0);

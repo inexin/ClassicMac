@@ -206,7 +206,7 @@ internal static class ResourceForkReader
                 $"The data of {label} at {start} lies outside the data area; the resource is skipped.", entry);
             return null;
         }
-        long length = new BigEndianReader(context.Input).ReadUInt32At((int)start);
+        long length = context.Reader.ReadUInt32At((int)start);
         if (length > context.Options.MaxResourceSize)
         {
             context.Report(DiagnosticSeverity.Error, "resource.too-large",
@@ -264,6 +264,10 @@ internal static class ResourceForkReader
         long dataOffset, long dataEnd, long mapEnd, long nameList)
     {
         public ReadOnlyMemory<byte> Input { get; } = input;
+
+        // The fork's one reader, for the data lengths read at each resource's offset.
+        public BigEndianReader Reader { get; } = new(input);
+
         public ResourceFork Fork { get; } = fork;
         public ReadOptions Options { get; } = options;
         public long DataOffset { get; } = dataOffset;

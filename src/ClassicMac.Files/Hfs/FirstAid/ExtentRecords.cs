@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -12,7 +13,7 @@ internal static class ExtentRecords
     /// ChkExtRec (#11, ending the check): each of the record's three extents starts and counts below the volume's block
     /// count, and none with blocks follows an empty one; a start plus count past the end is not checked.
     /// </summary>
-    public static bool Check(FirstAidRun run, ReadOnlySpan<byte> record, long cnid, long node)
+    public static bool Check(FirstAidRun run, ReadOnlyMemory<byte> record, long cnid, long node)
     {
         if (record.Length < 12)
         {
@@ -20,9 +21,10 @@ internal static class ExtentRecords
         }
 
         uint previousCount = 1;
+        var extents = new BigEndianReader(record);
         for (var i = 0; i < 3; i++)
         {
-            uint start = (uint)(record[4 * i] << 8 | record[4 * i + 1]), count = (uint)(record[4 * i + 2] << 8 | record[4 * i + 3]);
+            uint start = extents.ReadUInt16(), count = extents.ReadUInt16();
             if (start >= run.BlockCount || count >= run.BlockCount || previousCount == 0 && count != 0)
             {
                 return run.Fatal(11, cnid, node);
@@ -57,7 +59,7 @@ internal static class ExtentRecords
     /// </summary>
     public static List<(uint Start, uint Count)>? Fork(FirstAidRun run, ReadOnlyMemory<byte> catalogRecord, byte fork, uint fileId, long node)
     {
-        if (!Check(run, catalogRecord.Span, fileId, node))
+        if (!Check(run, catalogRecord, fileId, node))
         {
             return null;
         }
@@ -70,7 +72,7 @@ internal static class ExtentRecords
         }
 
         var records = run.Extents!.Records;
-        int at = records.FindIndex(r => KeyIs(r.Key, fork, fileId) && (r.Key[6] << 8 | r.Key[7]) == blocks);
+        int at = records.FindIndex(r => KeyIs(r.Key, fork, fileId) && ExtentsStart(r.Key) == blocks);
         for (; at >= 0 && at < records.Count && KeyIs(records[at].Key, fork, fileId); at++)
         {
             if (!Check(run, records[at].Data, fileId, node))
@@ -79,7 +81,7 @@ internal static class ExtentRecords
             }
 
             // Beyond Disk First Aid: each record's start block is the fork's blocks before it.
-            if ((records[at].Key[6] << 8 | records[at].Key[7]) != blocks)
+            if (ExtentsStart(records[at].Key) != blocks)
             {
                 run.Problem("An overflow extents record's start block is not the fork's blocks before it", "firstaid.extent-start", FirstAidRepairs.ExtentStarts);
             }
@@ -95,5 +97,5 @@ internal static class ExtentRecords
     }
 
     private static bool KeyIs(byte[] key, byte fork, uint fileId) =>
-        key.Length >= 8 && key[1] == fork && (uint)(key[2] << 24 | key[3] << 16 | key[4] << 8 | key[5]) == fileId;
+        key.Length >= 8 && key[1] == fork && KeyId(key) == fileId;
 }

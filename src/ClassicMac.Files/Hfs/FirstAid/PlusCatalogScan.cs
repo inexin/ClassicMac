@@ -312,7 +312,7 @@ internal sealed class PlusCatalogScan
     // 0, and 3 to 15 but the special files' CNIDs that never have records, are not a folder's or file's.
     private static bool InvalidId(uint id) => id < 16;
 
-    private static ushort Type(byte[] data) => data.Length >= 2 ? (ushort)(data[0] << 8 | data[1]) : (ushort)0;
+    private static ushort Type(byte[] data) => data.Length >= 2 ? RecordType(data) : (ushort)0;
 
 
     private static string Name(byte[] key)

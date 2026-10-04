@@ -250,7 +250,7 @@ internal sealed class PlusCatalogRepair
 
     private void Add(uint cnid, string detail) => changes.Add(new PlannedChange("repair", "", $"catalog, CNID {cnid}: {detail}"));
 
-    private static ushort Type(byte[] data) => data.Length >= 2 ? (ushort)(data[0] << 8 | data[1]) : (ushort)0;
+    private static ushort Type(byte[] data) => data.Length >= 2 ? RecordType(data) : (ushort)0;
 
     private static uint Id(byte[] data) => data.Length >= 12 ? PlusRecordId(data) : 0;
 

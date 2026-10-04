@@ -385,12 +385,14 @@ public static class MacWordDocuments
 
         // Applies a character block (a style's, or a CHPX) to a CHP: the first byte toggles the flags, the second says
         // which of the fields after it apply [Fitted; Reference: libmwaw].
-        private static Chp Apply(Chp chp, ReadOnlySpan<byte> block, Chp style)
+        private static Chp Apply(Chp chp, ReadOnlyMemory<byte> data, Chp style)
         {
-            if (block.Length == 0)
+            if (data.Length == 0)
             {
                 return chp;
             }
+
+            var block = data.Span;
 
             var what = block.Length > 1 ? block[1] : (byte)0;
             if ((what & 0x40) != 0)
@@ -401,7 +403,7 @@ public static class MacWordDocuments
             chp = chp with { Flags = (byte)(chp.Flags ^ block[0]) };
             if ((what & 0x50) != 0 && block.Length >= 4)
             {
-                chp = chp with { Font = (short)((block[2] << 8) | block[3]) };
+                chp = chp with { Font = new BigEndianReader(data).ReadInt16At(2) };
             }
 
             if ((what & 0x48) != 0 && block.Length >= 5 && block[4] > 0)
@@ -423,8 +425,10 @@ public static class MacWordDocuments
         }
 
         // Applies paragraph sprms (word-mac.md §1.6); stops at an unknown one (reported).
-        private Pap Apply(Pap pap, ReadOnlySpan<byte> sprms)
+        private Pap Apply(Pap pap, ReadOnlyMemory<byte> data)
         {
+            var reader = new BigEndianReader(data);
+            var sprms = data.Span;
             for (var i = 0; i < sprms.Length;)
             {
                 var sprm = sprms[i++];
@@ -439,7 +443,7 @@ public static class MacWordDocuments
                     0x10 or 0x11 or 0x13 or 0x14 or 0x15 or 0x16 or >= 0x1E and <= 0x22 or 0x94 or 0x99 => 2,
                     0x0F or 0x17 when i < sprms.Length => 1 + sprms[i],
                     // The cell definitions' length is even, counting a pad byte the block may end before [Verified].
-                    0x98 when i + 1 < sprms.Length => Math.Min(2 + ((sprms[i] << 8) | sprms[i + 1]), Math.Max(sprms.Length - i, 3)),
+                    0x98 when i + 1 < sprms.Length => Math.Min(2 + reader.ReadUInt16At(i), Math.Max(sprms.Length - i, 3)),
                     _ => -1,
                 };
                 if (size < 0 || i + size > sprms.Length)
@@ -450,7 +454,7 @@ public static class MacWordDocuments
                 }
 
                 var arg = sprms.Slice(i, size);
-                var word = size >= 2 ? (short)((arg[0] << 8) | arg[1]) : (short)0;
+                var word = size >= 2 ? reader.ReadInt16At(i) : (short)0;
                 pap = sprm switch
                 {
                     0x05 => pap with
@@ -470,7 +474,7 @@ public static class MacWordDocuments
                     0x16 => pap with { After = word },
                     0x18 => pap with { InTable = arg[0] != 0 },
                     0x19 => pap with { RowEnd = arg[0] != 0 },
-                    0x98 when arg.Length >= 3 => pap with { CellEdges = CellEdges(arg) },
+                    0x98 when arg.Length >= 3 => pap with { CellEdges = CellEdges(reader.ReadSubReaderAt(i, size)) },
                     _ => pap,
                 };
                 i += size;
@@ -481,13 +485,13 @@ public static class MacWordDocuments
 
         // The cell definitions: a length word, the cell count, then the row's left edge and each cell's right edge,
         // signed twips [Verified: Word 5.1a and 4.0 tables].
-        private static short[] CellEdges(ReadOnlySpan<byte> arg)
+        private static short[] CellEdges(BigEndianReader arg)
         {
-            var count = arg[2];
+            var count = arg.ReadByteAt(2);
             var edges = new List<short>();
             for (var k = 0; k <= count && 3 + 2 * k + 1 < arg.Length; k++)
             {
-                edges.Add((short)((arg[3 + 2 * k] << 8) | arg[4 + 2 * k]));
+                edges.Add(arg.ReadInt16At(3 + 2 * k));
             }
 
             return [.. edges];
@@ -555,7 +559,7 @@ public static class MacWordDocuments
                     papRun = p;
                     var block = p >= 0 ? paragraphs[p].Block : [];
                     style = block.Length > 0 ? block[0] : 0;
-                    pap = Apply(StylePap(style), block.Length > 7 ? block.AsSpan(7) : []);
+                    pap = Apply(StylePap(style), block.Length > 7 ? block.AsMemory(7) : ReadOnlyMemory<byte>.Empty);
                 }
 
                 var c = RunAt(characters, fc);

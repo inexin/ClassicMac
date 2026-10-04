@@ -231,7 +231,7 @@ internal static class FolderPreviews
             var finder = file.FinderInfo;
             var kind = ApplicationTypes.Contains(finder.Type.ToString()) ? FinderItemKind.Application : FinderItemKind.Document;
             // The extended Finder flags: FXInfo +8, a word over fdScript and fdXFlags (Finder.h, ExtendedFileInfo).
-            var extended = finder.Extended.Span is { Length: >= 10 } x ? (ushort)((x[8] << 8) | x[9]) : (ushort)0;
+            var extended = finder.Extended.Length >= 10 ? new BigEndianReader(finder.Extended).ReadUInt16At(8) : (ushort)0;
             return resolver.Find(kind, finder.Type, finder.Creator, (ushort)finder.Flags, fork, extended, file.IsLocked);
         }
 

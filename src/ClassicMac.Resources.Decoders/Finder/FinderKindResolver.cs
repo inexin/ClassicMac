@@ -254,7 +254,8 @@ public sealed class FinderKindResolver
                 continue;
             }
 
-            var data = Data(resource, fork).Span;
+            var memory = Data(resource, fork);
+            var data = memory.Span;
             var at = 0;
             if (listType == StrList)
             {
@@ -263,7 +264,7 @@ public sealed class FinderKindResolver
                     return null;
                 }
 
-                var count = data[0] << 8 | data[1];
+                var count = new BigEndianReader(memory).ReadUInt16At(0);
                 at = 2;
                 for (var i = 1; i < item && i <= count && at < data.Length; i++)
                 {

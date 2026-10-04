@@ -71,7 +71,7 @@ public sealed class PictInfo
             return;
         }
 
-        uint selector = (uint)(data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3]);
+        uint selector = new BigEndianReader(data).ReadUInt32At(0);
         var payload = data.AsSpan(4);
         switch (selector)
         {

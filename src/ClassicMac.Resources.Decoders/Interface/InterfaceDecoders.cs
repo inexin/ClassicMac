@@ -167,8 +167,8 @@ internal sealed class InterfaceDecoder(DecodeOptions options, string name, strin
             }
             else if (item.Type == 1 && item.Data.Length >= 4)
             {
-                var help = item.Data.Span;
-                var helpKind = (help[0] << 8) | help[1];
+                var help = new BigEndianReader(item.Data);
+                var helpKind = help.ReadUInt16At(0);
                 w.WriteNumber("helpKind", helpKind);
                 if (helpKind switch { 1 => "hdlg", 2 => "hrct", 8 => "appendHdlg", _ => null } is { } helpName)
                 {
@@ -178,7 +178,7 @@ internal sealed class InterfaceDecoder(DecodeOptions options, string name, strin
                 w.WriteNumber("resourceId", item.ResourceId ?? 0);
                 if (help.Length >= 6)
                 {
-                    w.WriteNumber("offset", (short)((help[4] << 8) | help[5]));
+                    w.WriteNumber("offset", help.ReadInt16At(4));
                 }
             }
             else if (item.ResourceId is { } id)

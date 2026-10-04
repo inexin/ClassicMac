@@ -148,7 +148,8 @@ internal sealed class BTreeCheck
                 return run.Fatal(22, 0, node);
             }
 
-            if (tree.KeyLength(key.Span) > tree.MaxKeyLength || !tree.KeyFits(key.Span))
+            var keyReader = new BigEndianReader(key);
+            if (tree.KeyLength(keyReader) > tree.MaxKeyLength || !tree.KeyFits(keyReader))
             {
                 return run.Fatal(25, 0, node);
             }
@@ -179,7 +180,7 @@ internal sealed class BTreeCheck
             file.TryRecord(node, i, out var key, out var data);
             tree.LeafRecords++;
             tree.Records.Add((key.ToArray(), data.ToArray(), node));
-            if (tree.Plus ? tree.FileId == 3 && !PlusExtentRecords.Check(run, data, 0, node) : !tree.IsCatalog && !ExtentRecords.Check(run, data.Span, 0, node))
+            if (tree.Plus ? tree.FileId == 3 && !PlusExtentRecords.Check(run, data, 0, node) : !tree.IsCatalog && !ExtentRecords.Check(run, data, 0, node))
             {
                 return false;
             }

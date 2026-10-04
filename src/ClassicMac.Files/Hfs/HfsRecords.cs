@@ -31,8 +31,9 @@ internal static class HfsRecords
     // An HFS Plus extents key's first allocation block in the fork.
     internal static uint PlusExtentsStart(ReadOnlyMemory<byte> key) => new BigEndianReader(key).ReadUInt32At(8);
 
-    // An HFS Plus catalog record's type, and a folder or file record's CNID.
-    internal static ushort PlusRecordType(ReadOnlyMemory<byte> data) => new BigEndianReader(data).ReadUInt16At(0);
+    // A catalog record's type word: HFS's cdrType and its reserved byte, HFS Plus's recordType.
+    internal static ushort RecordType(ReadOnlyMemory<byte> data) => new BigEndianReader(data).ReadUInt16At(0);
 
+    // An HFS Plus folder or file record's CNID.
     internal static uint PlusRecordId(ReadOnlyMemory<byte> data) => new BigEndianReader(data).ReadUInt32At(8);
 }

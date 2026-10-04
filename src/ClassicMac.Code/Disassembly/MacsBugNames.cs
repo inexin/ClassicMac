@@ -110,7 +110,7 @@ public static class MacsBugNames
         }
         if (first < 0x80)
         {
-            return ReadUnmarked(data, offset, returnOffset);
+            return ReadUnmarked(reader, offset, returnOffset);
         }
 
         if (first < 0xA0 || !IsNameChar((byte)(first & 0x7F)))
@@ -150,8 +150,9 @@ public static class MacsBugNames
     // after returns in ResEdit 2.1.3 and the Mac OS 9 System file] It is upper case: a letter or '_', then letters,
     // digits and '_', then spaces to 8 characters; and the word after it does not continue the text: the code ends,
     // a link (the next routine, $4E50–$4E57), or a first byte that is not one of those characters.
-    private static MacsBugName? ReadUnmarked(ReadOnlySpan<byte> data, int offset, int returnOffset)
+    private static MacsBugName? ReadUnmarked(BigEndianReader reader, int offset, int returnOffset)
     {
+        var data = reader.Source.Span;
         if (8 > data.Length - offset)
         {
             return null;
@@ -180,7 +181,7 @@ public static class MacsBugNames
         int next = offset + 8;
         if (next <= data.Length - 2)
         {
-            int word = (data[next] << 8) | data[next + 1];
+            int word = reader.ReadUInt16At(next);
             bool link = (word & 0xFFF8) == 0x4E50;
             if (!link && (IsUpperChar(data[next]) || data[next] == (byte)' '))
             {

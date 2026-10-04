@@ -19,11 +19,11 @@ public class ByteMeaningsTests
         Assert.Equal(new ByteMeaning("Length of the string", 0, 1, "8"), ByteMeanings.MeaningAt(Str, data, 0, null));
         Assert.Equal(new ByteMeaning("Character 1 of the string, “Untitled”", 1, 8, "U"), ByteMeanings.MeaningAt(Str, data, 1, null));
         Assert.Equal(new ByteMeaning("Character 8 of the string, “Untitled”", 1, 8, "d"), ByteMeanings.MeaningAt(Str, data, 8, null));
-        Assert.Equal(new ByteMeaning("After the string", 9, 2, null), ByteMeanings.MeaningAt(Str, [.. data, 0, 0], 9, null));
+        Assert.Equal(new ByteMeaning("After the string", 9, 2, null), ByteMeanings.MeaningAt(Str, (byte[])[.. data, 0, 0], 9, null));
         Assert.Null(ByteMeanings.MeaningAt(Str, data, 9, null));                       // past the end
         Assert.Null(ByteMeanings.MeaningAt(Str, data, -1, null));
-        Assert.Equal(new ByteMeaning("Character 1 of the string, “ab”", 1, 2, "a"), ByteMeanings.MeaningAt(Str, [5, (byte)'a', (byte)'b'], 1, null)); // cut short
-        Assert.Equal(new ByteMeaning("Length of the string", 0, 1, "0"), ByteMeanings.MeaningAt(Str, [0], 0, null));
+        Assert.Equal(new ByteMeaning("Character 1 of the string, “ab”", 1, 2, "a"), ByteMeanings.MeaningAt(Str, (byte[])[5, (byte)'a', (byte)'b'], 1, null)); // cut short
+        Assert.Equal(new ByteMeaning("Length of the string", 0, 1, "0"), ByteMeanings.MeaningAt(Str, (byte[])[0], 0, null));
     }
 
     [Fact]
@@ -35,9 +35,9 @@ public class ByteMeaningsTests
         Assert.Equal(new ByteMeaning("Character 1 of string 1, “Untitled”", 3, 8, "U"), ByteMeanings.MeaningAt(StrList, data, 3, null));
         Assert.Equal(new ByteMeaning("Length of string 2", 11, 1, "2"), ByteMeanings.MeaningAt(StrList, data, 11, null));
         Assert.Equal(new ByteMeaning("Character 2 of string 2, “Go”", 12, 2, "o"), ByteMeanings.MeaningAt(StrList, data, 13, null));
-        Assert.Equal(new ByteMeaning("After the strings", 14, 1, null), ByteMeanings.MeaningAt(StrList, [.. data, 9], 14, null));
+        Assert.Equal(new ByteMeaning("After the strings", 14, 1, null), ByteMeanings.MeaningAt(StrList, (byte[])[.. data, 9], 14, null));
         Assert.Null(ByteMeanings.MeaningAt(StrList, data, 14, null));
-        Assert.Equal(new ByteMeaning("Number of strings", 0, 2, "0"), ByteMeanings.MeaningAt(StrList, [0], 0, null)); // cut short
+        Assert.Equal(new ByteMeaning("Number of strings", 0, 2, "0"), ByteMeanings.MeaningAt(StrList, (byte[])[0], 0, null)); // cut short
     }
 
     private static readonly FourCC Code = FourCC.FromString("CODE");
@@ -114,7 +114,7 @@ public class ByteMeaningsTests
         Assert.Equal(new ByteMeaning("Length of Name of item 2", 11, 1, "0"), ByteMeanings.MeaningAt(type, data, 11, template));
         Assert.Equal(new ByteMeaning("Flags", 12, 1, "$FF"), ByteMeanings.MeaningAt(type, data, 12, template));
         Assert.Null(ByteMeanings.MeaningAt(type, data, 13, template));
-        Assert.Equal(new ByteMeaning("After the template's fields", 13, 2, null), ByteMeanings.MeaningAt(type, [.. data, 1, 2], 14, template));
+        Assert.Equal(new ByteMeaning("After the template's fields", 13, 2, null), ByteMeanings.MeaningAt(type, (byte[])[.. data, 1, 2], 14, template));
     }
 
     [Fact]
@@ -160,7 +160,7 @@ public class ByteMeaningsTests
             ("Low", "BBIT"), ("", "AWRD"), ("", "FBYT"), ("Items", "LSTZ"), ("Code", "HBYT"), ("*****", "LSTE"));
         byte[] data = [0x81, 0, 0, 7, 9, 0];
         Assert.Equal(new ByteMeaning("Bits on: High, Low; off: Mid", 0, 1, "$81"), ByteMeanings.MeaningAt(type, data, 0, template));   // which named bits are set
-        Assert.Equal(new ByteMeaning("Bits on: none; off: High, Mid, Low", 0, 1, "$00"), ByteMeanings.MeaningAt(type, [0, 0, 0, 7, 9, 0], 0, template));
+        Assert.Equal(new ByteMeaning("Bits on: none; off: High, Mid, Low", 0, 1, "$00"), ByteMeanings.MeaningAt(type, (byte[])[0, 0, 0, 7, 9, 0], 0, template));
         Assert.Equal(new ByteMeaning("Alignment", 1, 1, null), ByteMeanings.MeaningAt(type, data, 1, template));
         Assert.Equal(new ByteMeaning("Filler", 2, 1, null), ByteMeanings.MeaningAt(type, data, 2, template));
         Assert.Equal(new ByteMeaning("Code of item 2", 4, 1, "$09"), ByteMeanings.MeaningAt(type, data, 4, template));

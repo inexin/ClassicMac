@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ClassicMac.Core;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -49,7 +50,7 @@ internal sealed class FirstAidTree(int fileId, byte[] bytes, int nodeSize, List<
     /// Whether an HFS Plus key's fields fit it: a catalog key's name (8 + 2n bytes), an extents key (12 bytes), an
     /// attributes key's name (14 + 2n); HFS keys are compared by their own bounds.
     /// </summary>
-    public bool KeyFits(ReadOnlySpan<byte> key)
+    public bool KeyFits(BigEndianReader key)
     {
         if (!Plus)
         {
@@ -58,14 +59,14 @@ internal sealed class FirstAidTree(int fileId, byte[] bytes, int nodeSize, List<
 
         return FileId switch
         {
-            4 => key.Length >= 8 && 8 + 2 * (key[6] << 8 | key[7]) == key.Length,
-            8 => key.Length >= 14 && 14 + 2 * (key[12] << 8 | key[13]) == key.Length,
+            4 => key.Length >= 8 && 8 + 2 * key.ReadUInt16At(6) == key.Length,                  // the name's length
+            8 => key.Length >= 14 && 14 + 2 * key.ReadUInt16At(12) == key.Length,
             _ => key.Length == 12,
         };
     }
 
     /// <summary>A key's length, without its length field.</summary>
-    public int KeyLength(ReadOnlySpan<byte> key) => Plus ? key[0] << 8 | key[1] : key[0];
+    public int KeyLength(BigEndianReader key) => Plus ? key.ReadUInt16At(0) : key.ReadByteAt(0);
 
     /// <summary>The nodes the walk reached (header, index, leaf and map nodes).</summary>
     public HashSet<uint> Reached { get; } = [];
