@@ -140,6 +140,11 @@ The readers parse arbitrary downloaded files, so every size and offset is checke
 - **Nesting and cycles:** container recursion stops at a depth limit; HFS B-tree and extent walks detect cycles.
 - **Fuzzing:** SharpFuzz with libFuzzer on each container reader, the resource map and `dcmp`, seeded from the test
   fixtures; a short run on every CI build, a longer one nightly; crashes become regression fixtures.
+  First step built (2026-10-04): `MutationTests` mutates every `TestData` input and a few synthetic containers (bytes
+  flipped, a run zeroed or set, the end cut off; seeded), unwraps each as deep as it goes and reads every fork, and
+  allows only `InvalidDataException` and `EndOfStreamException`: 100 mutants per input in the suite,
+  `CLASSICMAC_MUTANTS` for deeper runs. It found an `OverflowException` in DiskDoubler's method-10 decoder (fixed).
+  Not yet covered: resource maps and `dcmp`, the resource decoders, NDIF and other inputs with resource forks.
 
 ### Configuration
 
@@ -520,7 +525,7 @@ src/ClassicMac.<Package>/   one folder per package; the app goes in src/ClassicM
                             today: Core, Files, Resources, Graphics (and its two adapters), Code,
                             Resources.Decoders, Resources.Cli, App
 tests/ClassicMac.<Package>.Tests/   one test project per package
-tests/fixtures/             synthetic fixtures (and their Rez sources)
+tests/<Project>/TestData/   committed test inputs (synthetic, ClassicMac-made or redistributable samples)
 schemas/                    manifest JSON Schemas
 tools/                      fixture and table generators; never packed
 ```
@@ -552,7 +557,7 @@ the public drawing API, icons as full resource decoders; the renderer draws text
 | MacPaint (in the base) | PNTG files and the `PNTG` codec's decoder | base |
 | `.QuickDraw` | The renderer: GrafPort state, regions, shapes, patterns, transfer modes, CopyBits/StretchBits, text drawing, screen depths, with a public drawing API (`FrameRect`, `PaintRgn`, `CopyBits`, `DrawText`, …) on a canvas | Graphics, Fonts |
 | `.Pict` | The PICT file format: the opcode reader that replays a picture into the renderer, and the writer | QuickDraw, QuickTime |
-| `ClassicMac.Core`, `ClassicMac.Files` | The shared base and the file layer (unchanged by the merge) | nothing; Files on Core |
+| `ClassicMac.Core`, `ClassicMac.Files` | The shared base and the file layer (unchanged by the merge) | nothing; Files on Core and Resources |
 | `ClassicMac.Resources` (+ `.Decoders`) | Resource forks; icons, cursors and patterns become resource decoders here | Core; the decoders on Graphics, QuickDraw |
 | `ClassicMac.Graphics.ImageSharp`, `ClassicMac.Graphics.SkiaSharp` | One integration package per host library, covering every image format (PICT, QTIF, MacPaint, icons) | `ClassicMac.Graphics` |
 

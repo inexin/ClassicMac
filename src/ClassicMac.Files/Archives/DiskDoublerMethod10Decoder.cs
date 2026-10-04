@@ -42,7 +42,7 @@ internal static class DiskDoublerMethod10Decoder
                 throw new InvalidDataException("A DiskDoubler method-10 block header checksum is invalid.");
             }
 
-            int blockLength = checked((int)U32(header, 0));
+            uint storedLength = U32(header, 0);
             int literalCount = U16(header, 4);
             int offsetCount = U16(header, 6);
             int lengthStreamLength = U16(header, 8);
@@ -50,10 +50,13 @@ internal static class DiskDoublerMethod10Decoder
             int offsetStreamLength = U16(header, 12);
             byte flags = header[14];
             byte expectedBlockXor = header[19];
-            if (blockLength is 0 or > MaximumBlockLength || blockLength > output.Length - outputOffset)
+            // Checked before it is an int: a damaged length can pass int's range.
+            if (storedLength is 0 or > MaximumBlockLength || storedLength > output.Length - outputOffset)
             {
                 throw new InvalidDataException("A DiskDoubler method-10 block has an invalid expanded length.");
             }
+
+            int blockLength = (int)storedLength;
 
             int dataOffset = checked(inputOffset + BlockHeaderLength);
             if ((flags & 0x40) != 0)

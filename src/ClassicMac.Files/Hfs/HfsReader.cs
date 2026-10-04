@@ -655,7 +655,7 @@ namespace ClassicMac.Files.Hfs
                 var headerRecordCount = headerReader.ReadUInt16At(10);
                 var reserved = headerReader.ReadUInt16At(12);
                 if (headerReader.ReadUInt32At(4) != 0 ||
-                    header[8] != 1 || header[9] != 0 || headerRecordCount != 3 || reserved != 0)
+                    header.Span[8] != 1 || header.Span[9] != 0 || headerRecordCount != 3 || reserved != 0)
                 {
                     context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-header",
                         $"The {name} B-tree header node has an invalid backward link, kind, height, record count, or reserved field.");
@@ -722,10 +722,10 @@ namespace ClassicMac.Files.Hfs
 
                     var bytes = Node(tree, node);
                     var nodeReader = new BigEndianReader(bytes);
-                    if ((sbyte)bytes[8] != -1 || bytes[9] != 1)
+                    if ((sbyte)bytes.Span[8] != -1 || bytes.Span[9] != 1)
                     {
                         context.Report(DiagnosticSeverity.Error, "hfs.not-leaf",
-                            $"Node {node} of the {name} tree is linked as a leaf but has type {(sbyte)bytes[8]} and height {bytes[9]}; stopped.");
+                            $"Node {node} of the {name} tree is linked as a leaf but has type {(sbyte)bytes.Span[8]} and height {bytes.Span[9]}; stopped.");
                         yield break;
                     }
                     uint backwardLink = nodeReader.ReadUInt32At(4);
@@ -756,7 +756,7 @@ namespace ClassicMac.Files.Hfs
                                 $"Record {i} of node {node} in the {name} tree has offsets {start}–{end}; skipped.");
                             continue;
                         }
-                        int keyLength = bytes[start];
+                        int keyLength = bytes.Span[start];
                         var dataStart = start + 1 + keyLength;
                         if ((dataStart & 1) != 0)
                         {
@@ -768,7 +768,7 @@ namespace ClassicMac.Files.Hfs
                             continue;
                         }
 
-                        var key = bytes[start..(start + 1 + keyLength)];
+                        var key = bytes[start..(start + 1 + keyLength)].ToArray();
                         if (IsValidKey(name, key))
                         {
                             if (previousKey is not null && CompareKeys(name, previousKey, key) >= 0)
@@ -785,7 +785,7 @@ namespace ClassicMac.Files.Hfs
                                 $"Catalog record {i} of node {node} has a malformed key; skipped.");
                             continue;
                         }
-                        yield return (key, bytes[dataStart..end]);
+                        yield return (key, bytes[dataStart..end].ToArray());
                     }
                     node = nodeReader.ReadUInt32At(0);
                 }
@@ -803,7 +803,7 @@ namespace ClassicMac.Files.Hfs
                 }
             }
 
-            private List<uint>? ValidateNodeMap(byte[] tree, byte[] header, int nodes, string name)
+            private List<uint>? ValidateNodeMap(byte[] tree, ReadOnlyMemory<byte> header, int nodes, string name)
             {
                 var headerReader = new BigEndianReader(header);
                 if (headerReader.ReadUInt16At(10) != 3)
@@ -917,7 +917,7 @@ namespace ClassicMac.Files.Hfs
                     context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-map", message);
             }
 
-            private static bool IsNodeAllocated(byte[] tree, byte[] header, List<uint> mapNodes, uint nodeNumber)
+            private static bool IsNodeAllocated(byte[] tree, ReadOnlyMemory<byte> header, List<uint> mapNodes, uint nodeNumber)
             {
                 var headerReader = new BigEndianReader(header);
                 int mapStart = headerReader.ReadUInt16At(NodeSize - 6);
@@ -980,7 +980,8 @@ namespace ClassicMac.Files.Hfs
                     : leftReader.ReadUInt16At(6).CompareTo(rightReader.ReadUInt16At(6));
             }
 
-            private static byte[] Node(byte[] tree, long index) => tree.AsSpan((int)(index * NodeSize), NodeSize).ToArray();
+            // A node of the tree, over its bytes (no copy).
+            private static ReadOnlyMemory<byte> Node(byte[] tree, long index) => tree.AsMemory((int)(index * NodeSize), NodeSize);
 
             private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
         }

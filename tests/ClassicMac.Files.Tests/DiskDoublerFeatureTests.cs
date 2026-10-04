@@ -7,6 +7,18 @@ namespace ClassicMac.Files.Tests;
 
 public sealed class DiskDoublerFeatureTests
 {
+    // A method-10 block header whose expanded length is past int's range (found by MutationTests) is malformed input, not
+    // an overflow.
+    [Fact]
+    public void A_method_10_block_length_past_int_is_refused_as_malformed()
+    {
+        var header = new byte[22];
+        BinaryPrimitives.WriteUInt32BigEndian(header, 0xFFFF_FFF0);
+        header[21] = (byte)(header[0] ^ header[1] ^ header[2] ^ header[3]);
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerMethod10Decoder.Decode(header, 100));
+    }
+
     [Fact]
     public void CanReadRecognizesOnlyACompleteDda2Header()
     {

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Robustness: a mutation test over the test inputs (only malformed-input exceptions allowed); DiskDoubler method-10 blocks
+  with a length past `int` are refused as malformed instead of overflowing.
 - HFS: catalog edits follow Apple's BTree manager: a full node rotates records into its left sibling or splits to the
   left into the first free node, emptied nodes are zeroed and freed, the root collapses, and the file grows first when
   free nodes run short; a tree is rebuilt only when it cannot grow (hfs.md §1.8, §5.5).
