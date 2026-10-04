@@ -136,7 +136,8 @@ iterators and lambdas.
   file-level APIs take a `Stream` at the edge and read it this way.
 - Reads are sequential (`ReadUInt16`, `ReadFourCC`, `ReadMacRect` …) or at absolute offsets (`ReadUInt32At`, which do
   not move `Position`). `Try…` variants return false instead of throwing. `ReadSubReader(n)` gives a bounded reader
-  over the next bytes, without copying. `Source` is the underlying memory.
+  over the next bytes, and `ReadSubReaderAt(offset, n)` one at an absolute offset (a structure inside the buffer, read
+  by offsets from its own start), without copying. `Source` is the underlying memory.
 - Truncated input throws `EndOfStreamException`.
 - Create **one reader per buffer** (a header, node, record or resource) and pass it to internal helpers as a
   `BigEndianReader` parameter. Do not build a reader per field read: it is a class, so that is an allocation each time.

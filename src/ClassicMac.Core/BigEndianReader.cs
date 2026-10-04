@@ -466,6 +466,33 @@ public sealed class BigEndianReader
         return sub;
     }
 
+    /// <summary>
+    /// Creates a bounded reader over <paramref name="length"/> bytes at an absolute offset, without changing
+    /// <see cref="Position"/>: a structure inside this buffer, read by offsets from its own start.
+    /// </summary>
+    /// <remarks>The returned reader borrows the same source; it cannot read beyond the selected section.</remarks>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="offset"/> or <paramref name="length"/> is negative.</exception>
+    /// <exception cref="EndOfStreamException">The section runs past the end.</exception>
+    public BigEndianReader ReadSubReaderAt(int offset, int length)
+    {
+        ValidateRange(offset, length);
+        return new BigEndianReader(source.Slice(offset, length));
+    }
+
+    /// <summary>Creates a bounded reader from an absolute offset to the end, without changing <see cref="Position"/>.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="offset"/> is negative.</exception>
+    /// <exception cref="EndOfStreamException"><paramref name="offset"/> is past the end.</exception>
+    public BigEndianReader ReadSubReaderAt(int offset)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        if (offset > source.Length)
+        {
+            throw new EndOfStreamException();
+        }
+
+        return new BigEndianReader(source[offset..]);
+    }
+
     /// <summary>Attempts to return the next <paramref name="length"/> bytes as a borrowed slice.</summary>
     /// <remarks>A failed attempt returns an empty slice and leaves <see cref="Position"/> unchanged.</remarks>
     public bool TryReadBytes(int length, out ReadOnlySpan<byte> value)

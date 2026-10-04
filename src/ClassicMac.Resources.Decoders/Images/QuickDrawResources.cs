@@ -63,7 +63,7 @@ public static class QuickDrawResources
     }
 
     /// <summary><c>ICON</c>: a 32 × 32 1-bit icon (128 bytes), unmasked.</summary>
-    public static RgbaBitmap DecodeIcon(byte[] data) => Mono(Require(data, 128, "icon"), 0, 32, 32, default, 0);
+    public static RgbaBitmap DecodeIcon(byte[] data) => Mono(Require(data, 128, "icon"), 32, 32, default);
 
     /// <summary>
     /// An icon list: <c>ICN#</c> (32 × 32), <c>ics#</c> (16 × 16) or <c>icm#</c> (16 × 12) — a 1-bit icon followed
@@ -74,7 +74,7 @@ public static class QuickDrawResources
     {
         var (w, h) = IconSize(type);
         Require(data, w / 8 * h, type);
-        return Mono(data, 0, w, h, IconMask(data, w, h), 0);
+        return Mono(data, w, h, IconMask(data, w, h));
     }
 
     /// <summary>
@@ -100,7 +100,7 @@ public static class QuickDrawResources
             Data = data,
         };
         var mask = iconList != null && iconList.Length >= w / 8 * h ? IconMask(iconList, w, h) : null;
-        return Render(pm, mask, 0, w / 8);
+        return Render(pm, mask, w / 8);
     }
 
     /// <summary><c>SICN</c>: a list of 16 × 16 1-bit icons (32 bytes each), unmasked.</summary>
@@ -110,7 +110,7 @@ public static class QuickDrawResources
         var icons = new List<RgbaBitmap>();
         for (int o = 0; o + 32 <= data.Length; o += 32)
         {
-            icons.Add(Mono(data, o, 16, 16, default, 0));
+            icons.Add(Mono(data.AsSpan(o), 16, 16, default));
         }
 
         return icons;
@@ -123,21 +123,22 @@ public static class QuickDrawResources
     public static RgbaBitmap DecodeCicn(byte[] data)
     {
         var reader = new BigEndianReader(Require(data, 82, "cicn"));
-        var pm = ReadPixMap(reader, 0, out _);
-        int maskRowBytes = reader.ReadUInt16At(54) & 0x3FFF, maskHeight = Height(reader, 56);
-        int bitmapRowBytes = reader.ReadUInt16At(68) & 0x3FFF, bitmapHeight = Height(reader, 70);
-        int maskAt = 82;
-        int tableAt = maskAt + maskRowBytes * maskHeight + bitmapRowBytes * bitmapHeight;
-        pm.Palette = ColorTable(reader, tableAt, pm.PixelSize, "cicn", out int tableLength);
-        pm.Data = Pixels(reader, tableAt + tableLength, pm.RowBytes * pm.Height, "cicn");
-        return Render(pm, maskRowBytes > 0 ? data : default, maskAt, maskRowBytes);
+        var pm = ReadPixMap(reader.ReadSubReaderAt(0, PixMapLength), out _);
+        var (maskRowBytes, maskHeight) = BitMap(reader.ReadSubReaderAt(50, 14));
+        var (bitmapRowBytes, bitmapHeight) = BitMap(reader.ReadSubReaderAt(64, 14));
+        const int maskAt = 82;
+        // After the mask and BitMap bits: the color table, then the pixels.
+        var tail = Section(reader, maskAt + maskRowBytes * maskHeight + bitmapRowBytes * bitmapHeight, "cicn");
+        pm.Palette = PixMap.ReadColorTable(tail, pm.PixelSize);
+        pm.Data = tail.ReadBytes(pm.RowBytes * pm.Height).ToArray();
+        return Render(pm, maskRowBytes > 0 ? data.AsSpan(maskAt) : default, maskRowBytes);
     }
 
     /// <summary><c>CURS</c>: a 16 × 16 cursor — 32 bytes of data, 32 bytes of mask, the hotspot (v, h).</summary>
     public static MacCursor DecodeCursor(byte[] data)
     {
         var reader = new BigEndianReader(Require(data, 68, "CURS"));
-        return CursorBits(data, 0, null, reader.ReadInt16At(66), reader.ReadInt16At(64));
+        return CursorBits(data, null, reader.ReadMacPointAt(64));
     }
 
     /// <summary>
@@ -149,34 +150,35 @@ public static class QuickDrawResources
     public static MacCursor DecodeColorCursor(byte[] data)
     {
         var reader = new BigEndianReader(Require(data, 96, "crsr"));
-        if ((reader.ReadUInt16At(0) & 0xFFFE) != 0x8000)
+        int type = reader.ReadUInt16();
+        if ((type & 0xFFFE) != 0x8000)
         {
             throw new NotSupportedException("Unknown crsr type.");
         }
 
-        int mapAt = (int)reader.ReadUInt32At(2), pixelsAt = (int)reader.ReadUInt32At(6);
+        int mapAt = reader.ReadInt32(), pixelsAt = reader.ReadInt32();
         PixMap? color = null;
-        if (reader.ReadUInt16At(0) == 0x8001 && mapAt > 0)
+        if (type == 0x8001 && mapAt > 0)
         {
-            color = ReadPixMap(reader, mapAt, out int tableAt);
-            color.Palette = ColorTable(reader, tableAt, color.PixelSize, "crsr", out _);
-            color.Data = Pixels(reader, pixelsAt, color.RowBytes * color.Height, "crsr");
+            color = ReadPixMap(Section(reader, mapAt, PixMapLength, "crsr"), out int tableAt);
+            color.Palette = PixMap.ReadColorTable(Section(reader, tableAt, "crsr"), color.PixelSize);
+            color.Data = Section(reader, pixelsAt, color.RowBytes * color.Height, "crsr").Source.ToArray();
         }
-        return CursorBits(data, 20, color, reader.ReadInt16At(86), reader.ReadInt16At(84));
+        return CursorBits(data.AsSpan(20), color, reader.ReadMacPointAt(84));
     }
 
     /// <summary><c>PAT </c>: an 8 × 8 1-bit pattern (8 bytes).</summary>
-    public static RgbaBitmap DecodePattern(byte[] data) => Mono(Require(data, 8, "PAT "), 0, 8, 8, default, 0);
+    public static RgbaBitmap DecodePattern(byte[] data) => Mono(Require(data, 8, "PAT "), 8, 8, default);
 
     /// <summary><c>PAT#</c>: a count, then 8-byte patterns.</summary>
     public static IReadOnlyList<RgbaBitmap> DecodePatternList(byte[] data)
     {
         var reader = new BigEndianReader(Require(data, 2, "PAT#"));
         var list = new List<RgbaBitmap>();
-        int count = reader.ReadUInt16At(0);
-        for (int i = 0, o = 2; i < count && o + 8 <= data.Length; i++, o += 8)
+        int count = reader.ReadUInt16();
+        for (int i = 0; i < count && reader.Remaining >= 8; i++)
         {
-            list.Add(Mono(data, o, 8, 8, default, 0));
+            list.Add(Mono(reader.ReadBytes(8), 8, 8, default));
         }
 
         return list;
@@ -191,7 +193,7 @@ public static class QuickDrawResources
     public static RgbaBitmap DecodePixelPattern(byte[] data)
     {
         ArgumentNullException.ThrowIfNull(data);
-        return PixelPattern(new BigEndianReader(data), 0, data.Length);
+        return PixelPattern(new BigEndianReader(data));
     }
 
     /// <summary><c>ppt#</c>: a count, that many offsets from the resource start, then the <c>ppat</c> data each offset
@@ -199,61 +201,64 @@ public static class QuickDrawResources
     public static IReadOnlyList<RgbaBitmap> DecodePixelPatternList(byte[] data)
     {
         var reader = new BigEndianReader(Require(data, 2, "ppt#"));
-        int count = reader.ReadUInt16At(0);
+        int count = reader.ReadUInt16();
         var offsets = new List<int>();
-        for (int i = 0; i < count && 2 + 4 * i + 4 <= reader.Length; i++)
+        for (int i = 0; i < count && reader.Remaining >= 4; i++)
         {
-            offsets.Add((int)reader.ReadUInt32At(2 + 4 * i));
+            offsets.Add(reader.ReadInt32());
         }
 
         var list = new List<RgbaBitmap>();
         for (int i = 0; i < offsets.Count; i++)
         {
             int end = i + 1 < offsets.Count ? offsets[i + 1] : reader.Length;
-            list.Add(PixelPattern(reader, offsets[i], end));
+            list.Add(PixelPattern(Section(reader, offsets[i], end - offsets[i], "ppat")));
         }
         return list;
     }
 
     // ---- helpers ----
 
-    // GetPixPat: the pixel data runs from patData to pmTable (a table before the data fails to load); the color
-    // table is read unless the PixMap is RGB direct (pixelType 16). Type 0 draws the first 8 bytes of the pixel
-    // data as a 1-bit pattern; types 1 and 3 the PixMap; type 2 the RGB of table entry 4 (table + $2A), solid on a
-    // 32-bit screen. Other types fail to load (Mac OS 9).
-    private static RgbaBitmap PixelPattern(BigEndianReader reader, int start, int end)
+    private const int PixMapLength = 50;
+
+    // GetPixPat, over one ppat's bytes (its offsets are from its start): the pixel data runs from patData to pmTable
+    // (a table before the data fails to load); the color table is read unless the PixMap is RGB direct (pixelType 16).
+    // Type 0 draws the first 8 bytes of the pixel data as a 1-bit pattern; types 1 and 3 the PixMap; type 2 the RGB of
+    // table entry 4 (table + $2A), solid on a 32-bit screen. Other types fail to load (Mac OS 9).
+    private static RgbaBitmap PixelPattern(BigEndianReader ppat)
     {
-        if (start < 0 || end > reader.Length || end - start < 28)
+        if (ppat.Length < 28)
         {
             throw Truncated("ppat");
         }
 
-        int type = reader.ReadUInt16At(start);
+        int type = ppat.ReadUInt16();
         if (type > 3)
         {
             throw new NotSupportedException($"ppat type {type} is not 0-3.");
         }
 
-        int mapAt = start + (int)reader.ReadUInt32At(start + 2), pixelsAt = start + (int)reader.ReadUInt32At(start + 6);
+        int mapAt = ppat.ReadInt32(), pixelsAt = ppat.ReadInt32();
         if (type == 0)
         {
-            return Mono(Pixels(reader, pixelsAt, 8, "ppat"), 0, 8, 8, default, 0);
+            return Mono(Section(ppat, pixelsAt, 8, "ppat").Source.Span, 8, 8, default);
         }
-        var pm = ReadPixMap(reader, mapAt, out int tableAt, start);
+        var pm = ReadPixMap(Section(ppat, mapAt, PixMapLength, "ppat"), out int tableAt);
         if (tableAt < pixelsAt)
         {
             throw new NotSupportedException("The ppat's color table does not follow its pixel data.");
         }
 
+        var table = Section(ppat, tableAt, "ppat");
         if (type == 2)
         {
-            if (tableAt + 0x30 > reader.Length)
+            if (table.Length < 0x30)
             {
                 throw Truncated("ppat");
             }
 
             var solid = new RgbaBitmap(8, 8);
-            var rgb = new RgbaColor(reader.ReadByteAt(tableAt + 0x2A), reader.ReadByteAt(tableAt + 0x2C), reader.ReadByteAt(tableAt + 0x2E));
+            var rgb = new RgbaColor(table.ReadByteAt(0x2A), table.ReadByteAt(0x2C), table.ReadByteAt(0x2E));
             for (int y = 0; y < 8; y++)
             {
                 for (int x = 0; x < 8; x++)
@@ -269,67 +274,65 @@ public static class QuickDrawResources
             throw new NotSupportedException("The ppat's pixel data is shorter than its PixMap.");
         }
 
-        pm.Data = Pixels(reader, pixelsAt, pm.RowBytes * pm.Height, "ppat");
+        pm.Data = Section(ppat, pixelsAt, pm.RowBytes * pm.Height, "ppat").Source.ToArray();
         if (pm.PixelType != 16)
         {
-            pm.Palette = ColorTable(reader, tableAt, pm.PixelSize, "ppat", out _);
+            pm.Palette = PixMap.ReadColorTable(table, pm.PixelSize);
             // An empty table (ctSize -1, ResEdit's ppats) draws a 1-bit pattern 0 white, 1 black, whatever the
             // port's colours [Verified].
-            if (pm.PixelSize == 1 && reader.ReadInt16At(tableAt + 6) < 0)
+            if (pm.PixelSize == 1 && table.ReadInt16At(6) < 0)
             {
                 pm.Palette = [new RgbaColor(255, 255, 255), new RgbaColor(0, 0, 0)];
             }
         }
-        return Render(pm, default, 0, 0);
+        return Render(pm, default, 0);
     }
 
-    // A 50-byte PixMap record (baseAddr, rowBytes, bounds, ..., pmTable as an offset from `origin`).
-    private static PixMap ReadPixMap(BigEndianReader reader, int at, out int tableAt, int origin = 0)
+    // A 50-byte PixMap record: baseAddr, rowBytes, bounds, pmVersion, packType, packSize, hRes, vRes, pixelType,
+    // pixelSize, cmpCount, cmpSize, planeBytes, pmTable (an offset, in a resource), pmReserved.
+    private static PixMap ReadPixMap(BigEndianReader pixMap, out int tableAt)
     {
-        if (at < 0 || at + 50 > reader.Length)
-        {
-            throw Truncated("PixMap");
-        }
-
-        var pm = new PixMap
-        {
-            RowBytes = reader.ReadUInt16At(at + 4) & 0x3FFF,
-            Bounds = new PictRect(reader.ReadInt16At(at + 6), reader.ReadInt16At(at + 8), reader.ReadInt16At(at + 10), reader.ReadInt16At(at + 12)),
-            PackType = reader.ReadUInt16At(at + 16),
-            PixelType = reader.ReadUInt16At(at + 30),
-            PixelSize = reader.ReadUInt16At(at + 32),
-            CmpCount = reader.ReadUInt16At(at + 34),
-            IsPixMap = true,
-        };
+        pixMap.Skip(4);                                                                 // baseAddr
+        var pm = new PixMap { IsPixMap = true, RowBytes = pixMap.ReadUInt16() & 0x3FFF };
+        var bounds = pixMap.ReadMacRect();
+        pm.Bounds = new PictRect(bounds.Top, bounds.Left, bounds.Bottom, bounds.Right);
+        pixMap.Skip(2);                                                                 // pmVersion
+        pm.PackType = pixMap.ReadUInt16();
+        pixMap.Skip(12);                                                                // packSize, hRes, vRes
+        pm.PixelType = pixMap.ReadUInt16();
+        pm.PixelSize = pixMap.ReadUInt16();
+        pm.CmpCount = pixMap.ReadUInt16();
         if (pm.PixelSize is not (1 or 2 or 4 or 8 or 16 or 32))
         {
             throw new NotSupportedException($"PixMap pixelSize {pm.PixelSize} is not a QuickDraw depth");
         }
 
-        tableAt = origin + (int)reader.ReadUInt32At(at + 42);
+        pixMap.Skip(6);                                                                 // cmpSize, planeBytes
+        tableAt = pixMap.ReadInt32();
         return pm;
     }
 
-    // A color table at tableAt, and how many bytes it takes.
-    private static RgbaColor[] ColorTable(BigEndianReader reader, int tableAt, int pixelSize, string type, out int length)
+    // A 14-byte BitMap record (baseAddr, rowBytes, bounds): its row bytes and height.
+    private static (int RowBytes, int Height) BitMap(BigEndianReader bitMap)
     {
-        if (tableAt < 0 || tableAt + 8 > reader.Length)
-        {
-            throw Truncated(type);
-        }
-
-        var table = new BigEndianReader(reader.Source[tableAt..]);
-        var palette = PixMap.ReadColorTable(table, pixelSize);
-        length = table.Position;
-        return palette;
+        bitMap.Skip(4);                                                                 // baseAddr
+        int rowBytes = bitMap.ReadUInt16() & 0x3FFF;
+        var bounds = bitMap.ReadMacRect();
+        return (rowBytes, Math.Max(0, bounds.Bottom - bounds.Top));
     }
 
-    // A copy of the pixels at `at`.
-    private static byte[] Pixels(BigEndianReader reader, int at, int length, string type) =>
-        at >= 0 && length >= 0 && reader.TryReadBytesAt(at, length, out var bytes) ? bytes.ToArray() : throw Truncated(type);
+    // The resource's bytes from an offset it stores (to the end, or so many): a resource whose offset lies outside it
+    // is truncated.
+    private static BigEndianReader Section(BigEndianReader reader, int offset, string type) =>
+        offset >= 0 && offset <= reader.Length ? reader.ReadSubReaderAt(offset) : throw Truncated(type);
 
-    // A pixel map's colors with an optional 1-bit mask (maskRowBytes per row at maskAt in maskData; none when empty).
-    private static RgbaBitmap Render(PixMap pm, ReadOnlySpan<byte> maskData, int maskAt, int maskRowBytes)
+    private static BigEndianReader Section(BigEndianReader reader, int offset, int length, string type) =>
+        offset >= 0 && length >= 0 && offset <= reader.Length && length <= reader.Length - offset
+            ? reader.ReadSubReaderAt(offset, length)
+            : throw Truncated(type);
+
+    // A pixel map's colors with an optional 1-bit mask (maskRowBytes per row; none when empty).
+    private static RgbaBitmap Render(PixMap pm, ReadOnlySpan<byte> mask, int maskRowBytes)
     {
         int w = Math.Max(1, pm.Width), h = Math.Max(1, pm.Height);
         var bmp = new RgbaBitmap(w, h);
@@ -338,8 +341,7 @@ public static class QuickDrawResources
             for (int x = 0; x < pm.Width; x++)
             {
                 // Rows or columns past the mask's data are unmasked.
-                int maskByte = maskAt + y * maskRowBytes + (x >> 3);
-                if (!maskData.IsEmpty && (x >> 3) < maskRowBytes && maskByte < maskData.Length && !Bit(maskData, maskAt + y * maskRowBytes, x))
+                if (!mask.IsEmpty && (x >> 3) < maskRowBytes && y * maskRowBytes + (x >> 3) < mask.Length && !Bit(mask, y * maskRowBytes, x))
                 {
                     continue;
                 }
@@ -351,10 +353,10 @@ public static class QuickDrawResources
         return bmp;
     }
 
-    // 1-bit image at `at` (w/8 bytes per row), masked by the bits at maskAt of maskData when it is not empty.
-    private static RgbaBitmap Mono(ReadOnlySpan<byte> data, int at, int w, int h, ReadOnlySpan<byte> maskData, int maskAt)
+    // A 1-bit image (w/8 bytes per row), masked by the mask's bits when the mask is not empty.
+    private static RgbaBitmap Mono(ReadOnlySpan<byte> bits, int w, int h, ReadOnlySpan<byte> mask)
     {
-        if (data.Length < at + w / 8 * h)
+        if (bits.Length < w / 8 * h)
         {
             throw Truncated("icon");
         }
@@ -364,22 +366,22 @@ public static class QuickDrawResources
         {
             for (int x = 0; x < w; x++)
             {
-                if (!maskData.IsEmpty && !Bit(maskData, maskAt + y * (w / 8), x))
+                if (!mask.IsEmpty && !Bit(mask, y * (w / 8), x))
                 {
                     continue;
                 }
 
-                Set(bmp, x, y, Bit(data, at + y * (w / 8), x) ? Black : White);
+                Set(bmp, x, y, Bit(bits, y * (w / 8), x) ? Black : White);
             }
         }
 
         return bmp;
     }
 
-    // 16 x 16 cursor: data at `at`, mask 32 bytes later; drawn as screen = (screen & ~mask) ^ image. 1-bit: mask 1
-    // paints the data bit black / white, mask 0 with data 1 inverts. Color (the 1-bit data unused): mask 1 paints
-    // the pixel, mask 0 XORs its complement (pixels outside the PixMap read as black).
-    private static MacCursor CursorBits(ReadOnlySpan<byte> data, int at, PixMap? color, int hotH, int hotV)
+    // A 16 x 16 cursor: its data, its mask 32 bytes later; drawn as screen = (screen & ~mask) ^ image. 1-bit: mask 1
+    // paints the data bit black / white, mask 0 with data 1 inverts. Color (the 1-bit data unused): mask 1 paints the
+    // pixel, mask 0 XORs its complement (pixels outside the PixMap read as black). The hotspot is (v, h).
+    private static MacCursor CursorBits(ReadOnlySpan<byte> bits, PixMap? color, MacPoint hotspot)
     {
         var bmp = new RgbaBitmap(16, 16);
         var inverted = new bool[256];
@@ -388,7 +390,7 @@ public static class QuickDrawResources
         {
             for (int x = 0; x < 16; x++)
             {
-                bool mask = Bit(data, at + 32 + 2 * y, x);
+                bool mask = Bit(bits, 32 + 2 * y, x);
                 RgbaColor c;
                 if (color != null)
                 {
@@ -396,7 +398,7 @@ public static class QuickDrawResources
                 }
                 else
                 {
-                    c = Bit(data, at + 2 * y, x) ? Black : White;
+                    c = Bit(bits, 2 * y, x) ? Black : White;
                 }
 
                 if (mask)
@@ -411,7 +413,7 @@ public static class QuickDrawResources
             }
         }
 
-        return new MacCursor(bmp, inverted, Math.Clamp(hotH, 0, 15), Math.Clamp(hotV, 0, 15)) { Xor = xor };
+        return new MacCursor(bmp, inverted, Math.Clamp((int)hotspot.H, 0, 15), Math.Clamp((int)hotspot.V, 0, 15)) { Xor = xor };
     }
 
     // An icon list's mask bits (w/8 bytes per row): its second half, or CalcMask of the icon when that is missing.
@@ -489,8 +491,6 @@ public static class QuickDrawResources
         bmp.Pixels[i + 2] = c.B;
         bmp.Pixels[i + 3] = 255;
     }
-
-    private static int Height(BigEndianReader reader, int boundsAt) => Math.Max(0, reader.ReadInt16At(boundsAt + 4) - reader.ReadInt16At(boundsAt));
 
     private static byte[] Require(byte[] data, int length, string type)
     {

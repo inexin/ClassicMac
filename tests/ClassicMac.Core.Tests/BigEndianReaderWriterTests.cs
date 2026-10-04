@@ -112,6 +112,29 @@ public class BigEndianReaderWriterTests
         Assert.Equal(1, reader.Position);
     }
 
+    // A sub-reader at an absolute offset: a structure inside the buffer read by its own offsets, the parent untouched.
+    [Fact]
+    public void A_sub_reader_at_an_offset_reads_from_its_start_and_leaves_the_parent()
+    {
+        var parent = new BigEndianReader(new byte[] { 0xAA, 0x01, 0x02, 0x03, 0x04, 0xBB }) { Position = 5 };
+
+        var section = parent.ReadSubReaderAt(1, 4);
+        var rest = parent.ReadSubReaderAt(4);
+
+        Assert.Equal(5, parent.Position);
+        Assert.Equal((0, 4), (section.Position, section.Length));
+        Assert.Equal(0x0304, section.ReadUInt16At(2));
+        Assert.Equal(0x01020304, section.ReadInt32());
+        Assert.Throws<EndOfStreamException>(() => section.ReadByte());
+        Assert.Equal(new byte[] { 0x04, 0xBB }, rest.Source.ToArray());
+        Assert.Equal(0, parent.ReadSubReaderAt(6).Length);                              // at the end: empty
+        Assert.Throws<EndOfStreamException>(() => parent.ReadSubReaderAt(3, 4));
+        Assert.Throws<EndOfStreamException>(() => parent.ReadSubReaderAt(7));
+        Assert.Throws<ArgumentOutOfRangeException>(() => parent.ReadSubReaderAt(-1, 2));
+        Assert.Throws<ArgumentOutOfRangeException>(() => parent.ReadSubReaderAt(0, -1));
+        Assert.Equal(5, parent.Position);
+    }
+
     [Fact]
     public void Failed_try_reads_leave_the_position_unchanged()
     {
