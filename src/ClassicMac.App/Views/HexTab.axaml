@@ -1,0 +1,147 @@
+<!--
+  The Hex tab (boards/hex.md, E7): the bytes in a grid, edited in place, with Go to, Find and the byte inspector.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             x:Class="ClassicMac.App.Views.HexTab"
+             x:DataType="vm:MainViewModel">
+  <DockPanel x:Name="HexPane">
+    <Border DockPanel.Dock="Top" Classes="hex-bar">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="{Binding EditActions.GoToError}" Classes="error" VerticalAlignment="Center"
+                     IsVisible="{Binding EditActions.GoToError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Text="Go to" Classes="muted" VerticalAlignment="Center" />
+          <TextBox x:Name="GoToBox" Classes="go-to" PlaceholderText="0x0000" Text="{Binding EditActions.GoToText}" IsEnabled="{Binding EditActions.IsHexEditing}"
+                   AutomationProperties.Name="Go to offset">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding EditActions.GoToCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+        </StackPanel>
+        <Panel HorizontalAlignment="Left">
+          <Button Content="Edit Bytes" Command="{Binding EditActions.BeginHexEditCommand}" IsVisible="{Binding !EditActions.IsHexEditing}" />
+          <Border Classes="editing-badge" IsVisible="{Binding EditActions.IsHexEditing}" VerticalAlignment="Center">
+            <TextBlock Text="Editing bytes" />
+          </Border>
+        </Panel>
+      </DockPanel>
+    </Border>
+    <!-- Find (the hex board's follow-up): hex bytes or Mac OS Roman text; Enter finds the next, Shift+Enter the
+         previous; the match is selected or put under the cursor and highlighted. -->
+    <Border x:Name="HexFindBar" DockPanel.Dock="Top" Classes="hex-find">
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <TextBlock Text="Find" Classes="muted" VerticalAlignment="Center" />
+        <ListBox x:Name="FindModeChoice" Classes="segmented" ItemsSource="{x:Static vm:HexFind.FindModes}"
+                 SelectedIndex="{Binding HexFind.FindModeIndex, Mode=TwoWay}" AutomationProperties.Name="Find hex or text" />
+        <TextBox x:Name="FindBox" Classes="go-to find" PlaceholderText="Bytes or text" Text="{Binding HexFind.FindText}" AutomationProperties.Name="Find">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding HexFind.FindNextCommand}" />
+            <KeyBinding Gesture="Shift+Enter" Command="{Binding HexFind.FindPreviousCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button Content="Previous" Command="{Binding HexFind.FindPreviousCommand}" ToolTip.Tip="Shift+F3" />
+        <Button Content="Next" Command="{Binding HexFind.FindNextCommand}" ToolTip.Tip="F3" />
+        <TextBlock x:Name="FindStatusText" Text="{Binding HexFind.FindStatus}" Classes="muted" Classes.error="{Binding HexFind.FindFailed}" VerticalAlignment="Center" />
+      </StackPanel>
+    </Border>
+    <Border x:Name="HexFooter" DockPanel.Dock="Bottom" Classes="host-footer" IsVisible="{Binding EditActions.IsHexEditing}">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <Button Content="Discard" Command="{Binding EditActions.DiscardHexEditCommand}" />
+          <Button Classes="accent" Content="Apply" Command="{Binding EditActions.ApplyHexEditCommand}" />
+        </StackPanel>
+        <ListBox x:Name="HexMode" DockPanel.Dock="Left" Classes="segmented" ItemsSource="{x:Static vm:HexEditor.Modes}"
+                 SelectedIndex="{Binding EditActions.HexEdit.ModeIndex, Mode=TwoWay, FallbackValue=0}" AutomationProperties.Name="Overwrite or insert" />
+        <TextBlock Classes="hex-status" Text="{Binding EditActions.HexEdit.Status, FallbackValue={x:Null}}" TextTrimming="CharacterEllipsis" />
+      </DockPanel>
+    </Border>
+    <Border x:Name="HexInspector" DockPanel.Dock="Right" Classes="hex-inspector" IsVisible="{Binding EditActions.HexInspection, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <!-- Rows without spacing so the readings fit under the Find bar at 1200 × 780; "In this resource" scrolls. -->
+      <!-- 10 on the right: the overlay scroll bar never covers the text. -->
+      <ScrollViewer x:Name="HexInspectorScroll" HorizontalScrollBarVisibility="Disabled" Padding="0,0,10,0">
+      <StackPanel Spacing="4">
+        <TextBlock Classes="caption" Text="{Binding EditActions.HexInspection.Heading, FallbackValue={x:Null}}" />
+        <ItemsControl ItemsSource="{Binding EditActions.HexInspection.Rows, FallbackValue={x:Null}}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:HexReading">
+              <Grid ColumnDefinitions="72,*">
+                <TextBlock Text="{Binding Label}" Classes="muted" />
+                <TextBlock Grid.Column="1" Text="{Binding Value}" Classes="mono" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <StackPanel Spacing="4" Margin="0,12,0,0"
+                    IsVisible="{Binding EditActions.HexInspection.Meaning, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}">
+          <TextBlock Classes="caption" Text="IN THIS RESOURCE" />
+          <TextBlock Text="{Binding EditActions.HexInspection.Meaning.Text, FallbackValue={x:Null}}" TextWrapping="Wrap" />
+          <TextBlock Classes="mono" Text="{Binding EditActions.HexInspection.Meaning.Value, StringFormat='= {0}', FallbackValue={x:Null}}"
+                     IsVisible="{Binding EditActions.HexInspection.Meaning.Value, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
+        </StackPanel>
+      </StackPanel>
+      </ScrollViewer>
+    </Border>
+    <!-- As the read-then-edit host (E1): a 3 px CmAccent line over the values while editing. -->
+    <Border x:Name="HexEditLine" DockPanel.Dock="Top" Height="3" Background="{DynamicResource CmAccent}" IsVisible="{Binding EditActions.IsHexEditing}" />
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Classes="hex-header">
+      <TextBlock Classes="hex-offset" Text="Offset" />
+      <ItemsControl ItemsSource="{x:Static vm:HexLines.HeaderCells}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Orientation="Horizontal" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:HexCell">
+            <Border Classes="hex-cell" Classes.group-end="{Binding IsGroupEnd}">
+              <TextBlock Text="{Binding Hex}" />
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Classes="hex-text" Text="Mac OS Roman" />
+    </StackPanel>
+    <ListBox x:Name="HexList" Classes="hex pane" Focusable="True" ItemsSource="{Binding HexLines, TargetNullValue={x:Static vm:HexLines.None}}" FontFamily="{StaticResource CmFontMono}" FontSize="13">
+      <ListBox.ItemTemplate>
+        <DataTemplate DataType="vm:HexLine">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Classes="hex-offset" Text="{Binding DisplayOffset}" />
+            <ItemsControl ItemsSource="{Binding Cells}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:HexCell">
+                  <Border Classes="hex-cell" Classes.group-end="{Binding IsGroupEnd}" Classes.zero="{Binding IsZero}"
+                          Classes.in-field="{Binding IsInField}" Classes.selected="{Binding IsSelected}" Classes.match="{Binding IsMatch}"
+                          Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
+                    <TextBlock Text="{Binding Hex}" />
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ItemsControl ItemsSource="{Binding Cells}" Margin="12,0,0,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:HexCell">
+                  <Border Classes="hex-char" Classes.in-field="{Binding IsInField}" Classes.selected="{Binding IsSelected}" Classes.match="{Binding IsMatch}"
+                          Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
+                    <TextBlock Text="{Binding Character}" Classes.muted="{Binding IsPlaceholder}" />
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </DockPanel>
+</UserControl>

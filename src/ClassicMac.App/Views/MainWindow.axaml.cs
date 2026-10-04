@@ -79,8 +79,6 @@ internal sealed partial class MainWindow : Window, IFilePicker
             }
         };
         Closing += OnClosing;
-        HexList.KeyDown += OnHexKeyDown;
-        HexList.AddHandler(PointerPressedEvent, OnHexPointerPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         Tree.AddHandler(PointerPressedEvent, OnTreePointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         Tree.AddHandler(PointerMovedEvent, OnTreePointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
         Tree.AddHandler(PointerReleasedEvent, (_, _) => dragPress = null, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -217,28 +215,6 @@ internal sealed partial class MainWindow : Window, IFilePicker
             draggingOut = false;
             node.IsDragSource = false;
         }
-    }
-
-    // A click on a byte (or its character) puts the cursor on it while editing, else selects it.
-    private void OnHexPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (DataContext is MainViewModel model && (e.Source as StyledElement)?.DataContext is HexCell cell)
-        {
-            model.EditActions.SelectHexByte(cell.Offset);
-            HexList.Focus();
-        }
-    }
-
-    // Keys of the hex view go to the byte editor while it is on; the cursor's line is kept in view.
-    private void OnHexKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (DataContext is not MainViewModel { EditActions.HexEdit: { } editor } || !editor.OnKey(e.Key, e.KeyModifiers))
-        {
-            return;
-        }
-
-        e.Handled = true;
-        HexList.ScrollIntoView(editor.CursorLine);
     }
 
     // The tree's selection goes to the view-model (the binding only brings the view-model's to the tree). The rows are
@@ -424,17 +400,16 @@ internal sealed partial class MainWindow : Window, IFilePicker
     private void OnQuit(object? sender, RoutedEventArgs e) => Close();
 
     // Find's match: its line scrolls into view.
-    private void OnHexLineShown(int line) => HexList.ScrollIntoView(line);
+    private void OnHexLineShown(int line) => HexTab.ScrollToLine(line);
 
     // Ctrl+F: the hex view's Find box while the Hex tab has the focus, else the tree's filter field. F3 and Shift+F3
     // in the Hex tab find the next and previous match.
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
-        var inHex = HexPane.IsKeyboardFocusWithin && DataContext is MainViewModel;
+        var inHex = HexTab.IsKeyboardFocusWithin && DataContext is MainViewModel;
         if (inHex && e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control)
         {
-            FindBox.Focus();
-            FindBox.SelectAll();
+            HexTab.FocusFind();
             e.Handled = true;
             return;
         }
