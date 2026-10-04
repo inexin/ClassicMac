@@ -1,0 +1,68 @@
+<!--
+  A sound's preview (boards/sound.md, P3): the transport, the detail chips, the channel lanes with the loop region and
+  the playhead.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             xmlns:views="using:ClassicMac.App.Views"
+             x:Class="ClassicMac.App.Views.SoundPane"
+             x:DataType="vm:MainViewModel">
+  <ScrollViewer x:Name="SoundPreview" IsVisible="{Binding Preview.IsSound}" Focusable="True">
+    <ScrollViewer.KeyBindings>
+      <KeyBinding Gesture="Space" Command="{Binding SoundPlayback.ToggleSoundCommand}" />
+    </ScrollViewer.KeyBindings>
+    <StackPanel Margin="16,12" Spacing="12">
+      <DockPanel>
+        <CheckBox x:Name="RepeatLoopBox" DockPanel.Dock="Right" Content="Repeat the loop" IsChecked="{Binding SoundPlayback.RepeatLoop}"
+                  IsVisible="{Binding SoundPlayback.HasSoundLoop}" />
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <Panel>
+            <Button x:Name="PlayButton" Classes="accent transport" Command="{Binding SoundPlayback.PlaySoundCommand}" IsVisible="{Binding !SoundPlayback.IsPlaying}"
+                    ToolTip.Tip="Play (Space)" AutomationProperties.Name="Play">
+              <PathIcon Data="M5,2 L14,8 L5,14 Z" />
+            </Button>
+            <Button x:Name="StopButton" Classes="accent transport" Command="{Binding SoundPlayback.StopSoundCommand}" IsVisible="{Binding SoundPlayback.IsPlaying}"
+                    ToolTip.Tip="Stop (Space)" AutomationProperties.Name="Stop">
+              <PathIcon Data="M3,3 H13 V13 H3 Z" />
+            </Button>
+          </Panel>
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <TextBlock Classes="mono sound-time" Text="{Binding SoundPlayback.PlayheadText}" />
+            <TextBlock Classes="mono muted sound-time" Text="{Binding SoundPlayback.SoundDurationText}" />
+          </StackPanel>
+          <TextBlock Classes="muted" VerticalAlignment="Center" Text="Space plays and stops · stops when the selection changes" />
+        </StackPanel>
+      </DockPanel>
+      <TextBlock Text="{Binding SoundPlayback.PlaybackNote}" Classes="muted" IsVisible="{Binding SoundPlayback.PlaybackNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <ItemsControl ItemsSource="{Binding Preview.SoundFacts}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:SoundFact">
+            <Border Classes="chip">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Classes="muted" Text="{Binding Label}" />
+                <TextBlock Text="{Binding Value}" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Border Classes="wave-card">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Classes="wave-header">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" IsVisible="{Binding SoundPlayback.HasSoundLoop}">
+                <Border Classes="loop-swatch" />
+                <TextBlock Classes="muted" Text="Loop" />
+              </StackPanel>
+              <TextBlock Classes="strong" Text="{Binding Preview.SoundLanesTitle}" />
+            </DockPanel>
+          </Border>
+          <views:WaveformView Sound="{Binding Preview.Sound}" LoopFrames="{Binding Preview.SoundLoopFrames}" Playhead="{Binding SoundPlayback.Playhead}"
+                              ShowsPlayhead="{Binding SoundPlayback.IsPlaying}" SeekCommand="{Binding SoundPlayback.SeekSoundCommand}" />
+        </DockPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,61 @@
+<!--
+  A structured resource's preview (boards/property-view.md, P2): property cards with links, or the JSON.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             x:Class="ClassicMac.App.Views.PropertyPane"
+             x:DataType="vm:MainViewModel">
+  <DockPanel IsVisible="{Binding Preview.IsJson}">
+    <ListBox x:Name="PropertyMode" DockPanel.Dock="Top" Classes="segmented" HorizontalAlignment="Left" Margin="16,12,16,0"
+             ItemsSource="{x:Static vm:PropertyLinks.PropertyModes}" SelectedIndex="{Binding PropertyLinks.PropertyModeIndex, Mode=TwoWay}"
+             IsVisible="{Binding Preview.HasProperties}" AutomationProperties.Name="Properties or JSON" />
+    <Panel>
+      <ScrollViewer x:Name="PropertyCards" IsVisible="{Binding PropertyLinks.ShowsProperties}" Padding="16,12">
+        <ItemsControl ItemsSource="{Binding Preview.PropertyCards}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Classes="cards" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:PropertyCard">
+              <Border Classes="card">
+                <StackPanel>
+                  <TextBlock Classes="card-title" Text="{Binding Caption}" />
+                  <ItemsControl Classes="property-rows" ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="vm:PropertyRow">
+                        <Border Classes="card-line">
+                          <Grid Classes="card-row property-row" ColumnDefinitions="150,*">
+                            <Grid.ContextMenu>
+                              <ContextMenu>
+                                <MenuItem Header="Copy as _Decimal" Tag="{Binding Decimal}" IsVisible="{Binding IsNumber}" Click="OnCopyProperty" />
+                                <MenuItem Header="Copy as _Hex" Tag="{Binding Hex}" IsVisible="{Binding IsNumber}" Click="OnCopyProperty" />
+                                <MenuItem Header="Copy as _JSON" Tag="{Binding Json}" Click="OnCopyProperty" />
+                              </ContextMenu>
+                            </Grid.ContextMenu>
+                            <TextBlock Classes="label" Text="{Binding Label}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                              <Ellipse Classes="dot" Classes.on="{Binding IsYes}" IsVisible="{Binding IsFlag}" />
+                              <SelectableTextBlock Classes="property-value" Classes.mono="{Binding IsMono}" Text="{Binding Value}" />
+                              <SelectableTextBlock Classes="property-raw" Text="{Binding Raw}" IsVisible="{Binding HasRaw}" />
+                              <TextBlock Classes="muted" Text="{Binding Note}" IsVisible="{Binding HasNote}" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <ScrollViewer IsVisible="{Binding PropertyLinks.ShowsJsonText}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
+        <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="{StaticResource CmFontMono}" />
+      </ScrollViewer>
+    </Panel>
+  </DockPanel>
+</UserControl>

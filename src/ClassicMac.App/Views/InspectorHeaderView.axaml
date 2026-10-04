@@ -1,0 +1,82 @@
+<!--
+  The inspector's header (boards/main-window.md, S3): the selection's icon, name, kind and facts, and its actions.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             xmlns:views="using:ClassicMac.App.Views"
+             x:Class="ClassicMac.App.Views.InspectorHeaderView"
+             x:DataType="vm:MainViewModel">
+  <Border x:Name="InspectorHeader" Classes="inspector-header" IsVisible="{Binding InspectorActions.Header, Converter={x:Static ObjectConverters.IsNotNull}}">
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+        <Button Content="Export…" Command="{Binding InspectorActions.HeaderExportCommand}" IsVisible="{Binding !SoundHeaderActions.IsSoundResource}" />
+        <!-- A sound's actions (boards/sound.md): replaced, not edited. -->
+        <Button x:Name="SaveAsWavButton" Content="Save as WAV…" Command="{Binding SoundHeaderActions.SaveAsWavCommand}" IsVisible="{Binding SoundHeaderActions.IsSoundResource}" />
+        <Button x:Name="ReplaceFromWavButton" Content="Replace from WAV…" Command="{Binding SoundHeaderActions.ReplaceFromWavCommand}" IsVisible="{Binding SoundHeaderActions.IsSoundResource}" />
+        <Panel IsVisible="{Binding Forms.HasForm}">
+          <Button Classes="accent" Content="Edit" Command="{Binding FormEditing.EditFormCommand}" IsVisible="{Binding !FormEditing.IsEditingForm}" />
+          <Border Classes="editing-badge" IsVisible="{Binding FormEditing.IsEditingForm}" VerticalAlignment="Center">
+            <TextBlock Text="Editing" />
+          </Border>
+        </Panel>
+      </StackPanel>
+      <Border Classes="icon-tile">
+        <Panel>
+          <!-- The selection's own large icon (an icon's image, a picture's thumbnail, a file's Finder icon), else its
+               kind's 32-pixel icon; both 1:1. -->
+          <views:PixelImage x:Name="HeaderOwnIcon" Source="{Binding InspectorActions.HeaderIconPng, Converter={x:Static views:Images.FromPng}}" Zoom="1"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            IsVisible="{Binding InspectorActions.HeaderIconPng, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <views:PixelImage x:Name="HeaderKindIcon" Source="{Binding InspectorActions.Header.Node.IconKind, Converter={x:Static views:TreeIcons.LargeConverter}, FallbackValue={x:Null}}" Zoom="1"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            IsVisible="{Binding InspectorActions.HeaderIconPng, Converter={x:Static ObjectConverters.IsNull}}" />
+        </Panel>
+      </Border>
+      <StackPanel Classes="titles">
+        <!-- A file in a "No name" group is named with its row's chips (boards/tree-no-name.md), its bytes on hover. -->
+        <ItemsControl x:Name="HeaderNameTokens" Classes="name-tokens" ItemsSource="{Binding InspectorActions.Header.Node.NameTokens, FallbackValue={x:Null}}"
+                      IsVisible="{Binding InspectorActions.Header.Node.HasNameTokens, FallbackValue=False}"
+                      ToolTip.Tip="{Binding InspectorActions.Header.Node.NameBytes, FallbackValue={x:Null}}" HorizontalAlignment="Left" Margin="0,4,0,3">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:NameToken">
+              <Border Classes="name-token">
+                <TextBlock Text="{Binding Label}" />
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock x:Name="HeaderName" Classes="heading" Text="{Binding InspectorActions.Header.Name, FallbackValue={x:Null}}"
+                   IsVisible="{Binding !InspectorActions.Header.Node.HasNameTokens, FallbackValue=True}" />
+        <TextBlock Classes="muted kind" Text="{Binding InspectorActions.Header.Kind, FallbackValue={x:Null}}" />
+        <!-- An alias file: where its original is, and Show Original (Ctrl+R) when it is found. -->
+        <StackPanel x:Name="AliasOriginal" Classes="alias-original" Orientation="Horizontal" Spacing="8" IsVisible="{Binding InspectorActions.Header.HasOriginal, FallbackValue=False}">
+          <TextBlock Classes="mono original" Text="{Binding InspectorActions.Header.Original, FallbackValue={x:Null}}" TextTrimming="CharacterEllipsis"
+                     ToolTip.Tip="{Binding InspectorActions.Header.Original, FallbackValue={x:Null}}" VerticalAlignment="Center" />
+          <Button x:Name="ShowOriginalButton" Content="Show Original" Command="{Binding AliasActions.ShowOriginalCommand}"
+                  IsVisible="{Binding AliasActions.AliasStrip, Converter={x:Static ObjectConverters.IsNotNull}}" ToolTip.Tip="Ctrl+R" />
+        </StackPanel>
+        <ItemsControl ItemsSource="{Binding InspectorActions.Header.Facts, FallbackValue={x:Null}}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:InspectorFact">
+              <StackPanel Classes="fact" Orientation="Horizontal">
+                <TextBlock Classes="muted label" Text="{Binding Label}" />
+                <TextBlock Classes="value" Classes.mono="{Binding IsMono}" Text="{Binding Value}" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>
