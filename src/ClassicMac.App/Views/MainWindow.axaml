@@ -1871,7 +1871,7 @@
                 </ScrollViewer>
                 <!-- A page in the web view: an Apple Help page (docs/formats/resources/help-pages.md), or a document's HTML export
                      (DOCMaker, SimpleText, Word; with Back and its pages). Rendered | Source (or Text); the page in a native web
-                     view (made in code, MainWindow.Help.cs), else its source or text with why; the status line under it. -->
+                     view (made in code, HelpWebView.cs), else its source or text with why; the status line under it. -->
                 <DockPanel IsVisible="{Binding Preview.IsWebPage}">
                   <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="16,12,16,0">
                     <ListBox x:Name="HelpMode" Classes="segmented" ItemsSource="{Binding HelpPreview.WebModes}" SelectedIndex="{Binding HelpPreview.HelpModeIndex, Mode=TwoWay}"
@@ -1970,7 +1970,7 @@
               </Panel>
             </DockPanel>
               <!-- The read-then-edit host (boards/read-then-edit.md, E1; FormEditing.cs): every form, read only first, then
-                   in place with Cancel and Apply. Esc cancels and Ctrl+Enter applies (MainWindow.Host.cs); a double-click
+                   in place with Cancel and Apply. Esc cancels and Ctrl+Enter applies (FormHostInput.cs); a double-click
                    on a "form-row" edits with that row selected. -->
               <DockPanel x:Name="FormHost" Classes="form-host" Classes.editing="{Binding FormEditing.IsEditingForm}" IsVisible="{Binding FormEditing.ShowsForm}">
                 <Border x:Name="FormFooter" DockPanel.Dock="Bottom" Classes="host-footer">
