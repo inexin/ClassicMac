@@ -1,0 +1,31 @@
+<!--
+  A help page's or document's preview: Rendered (a native web view) or Source, the chapter list, and why there is no
+  web view when there is none.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             x:Class="ClassicMac.App.Views.WebPagePane"
+             x:DataType="vm:MainViewModel">
+  <DockPanel IsVisible="{Binding Preview.IsWebPage}">
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="16,12,16,0">
+      <ListBox x:Name="HelpMode" Classes="segmented" ItemsSource="{Binding HelpPreview.WebModes}" SelectedIndex="{Binding HelpPreview.HelpModeIndex, Mode=TwoWay}"
+               AutomationProperties.Name="Rendered or source" />
+      <Button Content="Back" Command="{Binding Preview.Document.BackCommand, FallbackValue={x:Null}}"
+              IsVisible="{Binding Preview.IsDocument}" />
+      <ComboBox x:Name="DocumentChapters" ItemsSource="{Binding Preview.Document.ChapterTitles, FallbackValue={x:Null}}" MinWidth="260"
+                SelectedIndex="{Binding Preview.Document.ChapterIndex, Mode=TwoWay, FallbackValue=0}"
+                IsVisible="{Binding Preview.Document.HasChapters, FallbackValue=False}" AutomationProperties.Name="Page" />
+    </StackPanel>
+    <TextBlock x:Name="HelpEngineMessage" DockPanel.Dock="Top" Classes="muted" Margin="16,8,16,0" TextWrapping="Wrap"
+               Text="{Binding HelpPreview.WebEngineMessage}" IsVisible="{Binding HelpPreview.HasWebEngineMessage}" />
+    <TextBlock x:Name="HelpStatusText" DockPanel.Dock="Bottom" Classes="muted" Margin="16,4" TextTrimming="CharacterEllipsis"
+               Text="{Binding HelpPreview.HelpStatus}" IsVisible="{Binding HelpPreview.HelpStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    <Panel>
+      <Panel x:Name="HelpHost" Margin="0,8,0,0" IsVisible="{Binding HelpPreview.ShowsHelpRendered}" />
+      <ScrollViewer IsVisible="{Binding HelpPreview.ShowsHelpSource}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
+        <SelectableTextBlock x:Name="HelpSource" Classes.document="{Binding Preview.IsDocument}" Text="{Binding Preview.Web.Source, FallbackValue={x:Null}}" TextWrapping="Wrap" />
+      </ScrollViewer>
+    </Panel>
+  </DockPanel>
+</UserControl>

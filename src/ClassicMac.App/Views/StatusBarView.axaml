@@ -1,0 +1,28 @@
+<!--
+  The status bar (boards/main-window.md, S4): the selected input's summary, then the work in progress or the status
+  text.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             x:Class="ClassicMac.App.Views.StatusBarView"
+             x:DataType="vm:MainViewModel">
+  <Border x:Name="StatusBar" Classes="chrome status-bar">
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" IsVisible="{Binding StatusLine.Summary, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <TextBlock Classes="summary" Text="{Binding StatusLine.Summary.Text, FallbackValue={x:Null}}" />
+        <TextBlock Classes="summary error" Text="{Binding StatusLine.Summary.ErrorText, StringFormat=' · {0}', FallbackValue={x:Null}}"
+                   IsVisible="{Binding StatusLine.Summary.ErrorText, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
+        <TextBlock Classes="summary warning" Text="{Binding StatusLine.Summary.WarningText, StringFormat=' · {0}', FallbackValue={x:Null}}"
+                   IsVisible="{Binding StatusLine.Summary.WarningText, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
+      </StackPanel>
+      <StackPanel x:Name="Progress" DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" IsVisible="{Binding StatusLine.IsWorking}">
+        <TextBlock Text="{Binding StatusLine.ProgressText}" />
+        <TextBlock Text="{Binding StatusLine.ProgressCount}" Classes="muted" IsVisible="{Binding StatusLine.ProgressCount, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <ProgressBar Classes="status" Minimum="0" Maximum="{Binding StatusLine.ProgressMaximum}" Value="{Binding StatusLine.ProgressValue}"
+                     IsIndeterminate="{Binding StatusLine.IsProgressIndeterminate}" />
+      </StackPanel>
+      <TextBlock Classes="status" Text="{Binding Status}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !StatusLine.IsWorking}" />
+    </DockPanel>
+  </Border>
+</UserControl>

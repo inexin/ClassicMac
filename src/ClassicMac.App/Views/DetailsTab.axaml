@@ -1,0 +1,105 @@
+<!--
+  The Details tab (boards/details.md, P4): a two-column grid of cards, the full-width chain card under it, Copy all in
+  the header.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             x:Class="ClassicMac.App.Views.DetailsTab"
+             x:DataType="vm:MainViewModel">
+  <ScrollViewer x:Name="DetailsScroll" Padding="16,12">
+    <ScrollViewer.Resources>
+      <DataTemplate x:Key="DetailCard" DataType="vm:DetailGroup">
+        <Border Classes="detail-card" Margin="7">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Classes="detail-card-header">
+              <TextBlock Classes="caption" Text="{Binding Caption}" />
+            </Border>
+            <StackPanel Classes="detail-rows">
+              <ItemsControl Classes="flags" ItemsSource="{Binding Flags}" IsVisible="{Binding HasFlags}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:FinderFlagChip">
+                    <Panel Classes="chip" Classes.set="{Binding IsSet}" Classes.unset="{Binding !IsSet}">
+                      <Border />
+                      <Rectangle />
+                      <TextBlock Text="{Binding Name}" />
+                    </Panel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <DockPanel IsVisible="{Binding HasChain}">
+                <Panel DockPanel.Dock="Right" VerticalAlignment="Top" Margin="12,2,0,0">
+                  <TextBlock Classes="muted problems" FontSize="{DynamicResource CmFontSizeMeta}"
+                             Text="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).Details.ProblemsText, FallbackValue={x:Null}}"
+                             IsVisible="{Binding !$parent[TabItem].((vm:MainViewModel)DataContext).Details.HasProblems, FallbackValue=False}" />
+                  <Button Classes="link problems" Padding="0" FontSize="{DynamicResource CmFontSizeMeta}"
+                          Content="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).Details.ProblemsText, FallbackValue={x:Null}}"
+                          IsVisible="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).Details.HasProblems, FallbackValue=False}"
+                          Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).DetailsActions.ShowProblemsCommand, FallbackValue={x:Null}}"
+                          ToolTip.Tip="Show them in the diagnostics" />
+                </Panel>
+                <ItemsControl Classes="chain" ItemsSource="{Binding Chain}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:ReadStep">
+                      <StackPanel Orientation="Horizontal">
+                        <Panel Classes="chip step" Classes.last="{Binding IsLast}">
+                          <Border />
+                          <SelectableTextBlock Text="{Binding Text}" Margin="8,2" FontSize="{DynamicResource CmFontSizeMeta}" />
+                        </Panel>
+                        <TextBlock Classes="muted" Text="→" Margin="0,2,6,0" IsVisible="{Binding !IsLast}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </DockPanel>
+              <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:DetailRow">
+                    <Grid ColumnDefinitions="110,*" Margin="0,2">
+                      <TextBlock Text="{Binding Label}" Classes="muted" />
+                      <StackPanel Grid.Column="1" Spacing="4">
+                        <SelectableTextBlock Text="{Binding Value}" TextWrapping="Wrap" Classes.mono="{Binding Mono}" IsVisible="{Binding !Link}" />
+                        <Button Classes="link in" Padding="0" FontSize="{DynamicResource CmFontSizeBody}" HorizontalAlignment="Left" Content="{Binding Value}" IsVisible="{Binding Link}"
+                                Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).DetailsActions.GoToInCommand, FallbackValue={x:Null}}"
+                                ToolTip.Tip="Select it in the tree" />
+                        <ProgressBar Classes="fork-bar" Value="{Binding Bar, FallbackValue=0}" IsVisible="{Binding HasBar}" />
+                      </StackPanel>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="muted" Text="{Binding Note}" IsVisible="{Binding HasNote}" TextWrapping="Wrap"
+                         FontSize="{DynamicResource CmFontSizeMeta}" />
+            </StackPanel>
+          </DockPanel>
+        </Border>
+      </DataTemplate>
+    </ScrollViewer.Resources>
+    <StackPanel Spacing="4">
+      <DockPanel Margin="0,0,0,4">
+        <Button x:Name="CopyDetails" DockPanel.Dock="Right" Content="Copy all" Command="{Binding DetailsActions.CopyDetailsCommand}"
+                VerticalAlignment="Center" ToolTip.Tip="Copy the details as plain text" />
+        <TextBlock Text="{Binding Details.Heading}" FontSize="{DynamicResource CmFontSizeHeading}"
+                   FontWeight="{DynamicResource CmFontWeightStrong}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      </DockPanel>
+      <ItemsControl x:Name="DetailCards" ItemsSource="{Binding Details.Cards}" ItemTemplate="{StaticResource DetailCard}" Margin="-7,0">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <UniformGrid Columns="2" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+      </ItemsControl>
+      <ItemsControl x:Name="DetailWideCards" ItemsSource="{Binding Details.WideCards}" ItemTemplate="{StaticResource DetailCard}" Margin="-7,0" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

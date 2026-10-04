@@ -137,98 +137,11 @@
     </Menu>
 
     <!-- The toolbar (design/boards/main-window.md, S2): each button follows its command's enabled state. -->
-    <Border x:Name="Toolbar" DockPanel.Dock="Top" Classes="chrome toolbar">
-      <DockPanel>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsEnabled="{Binding ShellActions.IsZoomable}">
-          <TextBlock Text="Zoom" Classes="tool-label" VerticalAlignment="Center" />
-          <ListBox x:Name="ZoomChoice" Classes="segmented" ItemsSource="{Binding Zooms}" SelectedItem="{Binding Zoom, Mode=TwoWay}"
-                   AutomationProperties.Name="Zoom">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="x:Int32">
-                <TextBlock Text="{Binding StringFormat={}{0}×}" />
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-          <TextBlock Text="Depth" Classes="tool-label" VerticalAlignment="Center" Margin="8,0,0,0" />
-          <ComboBox x:Name="DepthChoice" ItemsSource="{Binding ShellActions.ScreenDepthChoices}" SelectedItem="{Binding ShellActions.SelectedDepthChoice, Mode=TwoWay}"
-                    MinWidth="120" AutomationProperties.Name="Screen depth">
-            <ComboBox.ItemTemplate>
-              <DataTemplate DataType="vm:ScreenDepthChoice">
-                <TextBlock Text="{Binding Label}" />
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-          <Button Classes="flat tool" Command="{Binding OpenCommand}" ToolTip.Tip="Open (Ctrl+O)" AutomationProperties.Name="Open">
-            <StackPanel>
-              <Path Classes="tool-icon" Data="M2,5 V14 H14 L16,8 H5 L3,14 M2,5 H7 L8.5,6.5 H14 V8" />
-              <TextBlock Text="Open" />
-            </StackPanel>
-          </Button>
-          <Button Classes="flat tool" Command="{Binding EditActions.SaveCommand}" ToolTip.Tip="Save (Ctrl+S)" AutomationProperties.Name="Save">
-            <StackPanel>
-              <Path Classes="tool-icon" Data="M9,2 V11 M5.5,7.5 L9,11 L12.5,7.5 M2,11 V15 H16 V11" />
-              <TextBlock Text="Save" />
-            </StackPanel>
-          </Button>
-          <Border Classes="tool-divider" />
-          <Button Classes="flat tool" Command="{Binding EditActions.GetInfoCommand}" ToolTip.Tip="Get Info (Ctrl+I)" AutomationProperties.Name="Get Info">
-            <StackPanel>
-              <Path Classes="tool-icon" Data="M9,1.75 A7.25,7.25 0 1 1 8.99,1.75 Z M9,8 V13 M9,5 V5.6" />
-              <TextBlock Text="Get Info" />
-            </StackPanel>
-          </Button>
-          <Button Classes="flat tool" Command="{Binding EditActions.EditHexCommand}" ToolTip.Tip="Edit Hex (Ctrl+H)" AutomationProperties.Name="Edit Hex">
-            <StackPanel>
-              <Path Classes="tool-icon" Data="M6,5 L2,9 L6,13 M12,5 L16,9 L12,13 M10.5,4 L7.5,14" />
-              <TextBlock Text="Edit Hex" />
-            </StackPanel>
-          </Button>
-          <Border Classes="tool-divider" />
-          <Button Classes="flat tool" Command="{Binding InspectorActions.HeaderExportCommand}" ToolTip.Tip="Export the selection" AutomationProperties.Name="Export">
-            <StackPanel>
-              <Path Classes="tool-icon" Data="M9,11 V2 M5.5,5.5 L9,2 L12.5,5.5 M2,11 V15 H16 V11" />
-              <TextBlock Text="Export…" />
-            </StackPanel>
-          </Button>
-          <Button Classes="flat tool" Command="{Binding ExportActions.ExtractAllCommand}" ToolTip.Tip="Extract all resources" AutomationProperties.Name="Extract All">
-            <StackPanel>
-              <Path Classes="tool-icon" Data="M2,7 H16 V16 H2 Z M3.5,4.5 H14.5 M5,2 H13 M9,9 V14 M7,12 L9,14 L11,12" />
-              <TextBlock Text="Extract All" />
-            </StackPanel>
-          </Button>
-          <Border Classes="tool-divider" />
-          <Button Classes="flat tool" Command="{Binding SoundPlayback.PlaySoundCommand}" ToolTip.Tip="Play the sound" AutomationProperties.Name="Play">
-            <StackPanel>
-              <Path Classes="tool-icon" Data="M5,3 L15,9 L5,15 Z" />
-              <TextBlock Text="Play" />
-            </StackPanel>
-          </Button>
-        </StackPanel>
-      </DockPanel>
-    </Border>
+    <views:ToolbarView x:Name="ToolbarView" DockPanel.Dock="Top" />
 
     <!-- The status bar (boards/main-window.md, S4): the selected file's summary with its error and warning counts; on the
          right, while work runs, what it does, how far and a progress bar, else the status text. -->
-    <Border x:Name="StatusBar" DockPanel.Dock="Bottom" Classes="chrome status-bar">
-      <DockPanel>
-        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" IsVisible="{Binding StatusLine.Summary, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <TextBlock Classes="summary" Text="{Binding StatusLine.Summary.Text, FallbackValue={x:Null}}" />
-          <TextBlock Classes="summary error" Text="{Binding StatusLine.Summary.ErrorText, StringFormat=' · {0}', FallbackValue={x:Null}}"
-                     IsVisible="{Binding StatusLine.Summary.ErrorText, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
-          <TextBlock Classes="summary warning" Text="{Binding StatusLine.Summary.WarningText, StringFormat=' · {0}', FallbackValue={x:Null}}"
-                     IsVisible="{Binding StatusLine.Summary.WarningText, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
-        </StackPanel>
-        <StackPanel x:Name="Progress" DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" IsVisible="{Binding StatusLine.IsWorking}">
-          <TextBlock Text="{Binding StatusLine.ProgressText}" />
-          <TextBlock Text="{Binding StatusLine.ProgressCount}" Classes="muted" IsVisible="{Binding StatusLine.ProgressCount, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          <ProgressBar Classes="status" Minimum="0" Maximum="{Binding StatusLine.ProgressMaximum}" Value="{Binding StatusLine.ProgressValue}"
-                       IsIndeterminate="{Binding StatusLine.IsProgressIndeterminate}" />
-        </StackPanel>
-        <TextBlock Classes="status" Text="{Binding Status}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !StatusLine.IsWorking}" />
-      </DockPanel>
-    </Border>
+    <views:StatusBarView x:Name="StatusBarView" DockPanel.Dock="Bottom" />
 
     <Grid x:Name="Body" RowDefinitions="*,6,196">
       <Grid ColumnDefinitions="380,5,*">
@@ -382,101 +295,7 @@
           <TabItem Header="Details">
             <!-- The Details tab (design/boards/details.md, P4): a two-column grid of cards, the full-width chain card
                  under it, Copy all in the header. -->
-            <ScrollViewer x:Name="DetailsScroll" Padding="16,12">
-              <ScrollViewer.Resources>
-                <DataTemplate x:Key="DetailCard" DataType="vm:DetailGroup">
-                  <Border Classes="detail-card" Margin="7">
-                    <DockPanel>
-                      <Border DockPanel.Dock="Top" Classes="detail-card-header">
-                        <TextBlock Classes="caption" Text="{Binding Caption}" />
-                      </Border>
-                      <StackPanel Classes="detail-rows">
-                        <ItemsControl Classes="flags" ItemsSource="{Binding Flags}" IsVisible="{Binding HasFlags}">
-                          <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                              <WrapPanel />
-                            </ItemsPanelTemplate>
-                          </ItemsControl.ItemsPanel>
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:FinderFlagChip">
-                              <Panel Classes="chip" Classes.set="{Binding IsSet}" Classes.unset="{Binding !IsSet}">
-                                <Border />
-                                <Rectangle />
-                                <TextBlock Text="{Binding Name}" />
-                              </Panel>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <DockPanel IsVisible="{Binding HasChain}">
-                          <Panel DockPanel.Dock="Right" VerticalAlignment="Top" Margin="12,2,0,0">
-                            <TextBlock Classes="muted problems" FontSize="{DynamicResource CmFontSizeMeta}"
-                                       Text="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).Details.ProblemsText, FallbackValue={x:Null}}"
-                                       IsVisible="{Binding !$parent[TabItem].((vm:MainViewModel)DataContext).Details.HasProblems, FallbackValue=False}" />
-                            <Button Classes="link problems" Padding="0" FontSize="{DynamicResource CmFontSizeMeta}"
-                                    Content="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).Details.ProblemsText, FallbackValue={x:Null}}"
-                                    IsVisible="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).Details.HasProblems, FallbackValue=False}"
-                                    Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).DetailsActions.ShowProblemsCommand, FallbackValue={x:Null}}"
-                                    ToolTip.Tip="Show them in the diagnostics" />
-                          </Panel>
-                          <ItemsControl Classes="chain" ItemsSource="{Binding Chain}">
-                            <ItemsControl.ItemsPanel>
-                              <ItemsPanelTemplate>
-                                <WrapPanel />
-                              </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate DataType="vm:ReadStep">
-                                <StackPanel Orientation="Horizontal">
-                                  <Panel Classes="chip step" Classes.last="{Binding IsLast}">
-                                    <Border />
-                                    <SelectableTextBlock Text="{Binding Text}" Margin="8,2" FontSize="{DynamicResource CmFontSizeMeta}" />
-                                  </Panel>
-                                  <TextBlock Classes="muted" Text="→" Margin="0,2,6,0" IsVisible="{Binding !IsLast}" />
-                                </StackPanel>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                        </DockPanel>
-                        <ItemsControl ItemsSource="{Binding Rows}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="vm:DetailRow">
-                              <Grid ColumnDefinitions="110,*" Margin="0,2">
-                                <TextBlock Text="{Binding Label}" Classes="muted" />
-                                <StackPanel Grid.Column="1" Spacing="4">
-                                  <SelectableTextBlock Text="{Binding Value}" TextWrapping="Wrap" Classes.mono="{Binding Mono}" IsVisible="{Binding !Link}" />
-                                  <Button Classes="link in" Padding="0" FontSize="{DynamicResource CmFontSizeBody}" HorizontalAlignment="Left" Content="{Binding Value}" IsVisible="{Binding Link}"
-                                          Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).DetailsActions.GoToInCommand, FallbackValue={x:Null}}"
-                                          ToolTip.Tip="Select it in the tree" />
-                                  <ProgressBar Classes="fork-bar" Value="{Binding Bar, FallbackValue=0}" IsVisible="{Binding HasBar}" />
-                                </StackPanel>
-                              </Grid>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Classes="muted" Text="{Binding Note}" IsVisible="{Binding HasNote}" TextWrapping="Wrap"
-                                   FontSize="{DynamicResource CmFontSizeMeta}" />
-                      </StackPanel>
-                    </DockPanel>
-                  </Border>
-                </DataTemplate>
-              </ScrollViewer.Resources>
-              <StackPanel Spacing="4">
-                <DockPanel Margin="0,0,0,4">
-                  <Button x:Name="CopyDetails" DockPanel.Dock="Right" Content="Copy all" Command="{Binding DetailsActions.CopyDetailsCommand}"
-                          VerticalAlignment="Center" ToolTip.Tip="Copy the details as plain text" />
-                  <TextBlock Text="{Binding Details.Heading}" FontSize="{DynamicResource CmFontSizeHeading}"
-                             FontWeight="{DynamicResource CmFontWeightStrong}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                </DockPanel>
-                <ItemsControl x:Name="DetailCards" ItemsSource="{Binding Details.Cards}" ItemTemplate="{StaticResource DetailCard}" Margin="-7,0">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <UniformGrid Columns="2" />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                </ItemsControl>
-                <ItemsControl x:Name="DetailWideCards" ItemsSource="{Binding Details.WideCards}" ItemTemplate="{StaticResource DetailCard}" Margin="-7,0" />
-              </StackPanel>
-            </ScrollViewer>
+            <views:DetailsTab x:Name="DetailsTab" />
           </TabItem>
 
           <TabItem Header="Preview">
@@ -507,80 +326,7 @@
                 <TextBlock Text="{Binding Preview.Message}" Margin="16" Classes="muted" IsVisible="{Binding Preview.IsMessage}" />
                 <!-- The image grid (boards/main-window.md, P1): the sub-bar, then the cards cut into rows by the view-model
                      for the viewport's width, in a virtualising list so hundreds of images scroll smoothly. -->
-                <DockPanel IsVisible="{Binding Preview.IsImage}">
-                  <DockPanel DockPanel.Dock="Top" Margin="12,8,12,0">
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="12">
-                      <CheckBox Name="ShowMasksBox" Content="Show masks" IsChecked="{Binding ImageGrid.ShowMasks}" IsVisible="{Binding ImageGrid.HasMasks}" />
-                      <CheckBox Name="FinderStatesBox" Content="Finder states" IsChecked="{Binding ImageGrid.ShowFinderStates}" IsVisible="{Binding ImageGrid.HasFinderStates}" />
-                    </StackPanel>
-                    <TextBlock Name="ImageSummaryText" Text="{Binding ImageGrid.ImageSummary}" Classes="muted" VerticalAlignment="Center" />
-                  </DockPanel>
-                  <ScrollViewer Name="ImageScroller" HorizontalScrollBarVisibility="Auto">
-                    <ItemsControl Name="ImageRowsList" ItemsSource="{Binding ImageGrid.ImageRows}" Margin="12">
-                      <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                          <VirtualizingStackPanel />
-                        </ItemsPanelTemplate>
-                      </ItemsControl.ItemsPanel>
-                      <ItemsControl.DataTemplates>
-                        <DataTemplate DataType="vm:ImageRow">
-                          <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,0,12">
-                            <ItemsControl.ItemsPanel>
-                              <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" />
-                              </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate DataType="vm:ImageItem">
-                                <Border Classes="image-card"
-                                        Width="{Binding $parent[Window].((vm:MainViewModel)DataContext).ImageGrid.ImageCardWidth, FallbackValue=112}">
-                                  <DockPanel>
-                                    <Border DockPanel.Dock="Bottom" Classes="image-caption">
-                                      <StackPanel>
-                                        <TextBlock Text="{Binding Image.Title}" FontFamily="{StaticResource CmFontMono}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
-                                                   IsVisible="{Binding Image.Title, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                                        <TextBlock Text="{Binding Image.CardDetail}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
-                                      </StackPanel>
-                                    </Border>
-                                    <Border Background="{DynamicResource CmCheckerboard}" Padding="12">
-                                      <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}"
-                                                        HorizontalAlignment="Center" VerticalAlignment="Bottom" />
-                                    </Border>
-                                  </DockPanel>
-                                </Border>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                        </DataTemplate>
-                        <DataTemplate DataType="vm:FinderStatesRow">
-                          <StackPanel Spacing="6" Margin="0,8,0,12">
-                            <TextBlock Text="Finder states" Classes="muted" FontSize="12" FontWeight="SemiBold" />
-                            <Border Background="{DynamicResource CmCheckerboard}" HorizontalAlignment="Left" Padding="12" CornerRadius="6" MaxWidth="{Binding MaxWidth}">
-                              <ItemsControl ItemsSource="{Binding Items}">
-                                <ItemsControl.ItemsPanel>
-                                  <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                  </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                  <DataTemplate DataType="vm:ImageItem">
-                                    <StackPanel Margin="0,0,12,4" Spacing="4">
-                                      <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}"
-                                                        HorizontalAlignment="Center" />
-                                      <Border Classes="state-plate">
-                                        <TextBlock Text="{Binding Image.Caption}" FontSize="11" />
-                                      </Border>
-                                    </StackPanel>
-                                  </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                              </ItemsControl>
-                            </Border>
-                          </StackPanel>
-                        </DataTemplate>
-                      </ItemsControl.DataTemplates>
-                    </ItemsControl>
-                  </ScrollViewer>
-                </DockPanel>
+                <views:ImagePane x:Name="ImagePane" />
                 <!-- 24 on the right: the overlay scroll bar never covers the text. -->
                 <!-- Mac content keeps its colours: styled text on white paper, as the Mac draws it, in both themes. -->
                 <ScrollViewer x:Name="StyledTextScroller" IsVisible="{Binding Preview.IsStyledText}" Padding="16,12,24,12" Background="White">
@@ -604,27 +350,7 @@
                 <!-- A page in the web view: an Apple Help page (docs/formats/resources/help-pages.md), or a document's HTML export
                      (DOCMaker, SimpleText, Word; with Back and its pages). Rendered | Source (or Text); the page in a native web
                      view (made in code, HelpWebView.cs), else its source or text with why; the status line under it. -->
-                <DockPanel IsVisible="{Binding Preview.IsWebPage}">
-                  <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="16,12,16,0">
-                    <ListBox x:Name="HelpMode" Classes="segmented" ItemsSource="{Binding HelpPreview.WebModes}" SelectedIndex="{Binding HelpPreview.HelpModeIndex, Mode=TwoWay}"
-                             AutomationProperties.Name="Rendered or source" />
-                    <Button Content="Back" Command="{Binding Preview.Document.BackCommand, FallbackValue={x:Null}}"
-                            IsVisible="{Binding Preview.IsDocument}" />
-                    <ComboBox x:Name="DocumentChapters" ItemsSource="{Binding Preview.Document.ChapterTitles, FallbackValue={x:Null}}" MinWidth="260"
-                              SelectedIndex="{Binding Preview.Document.ChapterIndex, Mode=TwoWay, FallbackValue=0}"
-                              IsVisible="{Binding Preview.Document.HasChapters, FallbackValue=False}" AutomationProperties.Name="Page" />
-                  </StackPanel>
-                  <TextBlock x:Name="HelpEngineMessage" DockPanel.Dock="Top" Classes="muted" Margin="16,8,16,0" TextWrapping="Wrap"
-                             Text="{Binding HelpPreview.WebEngineMessage}" IsVisible="{Binding HelpPreview.HasWebEngineMessage}" />
-                  <TextBlock x:Name="HelpStatusText" DockPanel.Dock="Bottom" Classes="muted" Margin="16,4" TextTrimming="CharacterEllipsis"
-                             Text="{Binding HelpPreview.HelpStatus}" IsVisible="{Binding HelpPreview.HelpStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                  <Panel>
-                    <Panel x:Name="HelpHost" Margin="0,8,0,0" IsVisible="{Binding HelpPreview.ShowsHelpRendered}" />
-                    <ScrollViewer IsVisible="{Binding HelpPreview.ShowsHelpSource}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
-                      <SelectableTextBlock x:Name="HelpSource" Classes.document="{Binding Preview.IsDocument}" Text="{Binding Preview.Web.Source, FallbackValue={x:Null}}" TextWrapping="Wrap" />
-                    </ScrollViewer>
-                  </Panel>
-                </DockPanel>
+                <views:WebPagePane x:Name="WebPagePane" />
                 <!-- The sound preview (boards/sound.md, P3): the transport (Play/Stop, the playhead's time, Repeat the loop),
                      the detail chips, and the channel lanes with the loop band and the playhead; a click on the waveform
                      plays from there, Space plays and stops. -->

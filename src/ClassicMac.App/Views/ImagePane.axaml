@@ -1,0 +1,85 @@
+<!--
+  An image resource's preview (boards/main-window.md, P1): the summary line, Show masks and Finder states, and the
+  cards in rows that fit the width.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             xmlns:views="using:ClassicMac.App.Views"
+             x:Class="ClassicMac.App.Views.ImagePane"
+             x:DataType="vm:MainViewModel">
+  <DockPanel IsVisible="{Binding Preview.IsImage}">
+    <DockPanel DockPanel.Dock="Top" Margin="12,8,12,0">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="12">
+        <CheckBox Name="ShowMasksBox" Content="Show masks" IsChecked="{Binding ImageGrid.ShowMasks}" IsVisible="{Binding ImageGrid.HasMasks}" />
+        <CheckBox Name="FinderStatesBox" Content="Finder states" IsChecked="{Binding ImageGrid.ShowFinderStates}" IsVisible="{Binding ImageGrid.HasFinderStates}" />
+      </StackPanel>
+      <TextBlock Name="ImageSummaryText" Text="{Binding ImageGrid.ImageSummary}" Classes="muted" VerticalAlignment="Center" />
+    </DockPanel>
+    <ScrollViewer Name="ImageScroller" HorizontalScrollBarVisibility="Auto">
+      <ItemsControl Name="ImageRowsList" ItemsSource="{Binding ImageGrid.ImageRows}" Margin="12">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <VirtualizingStackPanel />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.DataTemplates>
+          <DataTemplate DataType="vm:ImageRow">
+            <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,0,12">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:ImageItem">
+                  <Border Classes="image-card"
+                          Width="{Binding $parent[Window].((vm:MainViewModel)DataContext).ImageGrid.ImageCardWidth, FallbackValue=112}">
+                    <DockPanel>
+                      <Border DockPanel.Dock="Bottom" Classes="image-caption">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Image.Title}" FontFamily="{StaticResource CmFontMono}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                     IsVisible="{Binding Image.Title, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                          <TextBlock Text="{Binding Image.CardDetail}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                      </Border>
+                      <Border Background="{DynamicResource CmCheckerboard}" Padding="12">
+                        <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Bottom" />
+                      </Border>
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DataTemplate>
+          <DataTemplate DataType="vm:FinderStatesRow">
+            <StackPanel Spacing="6" Margin="0,8,0,12">
+              <TextBlock Text="Finder states" Classes="muted" FontSize="12" FontWeight="SemiBold" />
+              <Border Background="{DynamicResource CmCheckerboard}" HorizontalAlignment="Left" Padding="12" CornerRadius="6" MaxWidth="{Binding MaxWidth}">
+                <ItemsControl ItemsSource="{Binding Items}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:ImageItem">
+                      <StackPanel Margin="0,0,12,4" Spacing="4">
+                        <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}"
+                                          HorizontalAlignment="Center" />
+                        <Border Classes="state-plate">
+                          <TextBlock Text="{Binding Image.Caption}" FontSize="11" />
+                        </Border>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.DataTemplates>
+      </ItemsControl>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

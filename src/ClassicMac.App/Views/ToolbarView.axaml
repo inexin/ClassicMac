@@ -1,0 +1,81 @@
+<!--
+  The toolbar (boards/main-window.md, S2): Open, Save, Get Info, Edit Hex, Export, Extract All, Play, Zoom and Depth,
+  each following its command.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             x:Class="ClassicMac.App.Views.ToolbarView"
+             x:DataType="vm:MainViewModel">
+  <Border x:Name="Toolbar" Classes="chrome toolbar">
+    <DockPanel>
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsEnabled="{Binding ShellActions.IsZoomable}">
+        <TextBlock Text="Zoom" Classes="tool-label" VerticalAlignment="Center" />
+        <ListBox x:Name="ZoomChoice" Classes="segmented" ItemsSource="{Binding Zooms}" SelectedItem="{Binding Zoom, Mode=TwoWay}"
+                 AutomationProperties.Name="Zoom">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="x:Int32">
+              <TextBlock Text="{Binding StringFormat={}{0}×}" />
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock Text="Depth" Classes="tool-label" VerticalAlignment="Center" Margin="8,0,0,0" />
+        <ComboBox x:Name="DepthChoice" ItemsSource="{Binding ShellActions.ScreenDepthChoices}" SelectedItem="{Binding ShellActions.SelectedDepthChoice, Mode=TwoWay}"
+                  MinWidth="120" AutomationProperties.Name="Screen depth">
+          <ComboBox.ItemTemplate>
+            <DataTemplate DataType="vm:ScreenDepthChoice">
+              <TextBlock Text="{Binding Label}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+        <Button Classes="flat tool" Command="{Binding OpenCommand}" ToolTip.Tip="Open (Ctrl+O)" AutomationProperties.Name="Open">
+          <StackPanel>
+            <Path Classes="tool-icon" Data="M2,5 V14 H14 L16,8 H5 L3,14 M2,5 H7 L8.5,6.5 H14 V8" />
+            <TextBlock Text="Open" />
+          </StackPanel>
+        </Button>
+        <Button Classes="flat tool" Command="{Binding EditActions.SaveCommand}" ToolTip.Tip="Save (Ctrl+S)" AutomationProperties.Name="Save">
+          <StackPanel>
+            <Path Classes="tool-icon" Data="M9,2 V11 M5.5,7.5 L9,11 L12.5,7.5 M2,11 V15 H16 V11" />
+            <TextBlock Text="Save" />
+          </StackPanel>
+        </Button>
+        <Border Classes="tool-divider" />
+        <Button Classes="flat tool" Command="{Binding EditActions.GetInfoCommand}" ToolTip.Tip="Get Info (Ctrl+I)" AutomationProperties.Name="Get Info">
+          <StackPanel>
+            <Path Classes="tool-icon" Data="M9,1.75 A7.25,7.25 0 1 1 8.99,1.75 Z M9,8 V13 M9,5 V5.6" />
+            <TextBlock Text="Get Info" />
+          </StackPanel>
+        </Button>
+        <Button Classes="flat tool" Command="{Binding EditActions.EditHexCommand}" ToolTip.Tip="Edit Hex (Ctrl+H)" AutomationProperties.Name="Edit Hex">
+          <StackPanel>
+            <Path Classes="tool-icon" Data="M6,5 L2,9 L6,13 M12,5 L16,9 L12,13 M10.5,4 L7.5,14" />
+            <TextBlock Text="Edit Hex" />
+          </StackPanel>
+        </Button>
+        <Border Classes="tool-divider" />
+        <Button Classes="flat tool" Command="{Binding InspectorActions.HeaderExportCommand}" ToolTip.Tip="Export the selection" AutomationProperties.Name="Export">
+          <StackPanel>
+            <Path Classes="tool-icon" Data="M9,11 V2 M5.5,5.5 L9,2 L12.5,5.5 M2,11 V15 H16 V11" />
+            <TextBlock Text="Export…" />
+          </StackPanel>
+        </Button>
+        <Button Classes="flat tool" Command="{Binding ExportActions.ExtractAllCommand}" ToolTip.Tip="Extract all resources" AutomationProperties.Name="Extract All">
+          <StackPanel>
+            <Path Classes="tool-icon" Data="M2,7 H16 V16 H2 Z M3.5,4.5 H14.5 M5,2 H13 M9,9 V14 M7,12 L9,14 L11,12" />
+            <TextBlock Text="Extract All" />
+          </StackPanel>
+        </Button>
+        <Border Classes="tool-divider" />
+        <Button Classes="flat tool" Command="{Binding SoundPlayback.PlaySoundCommand}" ToolTip.Tip="Play the sound" AutomationProperties.Name="Play">
+          <StackPanel>
+            <Path Classes="tool-icon" Data="M5,3 L15,9 L5,15 Z" />
+            <TextBlock Text="Play" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

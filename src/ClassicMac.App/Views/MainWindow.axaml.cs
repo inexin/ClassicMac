@@ -26,7 +26,7 @@ internal sealed partial class MainWindow : Window, IFilePicker
     {
         InitializeComponent();
         playhead = new PlayheadFollower(this);
-        helpWebView = new HelpWebView(this, HelpHost);
+        helpWebView = new HelpWebView(this, WebPagePane.HelpHost);
         shell = new WindowShell(this, WindowMenu);
         // The custom title bar (S1): Windows and macOS extend the client area into the decorations; Linux keeps the
         // system title bar, whose support for this varies by desktop.
@@ -46,14 +46,6 @@ internal sealed partial class MainWindow : Window, IFilePicker
         Tree.AddHandler(TextInputEvent, OnTreeTextInput, RoutingStrategies.Tunnel);
         Tree.SelectionChanged += OnTreeSelectionChanged;
         Tree.AddHandler(KeyDownEvent, OnTreeKeyDown, RoutingStrategies.Tunnel);
-        // The image grid's rows hold as many cards as fit the scroller (P1).
-        ImageScroller.SizeChanged += (_, e) =>
-        {
-            if (DataContext is MainViewModel model)
-            {
-                model.ImageGrid.ImageViewportWidth = e.NewSize.Width;
-            }
-        };
         DataContextChanged += (_, _) =>
         {
             if (DataContext is not MainViewModel model)
@@ -254,7 +246,7 @@ internal sealed partial class MainWindow : Window, IFilePicker
     {
         if (e.PropertyName == nameof(MainViewModel.Preview))
         {
-            ImageScroller.Offset = default;
+            ImagePane.ScrollToTop();
         }
 
         if (e.PropertyName == nameof(MainViewModel.Selected) && sender is MainViewModel model)
