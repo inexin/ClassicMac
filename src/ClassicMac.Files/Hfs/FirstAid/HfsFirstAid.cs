@@ -27,7 +27,10 @@ public static class HfsFirstAid
                 && Stage(run, FirstAidMessages.CheckingExtentsBTree) && BTreeCheck.Run(run, run.Extents!)
                 && Stage(run, FirstAidMessages.CheckingExtentsFile)
                 && Stage(run, FirstAidMessages.CheckingCatalogBTree) && BTreeCheck.Run(run, run.Catalog!)
-                && CatalogScan.Run(run);
+                && CatalogScan.Run(run)
+                && HierarchyCheck.Run(run)
+                && BitmapCheck.Run(run)
+                && MdbCompare.Run(run);
         }
         catch (EndOfStreamException)
         {

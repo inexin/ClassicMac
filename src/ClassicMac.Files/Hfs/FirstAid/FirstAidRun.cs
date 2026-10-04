@@ -103,6 +103,12 @@ internal sealed class FirstAidRun(HfsVolume volume)
 
     public uint NextCnid { get; set; }
 
+    /// <summary>The bitmap built from the extents (the bitmap stage's), which repair writes.</summary>
+    public byte[] ComputedBitmap { get; set; } = [];
+
+    /// <summary>The MDB the volume-info stage computes, which repair writes.</summary>
+    public byte[] ComputedMdb { get; set; } = [];
+
     /// <summary>The file IDs the scan saw (for the orphaned-extents repair).</summary>
     public HashSet<uint> FileIds { get; } = [];
 
@@ -182,6 +188,9 @@ internal sealed class FirstAidRun(HfsVolume volume)
         Problems.Add(new FirstAidProblem(0, message, 0, 0, stage, Repairable: true, code));
         Repairs |= repairs;
     }
+
+    /// <summary>Records a problem that needs no repair: the volume can still appear to be OK.</summary>
+    public void Note(int number, long arg2 = 0, long arg3 = 0) => Add(number, arg2, arg3, repairable: true);
 
     /// <summary>Records a repair Disk First Aid makes without printing a problem.</summary>
     public void Silent(FirstAidRepairs repairs) => Repairs |= repairs;

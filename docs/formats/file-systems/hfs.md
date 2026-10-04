@@ -854,6 +854,45 @@ Then MountCheck's view, one line with no numbers:
   threads); a fork whose blocks × A is not its PEOF (the catalog is then rebuilt); more free blocks by the extents than
   the bitmap shows (leaked blocks) [Verified: C2, C4, C6, D1]. `drFreeBks` itself is not compared [Verified].
 
+**"Checking catalog hierarchy."** A depth-first walk from the root (the key (1, "") must not exist, else #31):
+
+- a folder nested more than 100 deep → #48 "Nesting of folders has exceeded the recommended limit of 100 …"; the rest
+  of the hierarchy is not checked, and no repair is recorded, so on its own the volume appears to be OK;
+- a folder that is its own ancestor → #41 "Loop in directory hierarchy", ending the check;
+- a folder's `dirVal` other than the records under it (its thread aside) → #3 "Invalid directory valence", repaired to
+  the count [Verified];
+- at the end, the folders and files reached against the scan's counts: #42 "Invalid root directory count", #43
+  "Invalid root file count", #44 "Invalid volume directory count", #45 "Invalid volume file count" (%2 the walk's,
+  %3 the scan's), repaired; these arise only for records the walk cannot reach. A wrong `drFilCnt`, `drDirCnt` or
+  `drNmRtDirs` is not these but #58 below.
+
+**"Checking volume bit map."** A bitmap is built from every extent walked (the B-tree files' and every fork's); a
+block claimed twice is #12 "Overlapped extent allocation" (once, repaired by giving the files their own copies). It is
+compared with the volume's bitmap whole sector by whole sector, so bits after `drNmAlBlks` and bytes after the bitmap
+in its last sector must be clear: any difference is #60 "Volume Bit Map needs minor repair", repaired by writing the
+built bitmap [Verified: a leaked block, a trailing byte, the bit after the last block]. %2 and %3 are not traced.
+
+**"Checking volume info."** The primary MDB is compared with one built so: the signature, creation date, `drVBMSt`,
+`drNmAlBlks`, `drAlBlSt`, the cache sizes ($7C–$81) and the B-tree files' sizes and extents from the alternate MDB;
+`drAtrb` kept unless a bit 0–6 is set ($0100 then); `drClpSiz` the primary's if it is a multiple of A within
+(N ÷ 4) × A, else the alternate's, else 4 blocks, and one block if over 1 MB; `drXTClpSiz` and `drCTClpSiz` the
+primary's if a multiple of A within (N ÷ 4) × A, else the alternate's, else the file's first extent; `drNxtCNID` the
+highest CNID + 1, or the primary's when it is above that by at most 4,096; `drVN` the root folder's name; the counts
+from the scan; the rest the primary's. The first group that differs is #58 "Master Directory Block needs minor
+repair" with %2 its detail, repaired by writing the built MDB:
+
+| Detail | Fields |
+| --- | --- |
+| 1 | `drSigWord`, `drCrDate`, `drLsMod`, `drAtrb`, `drVBMSt`, `drNmAlBlks`, `drClpSiz`, `drAlBlSt`, `drNxtCNID`, `drVN` |
+| 2 | $40–$81: `drVolBkUp` … `drCtlCSize`, the counts `drNmRtDirs`, `drFilCnt`, `drDirCnt` among them |
+| 3 | `drXTFlSize` |
+| 4 | `drXTExtRec` |
+| 5 | `drCTFlSize` |
+| 6 | `drCTExtRec` |
+
+`drNmFls`, `drAllocPtr`, `drAlBlkSiz` and `drFreeBks` are not compared [Verified: `drNmFls` + 1 and `drFreeBks` − 1
+appear to be OK].
+
 ## 6. Diagnostics
 
 "Not traced" means the Mac's behaviour in that case has not been followed in its code. The HFS wrapper's
