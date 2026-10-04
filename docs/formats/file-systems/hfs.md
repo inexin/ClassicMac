@@ -579,6 +579,10 @@ block size, every extent rewritten) are not done [ClassicMac].
 
 ## 5. ClassicMac
 
+One B-tree layout (`BTreeFile`: node descriptors, records by the offset table, the header record, the node map across
+the header and map nodes) serves the HFS reader, the HFS Plus reader and the writer; each keeps its own checks and
+diagnostics on top. [ClassicMac]
+
 ### 5.1 Recognising a volume
 
 - The readers are tried in a fixed order ([unwrapping.md](../containers/unwrapping.md)); for volumes it is: UDIF,
