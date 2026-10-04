@@ -148,6 +148,13 @@ public sealed class HfsCorpusWriteTests : IDisposable
         var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
         process.WaitForExit();
         File.Delete(image);
+        // fsck.hfs reports its passes on "**" lines; without them it did not run (Docker down, a missing tool), and
+        // comparing its error text before and after would pass for nothing.
+        if (!output.Split('\n').Any(l => l.TrimStart().StartsWith("**", StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException($"fsck.hfs did not run ({tools}): {output.Trim()}");
+        }
+
         return output.Split('\n').Select(l => l.Trim())
             .Where(l => l.Length > 0 && !l.StartsWith("**", StringComparison.Ordinal) && !l.StartsWith('(') &&
                         !l.StartsWith("Executing", StringComparison.Ordinal) && !l.StartsWith("The volume name", StringComparison.Ordinal))
