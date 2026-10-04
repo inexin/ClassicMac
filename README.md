@@ -10,11 +10,11 @@ Status: in development. See [docs/PLAN.md](docs/PLAN.md) and [CHANGELOG.md](CHAN
 
 ```
 dotnet run --project src/ClassicMac.App -- "some disk.img"          # the viewer
-dotnet run --project src/ClassicMac.Resources.Cli -- list "some disk.img"
-dotnet run --project src/ClassicMac.Resources.Cli -- extract "App.rsrc" -o out
-dotnet run --project src/ClassicMac.Resources.Cli -- unpack "some disk.img" -o files
-dotnet run --project src/ClassicMac.Resources.Cli -- convert "Manual" -o manual
-dotnet run --project src/ClassicMac.Resources.Cli -- pack out -o "App.rsrc"
+dotnet run --project src/ClassicMac.Cli -- list "some disk.img"
+dotnet run --project src/ClassicMac.Cli -- extract "App.rsrc" -o out
+dotnet run --project src/ClassicMac.Cli -- unpack "some disk.img" -o files
+dotnet run --project src/ClassicMac.Cli -- convert "Manual" -o manual
+dotnet run --project src/ClassicMac.Cli -- pack out -o "App.rsrc"
 ```
 
 ## Graphics

@@ -18,7 +18,7 @@ they are wrapped in — and turns them into modern files with a manifest, and la
 **Name and repository (decided):** the project is **ClassicMac**, in its own GitHub repo `inexin/ClassicMac` holding
 the libraries, the CLI and the viewer/editor app. Packages: `ClassicMac.Core`, `ClassicMac.Files`,
 `ClassicMac.Resources`, `ClassicMac.Encodings`, `ClassicMac.Graphics`, `ClassicMac.Graphics.ImageSharp`, `ClassicMac.Graphics.SkiaSharp`,
-`ClassicMac.Resources.Decoders`, `ClassicMac.Resources.Cli`; the app carries the same name. QuickDraw.Pict moved into
+`ClassicMac.Resources.Decoders`, `ClassicMac.Cli`; the app carries the same name. QuickDraw.Pict moved into
 this repo with its history on 2026-09-29 and became `ClassicMac.Graphics` (QuickDraw, PICT, QuickTime images,
 MacPaint, fonts) with the two adapters (the layering below).
 
@@ -225,7 +225,7 @@ layout in resources (NDIF's `bcem`, early UDIF's `blkx`).
 
 ### CLI
 
-A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built on System.CommandLine; `classicmac mcp`
+A `dotnet tool` (package `ClassicMac.Cli`, renamed from `ClassicMac.Resources.Cli` on 2026-10-04 since it reads disk images, archives and code too; command `classicmac`) built on System.CommandLine; `classicmac mcp`
 uses the official MCP C# SDK's `ModelContextProtocol.Core` (Apache-2.0; decided 2026-10-03: a permissive licence is
 fine for a dependency, with its notice in `THIRD-PARTY-NOTICES.md`; only the core package, no hosting or DI).
 
@@ -524,7 +524,7 @@ Directory.Build.props       shared settings (below) and package metadata
 Directory.Packages.props    every package version, in one place
 src/ClassicMac.<Package>/   one folder per package; the app goes in src/ClassicMac.App/
                             today: Core, Files, Resources, Graphics (and its two adapters), Code,
-                            Resources.Decoders, Resources.Cli, App
+                            Resources.Decoders, Cli, App
 tests/ClassicMac.<Package>.Tests/   one test project per package
 tests/<Project>/TestData/   committed test inputs (synthetic, ClassicMac-made or redistributable samples)
 schemas/                    manifest JSON Schemas

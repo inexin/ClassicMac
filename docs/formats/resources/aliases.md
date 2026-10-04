@@ -201,7 +201,7 @@ None.
   itself.
 - `tests/ClassicMac.Resources.Decoders.Tests/AliasDecoderTests.cs` and the golden `Golden/alis-0.json`: the JSON and the
   diagnostics.
-- `tests/ClassicMac.Resources.Cli.Tests/PathCommandTests.cs` and `tests/ClassicMac.App.Tests/AliasViewTests.cs` on
+- `tests/ClassicMac.Cli.Tests/PathCommandTests.cs` and `tests/ClassicMac.App.Tests/AliasViewTests.cs` on
   `AliasFixtures`: an alias whose original is in place, one whose original moved (found by its file ID), one whose
   original is gone, a folder alias, an alias of an alias, one on an 800K floppy disk that is not open, and one on an
   AppleShare volume with `'afpm'` mount information (§1.3).

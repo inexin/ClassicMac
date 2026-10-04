@@ -834,13 +834,13 @@ Other codes reach the manifest from the code the exporter calls:
   overwriting.
 - `tests/ClassicMac.Core.Tests/HostNamesTests.cs`: host-safe names, long names cut before the extension, colliding
   names numbered, type folder names.
-- `tests/ClassicMac.Resources.Cli.Tests/ExtractTests.cs`: a raw fork file into the output folder; a folder per file
+- `tests/ClassicMac.Cli.Tests/ExtractTests.cs`: a raw fork file into the output folder; a folder per file
   with resources on a disk; the type filter; corpus images with matching manifests; files that are neither containers
   nor forks.
-- `tests/ClassicMac.Resources.Cli.Tests/PackTests.cs`: an export with raw copies packs back byte for byte; the base
+- `tests/ClassicMac.Cli.Tests/PackTests.cs`: an export with raw copies packs back byte for byte; the base
   fork gives the stored data without raw copies; raw files can change, decoded ones cannot, and deletes need
   allowing; decoded code packs back from its `.bin` files; containers carry the name and Finder info.
-- `tests/ClassicMac.Resources.Cli.Tests/CorpusExportTests.cs`, `Corpus_exports_without_decoder_errors`: with
+- `tests/ClassicMac.Cli.Tests/CorpusExportTests.cs`, `Corpus_exports_without_decoder_errors`: with
   `CLASSICMAC_CORPUS` set, every export of the corpus, with raw copies, packs back with each resource's stored bytes
   and attributes unchanged. Not committed.
 

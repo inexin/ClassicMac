@@ -176,7 +176,7 @@ The codes the HTML converter raises. The reader's codes (`document.*`) are in
   link to a missing chapter left out) and `SimpleText_documents_convert_to_their_golden_HTML`, compared with
   `Golden/Documents/DocMaker` and `Golden/Documents/SimpleText` (pages and `style.css` as files, pictures as SHA-256
   in `images.txt`; `CLASSICMAC_UPDATE_GOLDEN=1` rewrites them).
-- `tests/ClassicMac.Resources.Cli.Tests/ConvertTests.cs`: `convert` writes every document on a disk in a folder each,
+- `tests/ClassicMac.Cli.Tests/ConvertTests.cs`: `convert` writes every document on a disk in a folder each,
   one document straight into the output folder; `extract` adds the document beside the resources.
 
 ## 8. Not covered

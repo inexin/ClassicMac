@@ -394,7 +394,7 @@ files and folders created on the Mac and read on the host, and host files read o
   `Existing_files_are_kept_unless_overwriting`, `AppleDouble_headers_read_back`, `Export_folders_are_new_and_numbered`.
 - `tests/ClassicMac.Core.Tests/HostNamesTests.cs`: `Mac_names_become_safe_host_names` (§3.1),
   `Long_names_are_cut_before_the_extension` (§3.3), `Colliding_names_get_numbers` (§3.4).
-- `tests/ClassicMac.Resources.Cli.Tests/UnpackTests.cs`: `Disks_unpack_to_folders_that_read_back` (an HFS disk with
+- `tests/ClassicMac.Cli.Tests/UnpackTests.cs`: `Disks_unpack_to_folders_that_read_back` (an HFS disk with
   an NDIF image in a folder: placement, names and `unpack.name-changed`, in both layouts),
   `Existing_files_are_kept_unless_overwriting`, and `Corpus_images_unpack_and_read_back` (the corpus's disk images,
   skipped without `CLASSICMAC_CORPUS`).

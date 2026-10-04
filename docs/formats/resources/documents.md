@@ -263,7 +263,7 @@ None.
     compared with `Golden/Documents/`.
 - `tests/ClassicMac.App.Tests/DocumentTests.cs`: the chapter-at-a-time preview with its pictures; SimpleText files
   previewed as documents only with pictures; Convert Documents and extract.
-- `tests/ClassicMac.Resources.Cli.Tests/ConvertTests.cs`: `convert` on a disk with several documents, one document
+- `tests/ClassicMac.Cli.Tests/ConvertTests.cs`: `convert` on a disk with several documents, one document
   straight into the output folder, `extract` adding the document beside the resources.
 
 ## 8. Not covered

@@ -456,7 +456,7 @@ documents). These are its own and the decoders':
 - `tests/ClassicMac.Resources.Decoders.Tests/CodeDecoderTests.cs`: each decoder's files and model, the application
   rebuilt from the fork, and each diagnostic; `CodeExportTests.cs`: `disasm`'s files, the CPU choice, every fragment
   location and its diagnostics, host-safe names. `GoldenTests` keep every code type's `.s` and `.json` in `Golden/`.
-- `tests/ClassicMac.Resources.Cli.Tests/DisasmTests.cs`: the command on a raw fork and an HFS disk with a fat
+- `tests/ClassicMac.Cli.Tests/DisasmTests.cs`: the command on a raw fork and an HFS disk with a fat
   application (data-fork fragment), `--cpu`, exit codes. `PackTests.Decoded_code_packs_back_from_its_bin_files`.
 - `tests/ClassicMac.App.Tests/PreviewTests.cs`: a `'CODE'` resource previews as its listing.
 - Compared outside the repository with an independent disassembler [Verified]: every PowerPC instruction both decode

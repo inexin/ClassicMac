@@ -353,7 +353,7 @@ Claude Desktop, in `claude_desktop_config.json` (Settings > Developer > Edit Con
 }
 ```
 
-`classicmac` must be on the path (`dotnet tool install -g ClassicMac.Resources.Cli`); otherwise give its full path as
+`classicmac` must be on the path (`dotnet tool install -g ClassicMac.Cli`); otherwise give its full path as
 the command.
 
 ### 4.2 Sessions

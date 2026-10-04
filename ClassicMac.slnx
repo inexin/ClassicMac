@@ -4,7 +4,7 @@
     <Project Path="src/ClassicMac.Code/ClassicMac.Code.csproj" />
     <Project Path="src/ClassicMac.Core/ClassicMac.Core.csproj" />
     <Project Path="src/ClassicMac.Files/ClassicMac.Files.csproj" />
-    <Project Path="src/ClassicMac.Resources.Cli/ClassicMac.Resources.Cli.csproj" />
+    <Project Path="src/ClassicMac.Cli/ClassicMac.Cli.csproj" />
     <Project Path="src/ClassicMac.Resources.Decoders/ClassicMac.Resources.Decoders.csproj" />
     <Project Path="src/ClassicMac.Resources/ClassicMac.Resources.csproj" />
     <Project Path="src/ClassicMac.Graphics/ClassicMac.Graphics.csproj" />
@@ -16,7 +16,7 @@
     <Project Path="tests/ClassicMac.Code.Tests/ClassicMac.Code.Tests.csproj" />
     <Project Path="tests/ClassicMac.Core.Tests/ClassicMac.Core.Tests.csproj" />
     <Project Path="tests/ClassicMac.Files.Tests/ClassicMac.Files.Tests.csproj" />
-    <Project Path="tests/ClassicMac.Resources.Cli.Tests/ClassicMac.Resources.Cli.Tests.csproj" />
+    <Project Path="tests/ClassicMac.Cli.Tests/ClassicMac.Cli.Tests.csproj" />
     <Project Path="tests/ClassicMac.Resources.Decoders.Tests/ClassicMac.Resources.Decoders.Tests.csproj" />
     <Project Path="tests/ClassicMac.Resources.Tests/ClassicMac.Resources.Tests.csproj" />
     <Project Path="tests/ClassicMac.Graphics.Tests/ClassicMac.Graphics.Tests.csproj" />
