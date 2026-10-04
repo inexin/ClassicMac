@@ -778,7 +778,7 @@ public static class HfsWriter
 
     /// <summary>
     /// The allocation block size Mac OS 9.0's initializer gives a volume of <paramref name="size"/> bytes (hfs.md §3.1),
-    /// which <see cref="Format"/> and <see cref="Resize"/> use when no block size is given; a larger multiple of 512
+    /// which <see cref="Format"/> and <see cref="Resize(ForkData, long, uint?)"/> use when no block size is given; a larger multiple of 512
     /// may be chosen instead.
     /// </summary>
     public static uint AutomaticBlockSize(long size) => HfsFormatter.AutomaticBlockSize(size);
@@ -808,6 +808,13 @@ public static class HfsWriter
     public static byte[] Resize(ForkData image, long size, uint? blockSize = null) => HfsResizer.Resize(image, size, blockSize);
 
     /// <summary>
+    /// Resizes as the other overload does, reporting to <paramref name="progress"/> (a volume laid out again: file by
+    /// file); cancelling throws <see cref="OperationCanceledException"/>, the source untouched (hfs.md §5.8).
+    /// </summary>
+    public static byte[] Resize(ForkData image, long size, uint? blockSize, IProgress<VolumeProgress>? progress, System.Threading.CancellationToken cancellationToken) =>
+        HfsResizer.Resize(image, size, blockSize, progress, cancellationToken);
+
+    /// <summary>
     /// Lays the volume out again in its own size and geometry (hfs.md §3.4): every fork in one extent, in catalog order
     /// after the B-trees, the extents tree empty and the free space in one run at the end; the catalog's records, the
     /// files' contents and the MDB's other fields kept. The result is checked by the writer and file by file.
@@ -815,9 +822,13 @@ public static class HfsWriter
     /// <exception cref="InvalidDataException">The volume is not one the writer edits, has bad blocks or wraps HFS Plus.</exception>
     public static byte[] Defragment(ForkData image) => HfsResizer.Defragment(image);
 
+    /// <summary>Defragments as the other overload does, file by file to <paramref name="progress"/>; cancelling throws, the source untouched.</summary>
+    public static byte[] Defragment(ForkData image, IProgress<VolumeProgress>? progress, System.Threading.CancellationToken cancellationToken) =>
+        HfsResizer.Defragment(image, progress, cancellationToken);
+
     /// <summary>
-    /// The smallest size <see cref="Resize"/> shrinks the volume to (hfs.md §3.3): room for its blocks in use, the
-    /// allocation area keeping its start; reached when the free space is one run at the end (<see cref="Defragment"/>).
+    /// The smallest size <see cref="Resize(ForkData, long, uint?)"/> shrinks the volume to (hfs.md §3.3): room for its blocks in use, the
+    /// allocation area keeping its start; reached when the free space is one run at the end (<see cref="Defragment(ForkData)"/>).
     /// </summary>
     /// <exception cref="InvalidDataException">The volume is not one the writer edits.</exception>
     public static long SmallestSize(ForkData image) => HfsResizer.SmallestSize(image);

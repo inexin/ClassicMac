@@ -1025,6 +1025,19 @@ The volume is opened as the writer opens it (§5.5); HFS Plus, a wrapper, and a 
 a 500 MB Mac OS 9 volume with 4,874 files it takes about 40 ms. The CLI's `stat` shows it for a volume, and the app's
 Volume card, Defragment and Resize use it.
 
+### 5.8 Progress and cancellation
+
+First Aid's verify and repair, Defragment and Resize take an `IProgress<VolumeProgress>` (step, steps, text) and a
+`CancellationToken` [ClassicMac]:
+
+- A verify reports each of its stages as it begins (§5.6), as a step of the stages that kind of volume has: HFS's ten,
+  HFS Plus's eight, with one more for an attributes tree and one for a journal. A repair reports each pass and the
+  stages of every verify it runs.
+- A volume laid out again (Defragment, §3.4; a resize to another block size or past 65,535 blocks, §3.2) reports
+  "File n of m" as it places each file; a shrink (§3.3) reports planning, moving and checking.
+- The token is checked as each stage, pass or file begins; a cancel throws `OperationCanceledException`. The work is
+  done on a copy, so the source, and an edit session's volume, are left as they were.
+
 ## 6. Diagnostics
 
 "Not traced" means the Mac's behaviour in that case has not been followed in its code. The HFS wrapper's

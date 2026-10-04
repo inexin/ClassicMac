@@ -19,9 +19,10 @@ internal static class FirstAidRepairer
 {
     private const int MaxPasses = 3, HeaderRecord = 14;
 
-    public static FirstAidRepairResult Repair(HfsVolume volume)
+    public static FirstAidRepairResult Repair(HfsVolume volume, IProgress<VolumeProgress>? progress = null,
+        System.Threading.CancellationToken cancellationToken = default)
     {
-        var (run, before) = HfsFirstAid.Check(volume);
+        var (run, before) = HfsFirstAid.Check(volume, progress, cancellationToken);
         if (before.Verdict != FirstAidVerdict.NeedsRepair)
         {
             return new FirstAidRepairResult(before, before, [], null);
@@ -32,6 +33,8 @@ internal static class FirstAidRepairer
         var after = before;
         for (var pass = 0; pass < MaxPasses && after.Verdict == FirstAidVerdict.NeedsRepair; pass++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new VolumeProgress(pass + 1, MaxPasses, "Repairing."));
             int made = changes.Count;
             if (!run.Plus && (run.Repairs & FirstAidRepairs.AlternateMdb) != 0)
             {
@@ -47,7 +50,7 @@ internal static class FirstAidRepairer
 
             if (run.Plus ? PlusRepair.Trees(run, working, changes) : Trees(run, working, changes))
             {
-                (run, after) = HfsFirstAid.Check(working);
+                (run, after) = HfsFirstAid.Check(working, progress, cancellationToken);
                 if (run.Ended is not null)
                 {
                     break;
@@ -65,7 +68,7 @@ internal static class FirstAidRepairer
                 Mdb(run, working, changes);
             }
 
-            (run, after) = HfsFirstAid.Check(working);
+            (run, after) = HfsFirstAid.Check(working, progress, cancellationToken);
             if (changes.Count == made)
             {
                 break;

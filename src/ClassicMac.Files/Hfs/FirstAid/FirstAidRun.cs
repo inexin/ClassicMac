@@ -138,6 +138,14 @@ internal sealed class FirstAidRun(HfsVolume volume)
 
     public List<string> Stages { get; } = [];
 
+    /// <summary>Where each stage is reported, as a step of <see cref="Steps"/>; and the token checked as each begins.</summary>
+    public System.IProgress<VolumeProgress>? Progress { get; init; }
+
+    public System.Threading.CancellationToken Token { get; init; }
+
+    /// <summary>The stages a check of this kind of volume has, so a bar can show how far it is.</summary>
+    public int Steps { get; set; }
+
     public List<FirstAidProblem> Problems { get; } = [];
 
     public FirstAidRepairs Repairs { get; set; }
@@ -176,8 +184,11 @@ internal sealed class FirstAidRun(HfsVolume volume)
 
     public void Stage(string line)
     {
+        Token.ThrowIfCancellationRequested();
         stage = line;
         Stages.Add(line);
+        Steps = Math.Max(Steps, Stages.Count);
+        Progress?.Report(new VolumeProgress(Stages.Count, Steps, line));
     }
 
     public byte[] ReadSector(long sector)

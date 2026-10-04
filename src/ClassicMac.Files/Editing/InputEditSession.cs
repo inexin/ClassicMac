@@ -433,7 +433,7 @@ public sealed class InputEditSession
         changes.Add(new PlannedChange("rename", macPath, $"to {newName}"));
     }
 
-    /// <summary>Whether <see cref="Resize"/> takes the input: a plain HFS volume image (not a partition, nor a Disk Copy or NDIF image's disk).</summary>
+    /// <summary>Whether <see cref="Resize(long, uint?)"/> takes the input: a plain HFS volume image (not a partition, nor a Disk Copy or NDIF image's disk).</summary>
     public bool CanResize => Kind == InputEditKind.HfsVolume && ndif is null && volumes is [{ Region: null }];
 
     /// <summary>The volume's size in bytes as edited so far; for an input <see cref="CanResize"/> takes.</summary>
@@ -446,7 +446,10 @@ public sealed class InputEditSession
     /// Grows or shrinks a plain volume image to <paramref name="size"/> bytes (hfs.md §3.2, §3.3); not a partitioned
     /// disk's partition, nor a Disk Copy or NDIF image's disk.
     /// </summary>
-    public void Resize(long size, uint? blockSize = null)
+    public void Resize(long size, uint? blockSize = null) => Resize(size, blockSize, null, System.Threading.CancellationToken.None);
+
+    /// <summary>Resizes as the other overload does, reporting to <paramref name="progress"/>; cancelling throws and changes nothing.</summary>
+    public void Resize(long size, uint? blockSize, IProgress<VolumeProgress>? progress, System.Threading.CancellationToken cancellationToken)
     {
         if (volumes.Count > 1)
         {
@@ -465,7 +468,7 @@ public sealed class InputEditSession
         }
 
         // Resizing rewrites the volume whole: it is held in memory from here, and saved whole.
-        volume.Overlay = new HfsVolume(ForkData.FromBytes(HfsWriter.Resize(Overlay(volume).AsForkData(), size, blockSize)));
+        volume.Overlay = new HfsVolume(ForkData.FromBytes(HfsWriter.Resize(Overlay(volume).AsForkData(), size, blockSize, progress, cancellationToken)));
         resized = true;
         changes.Add(new PlannedChange("resize", "", $"to {size.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} bytes"
             + (blockSize is { } blocks ? $", {blocks.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)}-byte blocks" : "")));
@@ -476,12 +479,15 @@ public sealed class InputEditSession
     /// over the volume where its sectors differ. On a disk with several partitions, <paramref name="volume"/> names the
     /// partition.
     /// </summary>
-    public void Defragment(string volume = "")
+    public void Defragment(string volume = "") => Defragment(volume, null, System.Threading.CancellationToken.None);
+
+    /// <summary>Defragments as the other overload does, file by file to <paramref name="progress"/>; cancelling throws and changes nothing.</summary>
+    public void Defragment(string volume, IProgress<VolumeProgress>? progress, System.Threading.CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(volume);
         var (edited, _) = RequireVolume(volume, "have a volume to defragment");
         var overlay = Overlay(edited);
-        var bytes = HfsWriter.Defragment(overlay.AsForkData());
+        var bytes = HfsWriter.Defragment(overlay.AsForkData(), progress, cancellationToken);
         var sector = new byte[512];
         for (long at = 0; at < bytes.Length; at += sector.Length)
         {
@@ -503,12 +509,15 @@ public sealed class InputEditSession
     /// session's changes; a volume that appears to be OK or cannot be repaired is left as it is. On a disk with several
     /// partitions, <paramref name="volume"/> names the partition.
     /// </summary>
-    public FirstAidRepairResult Repair(string volume = "")
+    public FirstAidRepairResult Repair(string volume = "") => Repair(volume, null, System.Threading.CancellationToken.None);
+
+    /// <summary>Repairs as the other overload does, each check's stages reported to <paramref name="progress"/>; cancelling throws and changes nothing.</summary>
+    public FirstAidRepairResult Repair(string volume, IProgress<VolumeProgress>? progress, System.Threading.CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(volume);
         // Not prepared first: the writer's own checks refuse much of what First Aid repairs.
         var (edited, _) = Route(volume, "have a volume to repair");
-        var result = FirstAidRepairer.Repair(Overlay(edited));
+        var result = FirstAidRepairer.Repair(Overlay(edited), progress, cancellationToken);
         if (result.Repaired is { } repaired)
         {
             edited.Overlay = repaired;

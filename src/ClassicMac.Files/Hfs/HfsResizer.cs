@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using ClassicMac.Core;
 using static ClassicMac.Files.Hfs.HfsWriter;
 using static ClassicMac.Files.Hfs.HfsCatalogEditing;
@@ -15,9 +16,11 @@ namespace ClassicMac.Files.Hfs;
 // in its own geometry (hfs.md §3.2–§3.4).
 internal static class HfsResizer
 {
-    internal static byte[] Resize(ForkData image, long size, uint? blockSize = null)
+    internal static byte[] Resize(ForkData image, long size, uint? blockSize = null, IProgress<VolumeProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
+        cancellationToken.ThrowIfCancellationRequested();
         if (size % BlockSize != 0 || size <= 0 || size > MaximumFormatSize)
         {
             throw new ArgumentOutOfRangeException(nameof(size), "An HFS volume is whole 512-byte blocks, up to just under 2 GB.");
@@ -30,12 +33,12 @@ internal static class HfsResizer
             // Another block size: every extent changes, so the volume is laid out again in the new geometry (§3.2).
             var template = HfsFormatter.FormatVolume(size, "Untitled", null, chosen).ToArray();
             var layout = new BigEndianReader(template.AsMemory(MdbOffset, MdbSize));
-            return Relayout(state, source, template, layout.ReadUInt16At(0x88), layout.ReadUInt16At(0x98));
+            return Relayout(state, source, template, layout.ReadUInt16At(0x88), layout.ReadUInt16At(0x98), progress, cancellationToken);
         }
 
         if (size < source.Length)
         {
-            return Shrink(state, source, size);
+            return Shrink(state, source, size, progress, cancellationToken);
         }
 
         if (size == source.Length)
@@ -67,7 +70,7 @@ internal static class HfsResizer
             // The layout Mac OS 9.0's initializer gives the new size (§3.1): its trees' sizes are the least they keep.
             var template = HfsFormatter.FormatVolume(size, "Untitled").ToArray();
             var layout = new BigEndianReader(template.AsMemory(MdbOffset, MdbSize));
-            return Relayout(state, source, template, layout.ReadUInt16At(0x88), layout.ReadUInt16At(0x98));
+            return Relayout(state, source, template, layout.ReadUInt16At(0x88), layout.ReadUInt16At(0x98), progress, cancellationToken);
         }
 
         long oldCount = state.BlockCount;
@@ -116,8 +119,9 @@ internal static class HfsResizer
     // A shrink (hfs.md §3.3): the allocation area keeps its start, so the bitmap keeps its sectors; every extent that
     // reaches past the new last block (a fork's, an overflow record's, the B-trees' own) moves whole to the first free run
     // below it that holds it, its descriptor rewritten where it lies (the catalog record, the extents record, the MDB).
-    private static byte[] Shrink(CatalogEditState state, byte[] source, long size)
+    private static byte[] Shrink(CatalogEditState state, byte[] source, long size, IProgress<VolumeProgress>? progress, CancellationToken cancellationToken)
     {
+        progress?.Report(new VolumeProgress(1, 3, "Planning the moves."));
         var mdb = new BigEndianReader(source.AsMemory(MdbOffset, MdbSize));
         if (mdb.ReadUInt16At(0x7C) == 0x482B)
         {
@@ -176,6 +180,8 @@ internal static class HfsResizer
 
         // The image: the source up to the new end, each moved extent's blocks copied to their new place, the trees as
         // rewritten across their extents, the bitmap, the MDB and its copy.
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report(new VolumeProgress(2, 3, $"Moving {moves.Count} extent{(moves.Count == 1 ? "" : "s")}."));
         var result = new byte[size];
         long areaEnd = start * BlockSize + count * state.BlockSize;
         source.AsSpan(0, (int)areaEnd).CopyTo(result);
@@ -211,6 +217,8 @@ internal static class HfsResizer
 
         // Checked as a growth is, and by its files: the result opens as the writer opens a volume, its catalog is the
         // source's but for the extents moved, and every file reads back as the source's.
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report(new VolumeProgress(3, 3, "Checking the result."));
         if (HfsWriter.Check(ForkData.FromBytes(result)) is { } fault)
         {
             throw new InvalidDataException($"The shrunk HFS volume does not pass the writer's checks: {fault}");
@@ -439,9 +447,10 @@ internal static class HfsResizer
 
     // Defragment (hfs.md §3.4): the volume laid out again in its own size and geometry, its extents tree as long as before
     // but empty, from block 0.
-    internal static byte[] Defragment(ForkData image)
+    internal static byte[] Defragment(ForkData image, IProgress<VolumeProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(image);
+        cancellationToken.ThrowIfCancellationRequested();
         var state = OpenCatalog(image);
         var source = state.Source.ToArray();
         var mdb = new BigEndianReader(source.AsMemory(MdbOffset, MdbSize));
@@ -456,7 +465,7 @@ internal static class HfsResizer
         var tree = EmptyTree(extentsBytes);
         state.ExtentsTree.AsSpan(0x2E, 4).CopyTo(tree.AsSpan(0x2E));                    // the header's clump size
         tree.CopyTo(template, start * BlockSize);
-        return Relayout(state, source, template, extentsBytes / state.BlockSize, state.Catalog.Length / state.BlockSize);
+        return Relayout(state, source, template, extentsBytes / state.BlockSize, state.Catalog.Length / state.BlockSize, progress, cancellationToken);
     }
 
     // An empty extents tree of this many bytes, its node map extended past the header's when it is that long.
@@ -477,7 +486,8 @@ internal static class HfsResizer
     // and the extents tree's place (an empty tree written at block 0); the catalog's nodes are kept (grown to whole blocks
     // and at least catalogBlocks) after it, each file's forks given one extent each in turn after that, and the source
     // MDB's other fields kept.
-    private static byte[] Relayout(CatalogEditState state, byte[] source, byte[] result, long extentsBlocks, long leastCatalogBlocks)
+    private static byte[] Relayout(CatalogEditState state, byte[] source, byte[] result, long extentsBlocks, long leastCatalogBlocks,
+        IProgress<VolumeProgress>? progress, CancellationToken cancellationToken)
     {
         long size = result.Length;
         var mdb = new BigEndianReader(source.AsMemory(MdbOffset, MdbSize));
@@ -506,8 +516,12 @@ internal static class HfsResizer
         long areaStart = start * BlockSize;
         var catalogReader = new BigEndianReader(catalog);
         var writer = new BigEndianWriter(catalog);
-        foreach (var record in LeafRecords(catalog).Where(r => r.Data.Length >= 0x62 && r.Data[0] == 2))
+        var fileRecords = LeafRecords(catalog).Where(r => r.Data.Length >= 0x62 && r.Data[0] == 2).ToList();
+        int laid = 0;
+        foreach (var record in fileRecords)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new VolumeProgress(++laid, fileRecords.Count, $"File {laid} of {fileRecords.Count}"));
             int data = DataOffset(catalog, record);
             uint id = FileId(record.Data);
             if (!files.TryGetValue(id, out var file))
