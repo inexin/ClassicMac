@@ -6,7 +6,7 @@ namespace ClassicMac.App.ViewModels;
 
 // Unapplied edits (a form's values that differ from the resource's, or bytes changed in the hex view): before the
 // selection moves, an undo or redo, a resource command, or a close, the user applies, discards or keeps them.
-public sealed class Drafts(MainViewModel main)
+public sealed class Drafts(IAppSelection appSelection, IAppServices appServices, IAppParts appParts)
 {
     internal bool askingDraft;
 
@@ -18,7 +18,10 @@ public sealed class Drafts(MainViewModel main)
 
     internal void Refuse(string property)
     {
-        main.RaisePropertyChanged(property);
+        if (property == nameof(IAppSelection.Selected))
+        {
+            appSelection.NotifySelectedChanged();
+        }
         ChangeRefused?.Invoke(this, property);
     }
 
@@ -30,12 +33,12 @@ public sealed class Drafts(MainViewModel main)
     {
         get
         {
-            if (main.EditActions.HexEdit is { IsModified: true } && main.EditActions.hexEditTarget is { } target)
+            if (appParts.EditActions.HexEdit is { IsModified: true } && appParts.EditActions.hexEditTarget is { } target)
             {
                 return (Name(target.Resource), null);
             }
 
-            if (main.Forms.Form is { } form && form.Draft is (true, var error))
+            if (appParts.Forms.Form is { } form && form.Draft is (true, var error))
             {
                 return (Name(form.Resource), error);
             }
@@ -64,12 +67,12 @@ public sealed class Drafts(MainViewModel main)
         }
 
         var choice = DraftChoice.Discard;
-        if (main.EditDialogs is not null)
+        if (appServices.EditDialogs is not null)
         {
             askingDraft = true;
             try
             {
-                choice = await main.EditDialogs.AskApplyDraftAsync(draft.What, draft.Error);
+                choice = await appServices.EditDialogs.AskApplyDraftAsync(draft.What, draft.Error);
             }
             finally
             {
@@ -79,13 +82,13 @@ public sealed class Drafts(MainViewModel main)
         switch (choice)
         {
             case DraftChoice.Apply when draft.Error is null:
-                if (main.EditActions.HexEdit is { IsModified: true })
+                if (appParts.EditActions.HexEdit is { IsModified: true })
                 {
-                    main.EditActions.ApplyHexEdit();
+                    appParts.EditActions.ApplyHexEdit();
                 }
                 else
                 {
-                    main.Forms.ApplyForm();
+                    appParts.Forms.ApplyForm();
                 }
 
                 return !HasDraft;
@@ -100,13 +103,13 @@ public sealed class Drafts(MainViewModel main)
     // Drops unapplied edits: the hex view's bytes, the form's values read again from the resource.
     internal void DiscardDraft()
     {
-        if (main.EditActions.HexEdit is { IsModified: true })
+        if (appParts.EditActions.HexEdit is { IsModified: true })
         {
-            main.EditActions.DiscardHexEdit();
+            appParts.EditActions.DiscardHexEdit();
         }
-        else if (main.Forms.Form is { Draft.IsDraft: true })
+        else if (appParts.Forms.Form is { Draft.IsDraft: true })
         {
-            main.Forms.UpdateForm(main.Selected);
+            appParts.Forms.UpdateForm(appSelection.Selected);
         }
     }
 
@@ -118,7 +121,7 @@ public sealed class Drafts(MainViewModel main)
             return;
         }
 
-        main.Selected = Current(target);
+        appSelection.Selected = Current(target);
     }
 
     // An applied edit rebuilds its file's type nodes: a type or resource node chosen before it is found again.

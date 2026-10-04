@@ -355,7 +355,7 @@ public sealed class DraftTests : EditTestsBase
 
         dialogs.Pending = new TaskCompletionSource<DraftChoice>();
         var changes = new System.Collections.Concurrent.ConcurrentQueue<string?>();  // background preview tasks raise on the thread pool
-        model.PropertyChanged += (_, e) => changes.Enqueue(e.PropertyName);
+        model.Forms.PropertyChanged += (_, e) => changes.Enqueue(e.PropertyName);
         model.Forms.UseTemplate = true;
         Assert.False(model.Forms.UseTemplate);                                    // not until answered
         Assert.Same(form, model.Forms.Form);

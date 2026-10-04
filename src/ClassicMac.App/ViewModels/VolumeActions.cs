@@ -19,7 +19,7 @@ public sealed record NewFileChoice(string Name, string Type, string Creator);
 // The Volume menu: files and folders created and deleted in a plain HFS image through HfsWriter. Each change is made
 // at once on an in-memory copy of the volume (so a refused one says why straight away) and shown in the tree; the
 // image on disk is not touched, and the changes are written only by Save As ▸ HFS Volume Image, with the fork edits.
-public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
+public sealed partial class VolumeActions(IAppSelection appSelection, IAppServices appServices, IAppParts appParts) : ObservableObject
 {
     // The folder node a new item goes into (the selected folder, the volume's root, or the folder of the selected
     // file), when it is in the input's writable volume and not inside a container held in it.
@@ -75,19 +75,19 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
 
     private static string MacPathOf(NodeViewModel item) => string.Join(":", FolderNames(TreeLayout.FolderOf(item)!).Append(ItemName(item)));
 
-    private bool CanCreateInVolume() => !main.ExportActions.IsExporting && VolumeFolder(main.Selected) is not null;
+    private bool CanCreateInVolume() => !appParts.ExportActions.IsExporting && VolumeFolder(appSelection.Selected) is not null;
 
-    private bool CanDeleteFromVolume() => !main.ExportActions.IsExporting && VolumeItem(main.Selected) is not null;
+    private bool CanDeleteFromVolume() => !appParts.ExportActions.IsExporting && VolumeItem(appSelection.Selected) is not null;
 
     [RelayCommand(CanExecute = nameof(CanCreateInVolume))]
     private async Task NewFile()
     {
-        if (VolumeFolder(main.Selected) is not { } folder || main.EditDialogs is null)
+        if (VolumeFolder(appSelection.Selected) is not { } folder || appServices.EditDialogs is null)
         {
             return;
         }
 
-        if (await main.EditDialogs.NewFileAsync("New File", new NewFileChoice("untitled", "TEXT", "ttxt")) is not { } choice)
+        if (await appServices.EditDialogs.NewFileAsync("New File", new NewFileChoice("untitled", "TEXT", "ttxt")) is not { } choice)
         {
             return;
         }
@@ -107,12 +107,12 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
     [RelayCommand(CanExecute = nameof(CanCreateInVolume))]
     private async Task ImportFile()
     {
-        if (VolumeFolder(main.Selected) is not { } folder || main.EditDialogs is null || main.FilePicker is null)
+        if (VolumeFolder(appSelection.Selected) is not { } folder || appServices.EditDialogs is null || appServices.FilePicker is null)
         {
             return;
         }
 
-        if ((await main.FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
+        if ((await appServices.FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
         {
             return;
         }
@@ -120,11 +120,11 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
         MacFile imported;
         try
         {
-            imported = await Task.Run(() => HostImport.Read(path, main.ContainerOptions));
+            imported = await Task.Run(() => HostImport.Read(path, appServices.ContainerOptions));
         }
         catch (Exception e) when (ExceptionFilters.IsFileAccess(e) || e is InvalidDataException)
         {
-            main.Status = $"{Path.GetFileName(path)} could not be read: {e.Message}";
+            appServices.Status = $"{Path.GetFileName(path)} could not be read: {e.Message}";
             return;
         }
         var name = imported.Name.ToMacRoman();
@@ -134,7 +134,7 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
         }
 
         var initial = new NewFileChoice(name, imported.FinderInfo.Type.ToString(), imported.FinderInfo.Creator.ToString());
-        if (await main.EditDialogs.NewFileAsync($"Import “{Path.GetFileName(path)}”", initial) is not { } choice)
+        if (await appServices.EditDialogs.NewFileAsync($"Import “{Path.GetFileName(path)}”", initial) is not { } choice)
         {
             return;
         }
@@ -151,7 +151,7 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
     {
         if (!InputEditSession.TryParseCode(choice.Type, out var type) || !InputEditSession.TryParseCode(choice.Creator, out var creator))
         {
-            main.Status = "The type and creator must each be four Mac OS Roman characters.";
+            appServices.Status = "The type and creator must each be four Mac OS Roman characters.";
             return null;
         }
         return initial with { Type = type, Creator = creator };
@@ -160,12 +160,12 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
     [RelayCommand(CanExecute = nameof(CanCreateInVolume))]
     private async Task NewFolder()
     {
-        if (VolumeFolder(main.Selected) is not { } folder || main.EditDialogs is null)
+        if (VolumeFolder(appSelection.Selected) is not { } folder || appServices.EditDialogs is null)
         {
             return;
         }
 
-        if (await main.EditDialogs.NewFolderAsync("untitled folder") is not { } name)
+        if (await appServices.EditDialogs.NewFolderAsync("untitled folder") is not { } name)
         {
             return;
         }
@@ -178,14 +178,14 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
 
         var node = new FolderNode(folder, name);
         Insert(folder, node);
-        main.Status = $"Created folder {name}; Save As ▸ HFS Volume Image writes it.";
+        appServices.Status = $"Created folder {name}; Save As ▸ HFS Volume Image writes it.";
     }
 
     // Deletes the selected file, or the selected folder with everything shown in it (after asking).
     [RelayCommand(CanExecute = nameof(CanDeleteFromVolume))]
     private async Task DeleteItem()
     {
-        if (VolumeItem(main.Selected) is not { } item)
+        if (VolumeItem(appSelection.Selected) is not { } item)
         {
             return;
         }
@@ -195,7 +195,7 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
         var question = inside > 0
             ? $"Delete the folder {name} and the {inside} item{(inside == 1 ? "" : "s")} in it from the volume?"
             : $"Delete {name} from the volume?";
-        if (main.EditDialogs is not null && !await main.EditDialogs.ConfirmAsync("Delete", question))
+        if (appServices.EditDialogs is not null && !await appServices.EditDialogs.ConfirmAsync("Delete", question))
         {
             return;
         }
@@ -209,9 +209,9 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
         var parent = TreeLayout.FolderOf(item)!;
         parent.Items!.Remove(item);
         TreeLayout.Relayout(parent);
-        main.Selected = parent;
-        main.EditActions.NotifyEditCommands();
-        main.Status = $"Deleted {name}; Save As ▸ HFS Volume Image writes the change.";
+        appSelection.Selected = parent;
+        appParts.EditActions.NotifyEditCommands();
+        appServices.Status = $"Deleted {name}; Save As ▸ HFS Volume Image writes the change.";
     }
 
     private static IEnumerable<NodeViewModel> Descendants(NodeViewModel node) =>
@@ -237,7 +237,7 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
             UnicodeName = null,
             UnicodeFolderPath = null,
         };
-        var node = ContainerUnwrapper.Default.Unwrap(created, HfsReader.Instance.FormatName, new ContainerContext(main.ContainerOptions));
+        var node = ContainerUnwrapper.Default.Unwrap(created, HfsReader.Instance.FormatName, new ContainerContext(appServices.ContainerOptions));
         NodeViewModel item = node.Children.Count > 0 ? new ContainerFileNode(folder, node) : new FileNode(folder, node);
         // A file made without resources can be given some at once: its edits start from an empty fork.
         if (item is FileNode { Children.Count: 0 } empty)
@@ -246,7 +246,7 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
         }
 
         Insert(folder, item);
-        main.Status = $"Created {file.Name.ToMacRoman()}; Save As ▸ HFS Volume Image writes it.";
+        appServices.Status = $"Created {file.Name.ToMacRoman()}; Save As ▸ HFS Volume Image writes it.";
     }
 
     // Applies a change to the input's volume through its edit session; false, with the reason in the status line, when
@@ -259,11 +259,11 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException or InvalidOperationException)
         {
-            main.Status = $"Could not {what}: {e.Message}";
+            appServices.Status = $"Could not {what}: {e.Message}";
             return false;
         }
         input.Title = input.BaseTitle + " •";
-        main.EditActions.NotifyEditCommands();
+        appParts.EditActions.NotifyEditCommands();
         return true;
     }
 
@@ -287,6 +287,6 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
             group.IsExpanded = true;
         }
 
-        main.Selected = TreeLayout.IsShown(item, main.Roots) ? item : folder;
+        appSelection.Selected = TreeLayout.IsShown(item, appSelection.Roots) ? item : folder;
     }
 }

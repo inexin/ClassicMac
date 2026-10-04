@@ -23,7 +23,7 @@ public enum DragOutFormat
 // Drag and drop out of the tree: the dragged item is written into a per-session temporary folder first (file
 // managers take dropped files by path), with the same writers as Unpack and Save Resource As, and the window hands
 // the paths to the platform's drag. The folder is deleted when the window closes.
-public sealed partial class DragOut(MainViewModel main) : ObservableObject
+public sealed partial class DragOut(IAppServices appServices, IAppParts appParts) : ObservableObject
 {
     [ObservableProperty]
     private DragOutFormat dragOutFormat = DragOutFormat.AppleDouble;
@@ -59,8 +59,8 @@ public sealed partial class DragOut(MainViewModel main) : ObservableObject
         var folder = Path.Combine(DragFolder, Guid.NewGuid().ToString("N"));
         var diagnostics = new List<Diagnostic>();
         // The status bar says what is written while the drag waits for it (boards/browse-tree.md, drag source).
-        var before = main.Status;
-        main.Status = node is ResourceNode ? $"Writing {node.BaseTitle}…"
+        var before = appServices.Status;
+        appServices.Status = node is ResourceNode ? $"Writing {node.BaseTitle}…"
             : DragOutFormat == DragOutFormat.MacBinary ? "Writing MacBinary…" : "Writing AppleDouble…";
         try
         {
@@ -74,16 +74,16 @@ public sealed partial class DragOut(MainViewModel main) : ObservableObject
             };
             foreach (var d in diagnostics)
             {
-                main.Report(new DiagnosticEntry(d, node.Source, node));
+                appServices.Report(new DiagnosticEntry(d, node.Source, node));
             }
 
-            main.Status = before;
+            appServices.Status = before;
             return paths;
         }
         catch (Exception e) when (ExceptionFilters.IsFileAccess(e) || e is InvalidDataException)
         {
-            main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", e.Message), node.Source, node));
-            main.Status = $"{node.BaseTitle} could not be dragged out: {e.Message}";
+            appServices.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", e.Message), node.Source, node));
+            appServices.Status = $"{node.BaseTitle} could not be dragged out: {e.Message}";
             return [];
         }
     }
@@ -140,7 +140,7 @@ public sealed partial class DragOut(MainViewModel main) : ObservableObject
 
     private IReadOnlyList<string> WriteResource(ResourceNode node, string folder, List<Diagnostic> diagnostics)
     {
-        var (outputs, raw) = main.ExportActions.Decode(node, diagnostics);
+        var (outputs, raw) = appParts.ExportActions.Decode(node, diagnostics);
         var chosen = outputs.FirstOrDefault();
         var path = Path.Combine(folder, HostNames.ToHostName(ExportActions.Stem(node.Resource), 200) + (chosen?.Extension ?? ".bin"));
         File.WriteAllBytes(path, (chosen?.Content ?? raw).ToArray());

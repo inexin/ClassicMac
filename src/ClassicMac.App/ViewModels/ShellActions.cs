@@ -63,17 +63,17 @@ public sealed record AboutInfo(string Name, string Version, string Description, 
 }
 
 // The shell's commands (S1, S2, S7): the title, zoom and depth, the theme, the Window and Help menus.
-public sealed partial class ShellActions(MainViewModel main) : ObservableObject
+public sealed partial class ShellActions(IAppSelection appSelection, IAppServices appServices, IAppView appView) : ObservableObject
 {
     public IShell? Shell { get; set; }
 
     // ---- Title (S1) ----
 
     /// <summary>The selected input's name for the title bar, or null when nothing is open.</summary>
-    public string? TitleFile => main.Selected?.Input.BaseTitle;
+    public string? TitleFile => appSelection.Selected?.Input.BaseTitle;
 
     /// <summary>Whether the selected input has unsaved edits (the title's " •").</summary>
-    public bool TitleUnsaved => main.Selected?.Input is { } input && (input.HasVolumeChanges || EditActions.EditedFiles(input).Any(e => e.State.Session.IsDirty));
+    public bool TitleUnsaved => appSelection.Selected?.Input is { } input && (input.HasVolumeChanges || EditActions.EditedFiles(input).Any(e => e.State.Session.IsDirty));
 
     /// <summary>The window's title: "Mac OS 9.hfv • — ClassicMac".</summary>
     public string WindowTitle => TitleFile is { } file ? $"{file}{(TitleUnsaved ? " •" : "")} — ClassicMac" : "ClassicMac";
@@ -88,7 +88,7 @@ public sealed partial class ShellActions(MainViewModel main) : ObservableObject
     // ---- Zoom and depth (S2, View menu) ----
 
     /// <summary>Whether the preview can be zoomed (images, folders, dialogs, menus): the toolbar's Zoom and Depth.</summary>
-    public bool IsZoomable => main.Preview.IsZoomable;
+    public bool IsZoomable => appView.Preview.IsZoomable;
 
     // MainViewModel's zoom, preview or screen depth changed: the zoom commands and the depth choice follow.
     internal void ViewChanged()
@@ -100,18 +100,18 @@ public sealed partial class ShellActions(MainViewModel main) : ObservableObject
         ActualSizeCommand.NotifyCanExecuteChanged();
     }
 
-    private bool CanZoomIn() => IsZoomable && main.Zoom < main.Zooms[^1];
+    private bool CanZoomIn() => IsZoomable && appView.Zoom < appView.Zooms[^1];
 
-    private bool CanZoomOut() => IsZoomable && main.Zoom > main.Zooms[0];
+    private bool CanZoomOut() => IsZoomable && appView.Zoom > appView.Zooms[0];
 
     [RelayCommand(CanExecute = nameof(CanZoomIn))]
-    private void ZoomIn() => main.Zoom = main.Zooms.First(z => z > main.Zoom);
+    private void ZoomIn() => appView.Zoom = appView.Zooms.First(z => z > appView.Zoom);
 
     [RelayCommand(CanExecute = nameof(CanZoomOut))]
-    private void ZoomOut() => main.Zoom = main.Zooms.Last(z => z < main.Zoom);
+    private void ZoomOut() => appView.Zoom = appView.Zooms.Last(z => z < appView.Zoom);
 
     [RelayCommand(CanExecute = nameof(CanZoomOut))]
-    private void ActualSize() => main.Zoom = main.Zooms[0];
+    private void ActualSize() => appView.Zoom = appView.Zooms[0];
 
     public IReadOnlyList<ScreenDepthChoice> ScreenDepthChoices { get; } =
         [new(1, "1-bit"), new(2, "2-bit"), new(4, "4-bit"), new(8, "8-bit (256)"), new(16, "16-bit"), new(32, "32-bit")];
@@ -119,25 +119,25 @@ public sealed partial class ShellActions(MainViewModel main) : ObservableObject
     /// <summary>The chosen screen depth, as the Depth select shows it.</summary>
     public ScreenDepthChoice SelectedDepthChoice
     {
-        get => ScreenDepthChoices.FirstOrDefault(c => c.Depth == main.ScreenDepth) ?? ScreenDepthChoices[^1];
+        get => ScreenDepthChoices.FirstOrDefault(c => c.Depth == appView.ScreenDepth) ?? ScreenDepthChoices[^1];
         set
         {
             if (value is not null)
             {
-                main.ScreenDepth = value.Depth;
+                appView.ScreenDepth = value.Depth;
             }
         }
     }
 
     [RelayCommand]
-    private void SetScreenDepth(int depth) => main.ScreenDepth = depth;
+    private void SetScreenDepth(int depth) => appView.ScreenDepth = depth;
 
     // ---- Theme (View ▸ Theme) ----
 
     /// <summary>The theme, kept between sessions; the window applies it.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSystemTheme), nameof(IsLightTheme), nameof(IsDarkTheme))]
-    private AppTheme theme = main.settings.Load().Theme;
+    private AppTheme theme = appServices.Settings.Load().Theme;
 
     public bool IsSystemTheme => Theme == AppTheme.System;
 
@@ -148,7 +148,7 @@ public sealed partial class ShellActions(MainViewModel main) : ObservableObject
     [RelayCommand]
     private void SetTheme(AppTheme value) => Theme = value;
 
-    partial void OnThemeChanged(AppTheme value) => main.settings.Save(main.settings.Load() with { Theme = value });
+    partial void OnThemeChanged(AppTheme value) => appServices.Settings.Save(appServices.Settings.Load() with { Theme = value });
 
     // ---- Window menu ----
 
@@ -159,7 +159,7 @@ public sealed partial class ShellActions(MainViewModel main) : ObservableObject
     private void ZoomWindow() => Shell?.ToggleZoom();
 
     /// <summary>Whether <paramref name="input"/> holds the selection (its Window menu item is checked).</summary>
-    public bool IsSelectedInput(InputNode input) => ReferenceEquals(main.Selected?.Input, input);
+    public bool IsSelectedInput(InputNode input) => ReferenceEquals(appSelection.Selected?.Input, input);
 
     private static bool CanShowInput(InputNode? input) => input is not null;
 
@@ -173,8 +173,8 @@ public sealed partial class ShellActions(MainViewModel main) : ObservableObject
         }
 
         input.IsExpanded = true;
-        main.Selected = input;
-        await main.DraftTask;
+        appSelection.Selected = input;
+        await appSelection.DraftTask;
     }
 
     // ---- Help menu ----

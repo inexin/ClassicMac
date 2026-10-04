@@ -374,14 +374,14 @@ internal static class TemplateRows
     }
 }
 
-public sealed class TemplateFinder(MainViewModel main)
+public sealed class TemplateFinder(IAppSelection appSelection, IAppServices appServices)
 {
     // The TMPL for a type, as ResEdit finds one: in the resource's own file, then in the other open files whose
     // resources are loaded; else ClassicMac's built-in template for the type; null when there is none.
     private (ResourceTemplate Template, string Source, string ShownThrough)? FindTemplate(FourCC type, ResourceFork own, NodeViewModel? ownFile)
     {
         var forks = new List<(ResourceFork Fork, string Name)> { (own, ownFile?.BaseTitle ?? "this file") };
-        foreach (var root in main.Roots)
+        foreach (var root in appSelection.Roots)
         {
             foreach (var node in Loaded(root))
             {
@@ -401,7 +401,7 @@ public sealed class TemplateFinder(MainViewModel main)
 
             try
             {
-                var data = ResourceDecompression.Default.GetData(tmpl, fork, main.ReadOptions, []);
+                var data = ResourceDecompression.Default.GetData(tmpl, fork, appServices.ReadOptions, []);
                 return (ResourceTemplate.Parse(data.Span), $"Template: TMPL {tmpl.Id} “{type}” in {name}", $"'TMPL' {tmpl.Id} “{type}” in {name}");
             }
             catch (InvalidDataException)
@@ -449,7 +449,7 @@ public sealed class TemplateFinder(MainViewModel main)
             return null;
         }
 
-        var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, main.ReadOptions, []);
+        var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, appServices.ReadOptions, []);
         return new TemplateForm(node.Resource, found.Template, found.Source, data.Span) { ShownThrough = found.ShownThrough };
     }
 

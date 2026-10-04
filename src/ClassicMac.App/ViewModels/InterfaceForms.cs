@@ -300,7 +300,7 @@ public sealed partial class DialogItemsForm : DataForm
     public override byte[] BuildData() => InterfaceWriter.WriteDialogItems(Items.Select(i => i.ToItem()).ToList());
 }
 
-public sealed partial class FormLivePreview(MainViewModel main) : ObservableObject
+public sealed partial class FormLivePreview(IAppSelection appSelection, IAppServices appServices, IAppView appView, IAppParts appParts) : ObservableObject
 {
     /// <summary>The live preview of the form's dialog, alert or item list, or null.</summary>
     [ObservableProperty]
@@ -312,13 +312,13 @@ public sealed partial class FormLivePreview(MainViewModel main) : ObservableObje
     private string? formDialogNote;
 
     /// <summary>Whether the host shows the form's dialog beside it (an item list's form has a preview panel of its own).</summary>
-    public bool ShowsHostDialog => FormDialog is not null && main.Forms.Form is not DialogItemsForm;
+    public bool ShowsHostDialog => FormDialog is not null && appParts.Forms.Form is not DialogItemsForm;
 
     /// <summary>Why the form's values cannot be written, or null (the host's error line; Apply waits for it to go).</summary>
     [ObservableProperty]
     private string? formError;
 
-    partial void OnFormErrorChanged(string? value) => main.Forms.ApplyFormCommand.NotifyCanExecuteChanged();
+    partial void OnFormErrorChanged(string? value) => appParts.Forms.ApplyFormCommand.NotifyCanExecuteChanged();
 
     // The form's error follows its values; a dialog, alert or item list also gets a live preview of the dialog.
     internal void WatchForm(ResourceForm? form, ResourceNode? node)
@@ -342,8 +342,8 @@ public sealed partial class FormLivePreview(MainViewModel main) : ObservableObje
                 if (form is DialogItemsForm items)
                 {
                     // The item list in the window of the dialog that uses it, redrawn from the values on each change.
-                    FormDialog = InterfacePreviews.ItemList(node.Resource, bytes, items.User, node.Fork, DecodeOptions.Default with { ScreenDepth = main.ScreenDepth },
-                        main.ReadOptions, [], sources ??= DialogSources.From(main.Roots));
+                    FormDialog = InterfacePreviews.ItemList(node.Resource, bytes, items.User, node.Fork, DecodeOptions.Default with { ScreenDepth = appView.ScreenDepth },
+                        appServices.ReadOptions, [], sources ??= DialogSources.From(appSelection.Roots));
                     FormDialogNote = FormDialog is not { } drawn ? null
                         : string.Create(CultureInfo.InvariantCulture,
                             $"{(items.UsedBy is { } user ? "Drawn from " + user : "Drawn on its own")} · {drawn.Drawing.Width} × {drawn.Drawing.Height}");
@@ -351,8 +351,8 @@ public sealed partial class FormLivePreview(MainViewModel main) : ObservableObje
                 else if (form is DataForm and not MenuForm)
                 {
                     // An alert draws the selected stage's default button (E4).
-                    FormDialog = InterfacePreviews.Dialog(node.Resource, bytes, node.Fork, DecodeOptions.Default with { ScreenDepth = main.ScreenDepth }, main.ReadOptions, [],
-                        sources ??= DialogSources.From(main.Roots), (form as AlertForm)?.SelectedStage?.BoldItem);
+                    FormDialog = InterfacePreviews.Dialog(node.Resource, bytes, node.Fork, DecodeOptions.Default with { ScreenDepth = appView.ScreenDepth }, appServices.ReadOptions, [],
+                        sources ??= DialogSources.From(appSelection.Roots), (form as AlertForm)?.SelectedStage?.BoldItem);
                 }
             }
             catch (Exception e) when (e is ArgumentException or OverflowException)

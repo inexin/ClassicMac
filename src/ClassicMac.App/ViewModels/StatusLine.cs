@@ -28,7 +28,7 @@ public sealed record StatusSummary(string Name, string Format, int Files, int Er
 
 // The status bar: the summary of the selected input on the left; on the right, while work runs, what it does and how
 // far it is, else the status text.
-public sealed partial class StatusLine(MainViewModel main) : ObservableObject
+public sealed partial class StatusLine(IAppSelection appSelection, IAppServices appServices) : ObservableObject
 {
     /// <summary>What runs now ("Extracting Disk…"), or null when nothing does.</summary>
     [ObservableProperty]
@@ -61,13 +61,13 @@ public sealed partial class StatusLine(MainViewModel main) : ObservableObject
     {
         get
         {
-            var input = main.Selected?.Input ?? main.Roots.FirstOrDefault();
+            var input = appSelection.Selected?.Input ?? appSelection.Roots.FirstOrDefault();
             if (input is null)
             {
                 return null;
             }
 
-            var (errors, warnings) = main.DiagnosticsPanel.CountsFor(d => d.Node?.Input == input || d.Node is null && d.Source == input.BaseTitle);
+            var (errors, warnings) = appServices.DiagnosticsPanel.CountsFor(d => d.Node?.Input == input || d.Node is null && d.Source == input.BaseTitle);
             var format = input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "resource fork";
             return new StatusSummary(input.BaseTitle, format, input.Root.Leaves().Count(), errors, warnings);
         }
@@ -76,17 +76,17 @@ public sealed partial class StatusLine(MainViewModel main) : ObservableObject
     // The summary changes with the selection, the open files and the diagnostics.
     internal void WatchSummary()
     {
-        main.Roots.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Summary));
-        main.DiagnosticsPanel.PropertyChanged += (_, e) =>
+        appSelection.Roots.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Summary));
+        appServices.DiagnosticsPanel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(DiagnosticsPanel.ErrorCount) or nameof(DiagnosticsPanel.WarningCount))
             {
                 OnPropertyChanged(nameof(Summary));
             }
         };
-        main.PropertyChanged += (_, e) =>
+        appSelection.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MainViewModel.Selected))
+            if (e.PropertyName == nameof(IAppSelection.Selected))
             {
                 OnPropertyChanged(nameof(Summary));
             }
@@ -99,7 +99,7 @@ public sealed partial class StatusLine(MainViewModel main) : ObservableObject
         ProgressValue = 0;
         ProgressMaximum = maximum;
         ProgressText = text;
-        return new WorkProgress(main);
+        return new WorkProgress(this, appServices);
     }
 
     /// <summary>
@@ -109,13 +109,15 @@ public sealed partial class StatusLine(MainViewModel main) : ObservableObject
     internal sealed class WorkProgress : IProgress<int>
     {
         private readonly object gate = new();
-        private readonly MainViewModel model;
+        private readonly StatusLine line;
+        private readonly IAppServices services;
         private readonly Progress<int> inner;
         private bool finished;
 
-        public WorkProgress(MainViewModel model)
+        public WorkProgress(StatusLine line, IAppServices services)
         {
-            this.model = model;
+            this.line = line;
+            this.services = services;
             inner = new Progress<int>(Apply);
         }
 
@@ -128,7 +130,7 @@ public sealed partial class StatusLine(MainViewModel main) : ObservableObject
             {
                 if (!finished)
                 {
-                    model.StatusLine.ProgressValue = done;
+                    line.ProgressValue = done;
                 }
             }
         }
@@ -144,10 +146,10 @@ public sealed partial class StatusLine(MainViewModel main) : ObservableObject
                 }
 
                 finished = true;
-                model.StatusLine.ProgressText = null;
+                line.ProgressText = null;
                 if (status is not null)
                 {
-                    model.Status = status;
+                    services.Status = status;
                 }
             }
         }

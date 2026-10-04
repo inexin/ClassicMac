@@ -20,7 +20,7 @@ namespace ClassicMac.App.ViewModels;
 /// <summary>What an import makes: the resource type (or <see cref="MainViewModel.IconFamily"/>), ID and name.</summary>
 public sealed record ImportChoice(string Type, short Id, string Name);
 
-public sealed partial class ImportActions(MainViewModel main) : ObservableObject
+public sealed partial class ImportActions(IAppSelection appSelection, IAppServices appServices, IAppParts appParts) : ObservableObject
 {
     /// <summary>The import choice that makes every icon of a Finder icon family.</summary>
     public const string IconFamily = "Icon family (ICN#, icl4, icl8, ics#, ics4, ics8)";
@@ -30,22 +30,22 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
 
     // Resource ▸ Import: a PNG (or other image) or WAV file made into a new resource, or into the data of the one
     // of that type and ID, as one undoable edit.
-    private bool CanImport() => main.EditActions.CanNewResource();
+    private bool CanImport() => appParts.EditActions.CanNewResource();
 
     [RelayCommand(CanExecute = nameof(CanImport))]
     private async Task Import()
     {
-        if (!await main.Drafts.ResolveDraftAsync())
+        if (!await appParts.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (EditActions.FileOwner(main.Selected) is not { } owner || main.FilePicker is null || main.EditDialogs is null)
+        if (EditActions.FileOwner(appSelection.Selected) is not { } owner || appServices.FilePicker is null || appServices.EditDialogs is null)
         {
             return;
         }
 
-        if ((await main.FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
+        if ((await appServices.FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
         {
             return;
         }
@@ -67,17 +67,17 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException or NotSupportedException)
         {
-            main.Status = $"“{fileName}” could not be imported: {e.Message}";
+            appServices.Status = $"“{fileName}” could not be imported: {e.Message}";
             return;
         }
 
-        var fork = main.EditActions.StateFor(owner).Session.Fork;
+        var fork = appParts.EditActions.StateFor(owner).Session.Fork;
         IReadOnlyList<string> types = isSound ? ["snd "] : [.. ImageImport.Types, IconFamily];
-        var selected = (main.Selected as ResourceNode)?.Resource;
+        var selected = (appSelection.Selected as ResourceNode)?.Resource;
         var type = selected is not null && types.Contains(selected.Type.ToString()) ? selected.Type.ToString() : types[0];
         short id = selected is not null && selected.Type.ToString() == type ? selected.Id : ResourceEditRules.NextFreeId(fork, FourCC.FromString(type));
         var source = isSound ? SoundSource(sound!) : ImageSource(image!);
-        if (await main.EditDialogs.ImportAsync(fileName, types, new ImportChoice(type, id, ""), source) is not { } choice)
+        if (await appServices.EditDialogs.ImportAsync(fileName, types, new ImportChoice(type, id, ""), source) is not { } choice)
         {
             return;
         }
@@ -90,13 +90,13 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
         }
         catch (Exception e) when (e is ArgumentException or NotSupportedException)
         {
-            main.Status = e.Message;
+            appServices.Status = e.Message;
             return;
         }
 
         var edits = new List<IResourceEdit>();
         var replaced = made.Select(m => fork.Find(FourCC.FromString(m.Type), choice.Id)).OfType<Resource>().ToList();
-        if (replaced.Count > 0 && !await main.EditDialogs.ConfirmAsync("Import",
+        if (replaced.Count > 0 && !await appServices.EditDialogs.ConfirmAsync("Import",
                 $"Replace the data of {string.Join(", ", replaced)} with “{fileName}”?"))
         {
             return;
@@ -115,7 +115,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
 
                 continue;
             }
-            if (await main.EditActions.Validate(fork, new ResourceInfo(madeType, choice.Id, choice.Name, ResourceAttributes.None), null) is not { } valid)
+            if (await appParts.EditActions.Validate(fork, new ResourceInfo(madeType, choice.Id, choice.Name, ResourceAttributes.None), null) is not { } valid)
             {
                 return;
             }
@@ -127,7 +127,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
                 select = () => add.Added;
             }
         }
-        main.EditActions.Execute(owner, edits.Count == 1 ? edits[0] : new CompoundEdit($"Import {fileName}", [.. edits]), select);
+        appParts.EditActions.Execute(owner, edits.Count == 1 ? edits[0] : new CompoundEdit($"Import {fileName}", [.. edits]), select);
     }
 
     // An image's size and depth ("32 × 32 · 24-bit", or 32-bit with alpha when a pixel is not opaque), and what each
@@ -161,8 +161,8 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
             return [];
         }
 
-        var options = main.ExportActions.CurrentDecodeOptions;
-        return made.Select(m => PreviewViewModel.ForData(m.Type, m.Data, options, main.ReadOptions) is { Images.Count: > 0 } preview
+        var options = appParts.ExportActions.CurrentDecodeOptions;
+        return made.Select(m => PreviewViewModel.ForData(m.Type, m.Data, options, appServices.ReadOptions) is { Images.Count: > 0 } preview
                 ? preview.Images[0] with { Caption = m.Type }
                 : null)
             .OfType<PreviewImage>().ToList();
@@ -170,7 +170,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
 
     // A sound's rate, channels, sample size and length, as its preview says them; nothing drawn.
     private ImportSource SoundSource(byte[] sound) =>
-        new(PreviewViewModel.ForData("snd ", sound, main.ExportActions.CurrentDecodeOptions, main.ReadOptions).SoundDetails, _ => []);
+        new(PreviewViewModel.ForData("snd ", sound, appParts.ExportActions.CurrentDecodeOptions, appServices.ReadOptions).SoundDetails, _ => []);
 
     // Any image Avalonia decodes, converted to unpremultiplied RGBA.
     private static RgbaBitmap ReadImage(string path)

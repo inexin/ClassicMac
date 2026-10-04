@@ -15,62 +15,62 @@ namespace ClassicMac.App.ViewModels;
 
 // The sound's header actions (design/boards/sound.md): Save as WAV… and Replace from WAV… in place of Export… and
 // Edit, since sounds are replaced, not edited.
-public sealed partial class SoundHeaderActions(MainViewModel main) : ObservableObject
+public sealed partial class SoundHeaderActions(IAppSelection appSelection, IAppServices appServices, IAppParts appParts) : ObservableObject
 {
     /// <summary>Whether the selection is a 'snd ' resource (the header shows the sound's actions).</summary>
-    public bool IsSoundResource => main.Selected is ResourceNode { Resource.Type: var type } && type.ToString() == "snd ";
+    public bool IsSoundResource => appSelection.Selected is ResourceNode { Resource.Type: var type } && type.ToString() == "snd ";
 
-    private bool CanSaveAsWav() => !main.ExportActions.IsExporting && IsSoundResource;
+    private bool CanSaveAsWav() => !appParts.ExportActions.IsExporting && IsSoundResource;
 
-    private bool CanReplaceFromWav() => CanSaveAsWav() && EditActions.FileOwner(main.Selected) is not null;
+    private bool CanReplaceFromWav() => CanSaveAsWav() && EditActions.FileOwner(appSelection.Selected) is not null;
 
     /// <summary>Save as WAV…: the sound decoded as <c>extract</c> writes it.</summary>
     [RelayCommand(CanExecute = nameof(CanSaveAsWav))]
-    private Task SaveAsWav() => main.ExportActions.Run(async () =>
+    private Task SaveAsWav() => appParts.ExportActions.Run(async () =>
     {
-        if (main.Selected is not ResourceNode node || main.FilePicker is null)
+        if (appSelection.Selected is not ResourceNode node || appServices.FilePicker is null)
         {
             return;
         }
 
         var diagnostics = new List<Diagnostic>();
-        var (outputs, _) = await Task.Run(() => main.ExportActions.Decode(node, diagnostics));
+        var (outputs, _) = await Task.Run(() => appParts.ExportActions.Decode(node, diagnostics));
         foreach (var d in diagnostics)
         {
-            main.Report(new DiagnosticEntry(d, node.Source, node));
+            appServices.Report(new DiagnosticEntry(d, node.Source, node));
         }
 
         if (outputs.FirstOrDefault(o => o.Extension == ".wav") is not { } wav)
         {
-            main.Status = $"{node.Resource} could not be decoded; see Diagnostics.";
+            appServices.Status = $"{node.Resource} could not be decoded; see Diagnostics.";
             return;
         }
 
-        var path = await main.FilePicker.PickSaveFileAsync($"Save {node.Resource} as WAV", HostNames.ToHostName(ExportActions.Stem(node.Resource), 200) + ".wav", [".wav"]);
+        var path = await appServices.FilePicker.PickSaveFileAsync($"Save {node.Resource} as WAV", HostNames.ToHostName(ExportActions.Stem(node.Resource), 200) + ".wav", [".wav"]);
         if (path is null)
         {
             return;
         }
 
         await File.WriteAllBytesAsync(path, wav.Content.ToArray());
-        main.Status = $"Saved {node.Resource} to {path}.";
+        appServices.Status = $"Saved {node.Resource} to {path}.";
     });
 
     /// <summary>Replace from WAV…: the sound's data made from a WAV file, as one undoable edit.</summary>
     [RelayCommand(CanExecute = nameof(CanReplaceFromWav))]
     private async Task ReplaceFromWav()
     {
-        if (!await main.Drafts.ResolveDraftAsync())
+        if (!await appParts.Drafts.ResolveDraftAsync())
         {
             return;
         }
 
-        if (main.Selected is not ResourceNode node || EditActions.FileOwner(node) is not { } owner || main.FilePicker is null)
+        if (appSelection.Selected is not ResourceNode node || EditActions.FileOwner(node) is not { } owner || appServices.FilePicker is null)
         {
             return;
         }
 
-        if ((await main.FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
+        if ((await appServices.FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
         {
             return;
         }
@@ -83,12 +83,12 @@ public sealed partial class SoundHeaderActions(MainViewModel main) : ObservableO
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException or NotSupportedException)
         {
-            main.Status = $"“{fileName}” could not be read: {e.Message}";
+            appServices.Status = $"“{fileName}” could not be read: {e.Message}";
             return;
         }
 
         var resource = node.Resource;
-        main.EditActions.Execute(owner, new SetResourceData(resource, data, $"Replace from {fileName}"), () => resource);
+        appParts.EditActions.Execute(owner, new SetResourceData(resource, data, $"Replace from {fileName}"), () => resource);
     }
 
     internal void OnSelectionChangedForSoundHeader()

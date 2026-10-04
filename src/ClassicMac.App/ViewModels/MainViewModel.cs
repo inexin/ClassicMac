@@ -67,42 +67,42 @@ public interface IFilePicker
 
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "The preview's CancellationTokenSource holds no timer or wait handle; it is cancelled, not disposed, when the next preview starts.")]
-public sealed partial class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAppServices, IAppView, IAppParts
 {
     private EditActions? editActions;
 
     /// <summary>Editing: new, duplicate, delete, Get Info, replace and hex editing, undo and redo, save and revert.</summary>
-    public EditActions EditActions => editActions ??= new(this);
+    public EditActions EditActions => editActions ??= new(this, this, this, this);
 
     private Forms? forms;
 
     /// <summary>The selection's form: the typed or template editor, Apply, and the template switch.</summary>
-    public Forms Forms => forms ??= new(this);
+    public Forms Forms => forms ??= new(this, this, this);
 
     private TemplateFinder? templateFinder;
 
     /// <summary>The TMPL for a resource, as ResEdit finds one, and the template form made from it.</summary>
-    public TemplateFinder TemplateFinder => templateFinder ??= new(this);
+    public TemplateFinder TemplateFinder => templateFinder ??= new(this, this);
 
     private FormLivePreview? formLivePreview;
 
     /// <summary>The form's error line and the live preview of its dialog, alert or item list.</summary>
-    public FormLivePreview FormLivePreview => formLivePreview ??= new(this);
+    public FormLivePreview FormLivePreview => formLivePreview ??= new(this, this, this, this);
 
     private ExportActions? exportActions;
 
     /// <summary>Save Resource As, Export, Extract All, Convert Documents and Unpack.</summary>
-    public ExportActions ExportActions => exportActions ??= new(this);
+    public ExportActions ExportActions => exportActions ??= new(this, this, this, this);
 
     private InspectorActions? inspectorActions;
 
     /// <summary>The inspector's header: the selection's title, icon, kind and actions.</summary>
-    public InspectorActions InspectorActions => inspectorActions ??= new(this);
+    public InspectorActions InspectorActions => inspectorActions ??= new(this, this);
 
     private FormEditing? formEditing;
 
     /// <summary>The read-then-edit host: Edit, Apply and Cancel for the selection's form, and its footer.</summary>
-    public FormEditing FormEditing => formEditing ??= new(this);
+    public FormEditing FormEditing => formEditing ??= new(this, this, this);
 
     private TreeSearch? treeSearch;
 
@@ -112,57 +112,57 @@ public sealed partial class MainViewModel : ObservableObject
     private ShellActions? shellActions;
 
     /// <summary>The shell: the title, zoom and screen depth, the theme, the Window menu and About.</summary>
-    public ShellActions ShellActions => shellActions ??= new(this);
+    public ShellActions ShellActions => shellActions ??= new(this, this, this);
 
     private SoundPlayback? soundPlayback;
 
     /// <summary>The sound preview's transport: play, stop, the playhead and the loop.</summary>
-    public SoundPlayback SoundPlayback => soundPlayback ??= new(this);
+    public SoundPlayback SoundPlayback => soundPlayback ??= new(this, this, this);
 
     private TypeCreatorActions? typeCreatorActions;
 
     /// <summary>The type and creator database: its entry for the selection, and forgetting it.</summary>
-    public TypeCreatorActions TypeCreatorActions => typeCreatorActions ??= new(this);
+    public TypeCreatorActions TypeCreatorActions => typeCreatorActions ??= new(this, this, this, this);
 
     private EmptyState? emptyState;
 
     /// <summary>The empty state shown while nothing is open, with the files opened last.</summary>
-    public EmptyState EmptyState => emptyState ??= new(this);
+    public EmptyState EmptyState => emptyState ??= new(this, this);
 
     private VolumeActions? volumeActions;
 
     /// <summary>New file, import, new folder and delete in a volume.</summary>
-    public VolumeActions VolumeActions => volumeActions ??= new(this);
+    public VolumeActions VolumeActions => volumeActions ??= new(this, this, this);
 
     private HelpPreview? helpPreview;
 
     /// <summary>The help page's Rendered | Source switch and its links.</summary>
-    public HelpPreview HelpPreview => helpPreview ??= new(this);
+    public HelpPreview HelpPreview => helpPreview ??= new(this, this);
 
     private ImportActions? importActions;
 
     /// <summary>Resource ▸ Import: an image or WAV file made into a resource.</summary>
-    public ImportActions ImportActions => importActions ??= new(this);
+    public ImportActions ImportActions => importActions ??= new(this, this, this);
 
     private HexFind? hexFind;
 
     /// <summary>Find in the Hex tab.</summary>
-    public HexFind HexFind => hexFind ??= new(this);
+    public HexFind HexFind => hexFind ??= new(this, this, this);
 
     private StatusLine? statusLine;
 
     /// <summary>The status bar: the selected input's summary, the work in progress and the status text.</summary>
-    public StatusLine StatusLine => statusLine ??= new(this);
+    public StatusLine StatusLine => statusLine ??= new(this, this);
 
     private Drafts? drafts;
 
     /// <summary>Unapplied edits: asked about before the selection moves, an undo or redo, or a close.</summary>
-    public Drafts Drafts => drafts ??= new(this);
+    public Drafts Drafts => drafts ??= new(this, this, this);
 
     private DragOut? dragOut;
 
     /// <summary>Drag and drop out of the tree, through a temporary folder.</summary>
-    public DragOut DragOut => dragOut ??= new(this);
+    public DragOut DragOut => dragOut ??= new(this, this);
 
     private AliasActions? aliasActions;
 
@@ -172,7 +172,7 @@ public sealed partial class MainViewModel : ObservableObject
     private SoundHeaderActions? soundHeaderActions;
 
     /// <summary>A sound resource's Save as WAV and Replace from WAV.</summary>
-    public SoundHeaderActions SoundHeaderActions => soundHeaderActions ??= new(this);
+    public SoundHeaderActions SoundHeaderActions => soundHeaderActions ??= new(this, this, this);
 
     private ImageGrid? imageGrid;
 
@@ -182,15 +182,12 @@ public sealed partial class MainViewModel : ObservableObject
     private PropertyLinks? propertyLinks;
 
     /// <summary>The Properties tab's links and copy actions.</summary>
-    public PropertyLinks PropertyLinks => propertyLinks ??= new(this);
-
-    // For the window's parts: raises PropertyChanged for one of this view model's properties.
-    internal void RaisePropertyChanged(string name) => OnPropertyChanged(name);
+    public PropertyLinks PropertyLinks => propertyLinks ??= new(this, this, this);
 
     private DetailsActions? detailsActions;
 
     /// <summary>The Details tab's actions: Copy all, the File card's In link, the chain card's link to problems.</summary>
-    public DetailsActions DetailsActions => detailsActions ??= new(this);
+    public DetailsActions DetailsActions => detailsActions ??= new(this, this, this, this);
 
     internal readonly ISettingsStore settings;
 
@@ -706,4 +703,29 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     private static bool CanShowItem(DiagnosticEntry? entry) => entry?.Node is not null;
+
+    // ---- The roles' members that stay internal here (AppRoles.cs) ----
+
+    ISettingsStore IAppServices.Settings => settings;
+
+    void IAppServices.Report(DiagnosticEntry entry) => Report(entry);
+
+    void IAppServices.SaveSettings() => SaveSettings();
+
+    Task IAppSelection.DraftTask
+    {
+        get => DraftTask;
+        set => DraftTask = value;
+    }
+
+    void IAppSelection.RemoveInput(InputNode input) => RemoveInput(input);
+
+    void IAppSelection.RaiseItemShown(NodeViewModel node) => RaiseItemShown(node);
+
+    void IAppSelection.NotifySelectedChanged() => OnPropertyChanged(nameof(Selected));
+
+    IReadOnlyList<ImageItem> IAppView.ItemsAt(PreviewViewModel preview, int zoom) => ItemsAt(preview, zoom);
+
+    void IAppView.NotifyHasHex() => OnPropertyChanged(nameof(HasHex));
+
 }

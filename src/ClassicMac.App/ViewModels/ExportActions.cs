@@ -19,7 +19,7 @@ namespace ClassicMac.App.ViewModels;
 // Export from the viewer, with the same code as the CLI: a resource saved as a file; a file's resources (or one
 // type's) exported with a manifest, a document among them as HTML; everything under a node extracted, unpacked or
 // its documents converted. Folder exports go into a new subfolder named after the item, so nothing is overwritten.
-public sealed partial class ExportActions(MainViewModel main) : ObservableObject
+public sealed partial class ExportActions(IAppSelection appSelection, IAppServices appServices, IAppView appView, IAppParts appParts) : ObservableObject
 {
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveResourceAsCommand), nameof(ExportResourcesCommand), nameof(ExtractAllCommand), nameof(UnpackAppleDoubleCommand), nameof(UnpackBasiliskCommand), nameof(ConvertDocumentsCommand))]
@@ -27,29 +27,29 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
 
     partial void OnIsExportingChanged(bool value)
     {
-        main.VolumeActions.NewFileCommand.NotifyCanExecuteChanged();
-        main.VolumeActions.ImportFileCommand.NotifyCanExecuteChanged();
-        main.VolumeActions.NewFolderCommand.NotifyCanExecuteChanged();
-        main.VolumeActions.DeleteItemCommand.NotifyCanExecuteChanged();
+        appParts.VolumeActions.NewFileCommand.NotifyCanExecuteChanged();
+        appParts.VolumeActions.ImportFileCommand.NotifyCanExecuteChanged();
+        appParts.VolumeActions.NewFolderCommand.NotifyCanExecuteChanged();
+        appParts.VolumeActions.DeleteItemCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>The last export's task (tests wait for it).</summary>
     internal Task ExportTask { get; private set; } = Task.CompletedTask;
 
-    internal DecodeOptions CurrentDecodeOptions => DecodeOptions.Default with { ScreenDepth = main.ScreenDepth, QuickDraw = main.ReadOptions.ResourceManager };
+    internal DecodeOptions CurrentDecodeOptions => DecodeOptions.Default with { ScreenDepth = appView.ScreenDepth, QuickDraw = appServices.ReadOptions.ResourceManager };
 
-    private bool CanSaveResource() => !IsExporting && main.Selected is ResourceNode;
+    private bool CanSaveResource() => !IsExporting && appSelection.Selected is ResourceNode;
 
-    private bool CanExportResources() => !IsExporting && main.Selected is FileNode or ResourceTypeNode or InputNode { Root.Children.Count: 0 };
+    private bool CanExportResources() => !IsExporting && appSelection.Selected is FileNode or ResourceTypeNode or InputNode { Root.Children.Count: 0 };
 
-    private bool CanExtractAll() => !IsExporting && main.Selected is InputNode or ContainerFileNode or FolderNode;
+    private bool CanExtractAll() => !IsExporting && appSelection.Selected is InputNode or ContainerFileNode or FolderNode;
 
-    private bool CanUnpack() => !IsExporting && main.Selected is InputNode or ContainerFileNode or FolderNode or FileNode;
+    private bool CanUnpack() => !IsExporting && appSelection.Selected is InputNode or ContainerFileNode or FolderNode or FileNode;
 
     [RelayCommand(CanExecute = nameof(CanSaveResource))]
     private Task SaveResourceAs() => Run(async () =>
     {
-        if (main.Selected is not ResourceNode node || main.FilePicker is null)
+        if (appSelection.Selected is not ResourceNode node || appServices.FilePicker is null)
         {
             return;
         }
@@ -58,7 +58,7 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
         var (outputs, raw) = await Task.Run(() => Decode(node, diagnostics));
         var extensions = outputs.Select(o => o.Extension).Append(".bin").ToList();
         var stem = HostNames.ToHostName(Stem(node.Resource), 200);
-        var path = await main.FilePicker.PickSaveFileAsync($"Save {node.Resource}", stem + extensions[0], extensions);
+        var path = await appServices.FilePicker.PickSaveFileAsync($"Save {node.Resource}", stem + extensions[0], extensions);
         if (path is null)
         {
             return;
@@ -68,16 +68,16 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
         await File.WriteAllBytesAsync(path, (chosen?.Content ?? raw).ToArray());
         foreach (var d in diagnostics)
         {
-            main.Report(new DiagnosticEntry(d, node.Source, node));
+            appServices.Report(new DiagnosticEntry(d, node.Source, node));
         }
 
-        main.Status = $"Saved {node.Resource} to {path}.";
+        appServices.Status = $"Saved {node.Resource} to {path}.";
     });
 
     [RelayCommand(CanExecute = nameof(CanExportResources))]
     private Task ExportResources() => Run(async () =>
     {
-        var node = main.Selected;
+        var node = appSelection.Selected;
         var (fileNode, file, types) = node switch
         {
             ResourceTypeNode t => (t.Parent!, FileOf(t.Parent!), (IReadOnlySet<FourCC>?)new HashSet<FourCC> { t.Type }),
@@ -92,12 +92,12 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
 
         var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(file.Name) + " resources");
         var source = new ExportSource(file.Name, [], file.FinderInfo.Type, file.FinderInfo.Creator, (ushort)file.FinderInfo.Flags);
-        var progress = main.StatusLine.BeginProgress($"Exporting {file.Name.ToMacRoman()}…", fork.Resources.Count(r => types is null || types.Contains(r.Type)));
+        var progress = appParts.StatusLine.BeginProgress($"Exporting {file.Name.ToMacRoman()}…", fork.Resources.Count(r => types is null || types.Contains(r.Type)));
         ExportResult result;
         try
         {
             result = await Task.Run(() => ResourceExporter.Export(fork, target, source, ExportOptionsFor(types),
-                () => file.DataFork.ToArray(main.ReadOptions.MaxResourceSize), progress));
+                () => file.DataFork.ToArray(appServices.ReadOptions.MaxResourceSize), progress));
         }
         finally
         {
@@ -106,30 +106,30 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
 
         foreach (var d in result.Diagnostics.Skip(fork.Diagnostics.Count))
         {
-            main.Report(new DiagnosticEntry(d, fileNode.Source, fileNode));
+            appServices.Report(new DiagnosticEntry(d, fileNode.Source, fileNode));
         }
 
-        main.Status = $"{result.Manifest.Resources.Count} resources to {target}.";
+        appServices.Status = $"{result.Manifest.Resources.Count} resources to {target}.";
     });
 
     [RelayCommand(CanExecute = nameof(CanExtractAll))]
     private Task ExtractAll() => Run(async () =>
     {
-        if (main.Selected is not { } node || await PickFolder("Extract all resources to") is not { } parent)
+        if (appSelection.Selected is not { } node || await PickFolder("Extract all resources to") is not { } parent)
         {
             return;
         }
 
         var root = await Whole(node);
         var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " resources");
-        var progress = main.StatusLine.BeginProgress($"Extracting {NameOf(node)}…", root.Leaves().Count());
+        var progress = appParts.StatusLine.BeginProgress($"Extracting {NameOf(node)}…", root.Leaves().Count());
         var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
         var result = await Task.Run(() =>
         {
             var forks = new List<ForkToExtract>();
             foreach (var leaf in root.Leaves())
             {
-                var found = MacFileResources.Read(leaf.File, main.ReadOptions);
+                var found = MacFileResources.Read(leaf.File, appServices.ReadOptions);
                 if (found.Fork is { Resources.Count: > 0 } fork)
                 {
                     forks.Add(new ForkToExtract(leaf, [leaf.Format], fork));
@@ -139,12 +139,12 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
         });
         foreach (var (source, d) in diagnostics)
         {
-            main.Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
+            appServices.Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
         }
 
         foreach (var failure in result.Failed)
         {
-            main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
+            appServices.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
         }
 
         progress.Finish($"{result.Resources} resources from {result.Files} files to {target}.");
@@ -153,7 +153,7 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
     [RelayCommand(CanExecute = nameof(CanUnpack))]
     private Task ConvertDocuments() => Run(async () =>
     {
-        if (main.Selected is not { } node || await PickFolder("Convert documents to") is not { } parent)
+        if (appSelection.Selected is not { } node || await PickFolder("Convert documents to") is not { } parent)
         {
             return;
         }
@@ -161,13 +161,13 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
         var root = await Whole(node);
         var name = HostNames.ToHostName(MacString.FromMacRoman(NameOf(node)));
         var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
-        var progress = main.StatusLine.BeginProgress($"Converting {NameOf(node)}…", root.Leaves().Count());
+        var progress = appParts.StatusLine.BeginProgress($"Converting {NameOf(node)}…", root.Leaves().Count());
         var (target, result) = await Task.Run(() =>
         {
             var forks = new List<ForkToExtract>();
             foreach (var leaf in root.Leaves())
             {
-                var found = MacFileResources.Read(leaf.File, main.ReadOptions);
+                var found = MacFileResources.Read(leaf.File, appServices.ReadOptions);
                 if (found.Fork is { Resources.Count: > 0 } fork)
                 {
                     forks.Add(new ForkToExtract(leaf, [leaf.Format], fork));
@@ -180,7 +180,7 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
             }
             var target = ExportFolders.CreateNew(parent, name + " documents");
             var result = DocumentConverter.Convert(root, forks, target, ResourceDecoders.CreateDocumentConverters(CurrentDecodeOptions),
-                main.ReadOptions, overwrite: false, diagnostics, progress);
+                appServices.ReadOptions, overwrite: false, diagnostics, progress);
             // No documents: the new folder, still empty, is not left behind.
             if (result.Documents.Count == 0 && result.Failed.Count == 0)
             {
@@ -191,16 +191,16 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
         });
         foreach (var (source, d) in diagnostics)
         {
-            main.Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
+            appServices.Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
         }
 
         foreach (var failure in result.Failed)
         {
-            main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
+            appServices.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
         }
 
         progress.Finish(null);
-        main.Status = result.Documents.Count switch
+        appServices.Status = result.Documents.Count switch
         {
             0 => $"No documents in {NameOf(node)}.",
             1 => $"1 document to {target}.",
@@ -216,24 +216,24 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
 
     private Task Unpack(HostLayout layout) => Run(async () =>
     {
-        if (main.Selected is not { } node || await PickFolder("Unpack to") is not { } parent)
+        if (appSelection.Selected is not { } node || await PickFolder("Unpack to") is not { } parent)
         {
             return;
         }
 
         var root = await Whole(node);
         var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " unpacked");
-        var progress = main.StatusLine.BeginProgress($"Unpacking {NameOf(node)}…", root.Leaves().Count());
+        var progress = appParts.StatusLine.BeginProgress($"Unpacking {NameOf(node)}…", root.Leaves().Count());
         var diagnostics = new List<Diagnostic>();
         var result = await Task.Run(() => Unpacker.Unpack(root, target, HostWriteOptions.Default with { Layout = layout }, diagnostics, progress));
         foreach (var d in diagnostics)
         {
-            main.Report(new DiagnosticEntry(d, node.Source, node));
+            appServices.Report(new DiagnosticEntry(d, node.Source, node));
         }
 
         foreach (var failure in result.Failed)
         {
-            main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
+            appServices.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
         }
 
         progress.Finish($"{result.Files} files ({result.Bytes:N0} bytes) to {target}.");
@@ -251,19 +251,19 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
             }
             catch (Exception e) when (ExceptionFilters.IsFileAccess(e) || e is InvalidDataException)
             {
-                main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", e.Message), main.Selected?.Source ?? "", main.Selected));
-                main.Status = $"Export failed: {e.Message}";
+                appServices.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", e.Message), appSelection.Selected?.Source ?? "", appSelection.Selected));
+                appServices.Status = $"Export failed: {e.Message}";
             }
             finally
             {
                 IsExporting = false;
-                main.StatusLine.ProgressText = null;         // ended, failed or not
+                appParts.StatusLine.ProgressText = null;         // ended, failed or not
             }
         }
         return ExportTask = Guarded();
     }
 
-    private async Task<string?> PickFolder(string title) => main.FilePicker is null ? null : await main.FilePicker.PickFolderAsync(title);
+    private async Task<string?> PickFolder(string title) => appServices.FilePicker is null ? null : await appServices.FilePicker.PickFolderAsync(title);
 
     private ExportOptions ExportOptionsFor(IReadOnlySet<FourCC>? types) =>
         ExportOptions.Default with
@@ -271,15 +271,15 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
             Decoders = ResourceDecoders.Create(CurrentDecodeOptions),
             Documents = ResourceDecoders.CreateDocumentConverters(CurrentDecodeOptions),
             Types = types,
-            ReadOptions = main.ReadOptions,
+            ReadOptions = appServices.ReadOptions,
         };
 
     // The decoded files for a resource, and its data as applications see it.
     internal (IReadOnlyList<DecodedFile> Outputs, ReadOnlyMemory<byte> Raw) Decode(ResourceNode node, List<Diagnostic> diagnostics)
     {
-        var raw = ResourceDecompression.Default.GetData(node.Resource, node.Fork, main.ReadOptions, diagnostics);
+        var raw = ResourceDecompression.Default.GetData(node.Resource, node.Fork, appServices.ReadOptions, diagnostics);
         var decoder = ResourceDecoders.Create(CurrentDecodeOptions).FirstOrDefault(d => d.CanDecode(node.Resource.Type));
-        IReadOnlyList<DecodedFile> outputs = decoder?.Decode(new DecodeInput(node.Resource, raw, node.Fork, main.ReadOptions, diagnostics)) ?? [];
+        IReadOnlyList<DecodedFile> outputs = decoder?.Decode(new DecodeInput(node.Resource, raw, node.Fork, appServices.ReadOptions, diagnostics)) ?? [];
         // One file per kind, named by its last extension: the first of several numbered images (SICN, PAT#: ".1.png"
         // is offered as ".png"), and a sidecar JSON only when it is the only output.
         var offered = outputs
@@ -317,11 +317,11 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
     {
         var part = Subtree(node);
         var diagnostics = new List<Diagnostic>();
-        var options = main.ContainerOptions;
+        var options = appServices.ContainerOptions;
         var whole = await Task.Run(() => ContainerUnwrapper.Default.Expand(part, new ContainerContext(options, diagnostics)));
         foreach (var d in diagnostics)
         {
-            main.Report(new DiagnosticEntry(d, Tree.SourceOf(node, d), node));
+            appServices.Report(new DiagnosticEntry(d, Tree.SourceOf(node, d), node));
         }
 
         return whole;

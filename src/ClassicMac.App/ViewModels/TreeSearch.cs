@@ -11,7 +11,7 @@ namespace ClassicMac.App.ViewModels;
 // The tree's filter (Ctrl+F) and type-ahead: both match a row's shown name, ignoring case. Files in a "No name"
 // group, the "Loading…" placeholders and rows the filter hides are never matches (the group row itself matches
 // "no name"); the type-ahead looks only at loaded rows, the filter also reads the containers not yet read.
-public sealed partial class TreeSearch(MainViewModel main) : ObservableObject
+public sealed partial class TreeSearch(IAppSelection appSelection) : ObservableObject
 {
     private int filterVersion;
     private List<NodeViewModel> matches = [];
@@ -103,7 +103,7 @@ public sealed partial class TreeSearch(MainViewModel main) : ObservableObject
         {
             return;
         }
-        var at = matches.IndexOf(main.Selected!);
+        var at = matches.IndexOf(appSelection.Selected!);
         var next = at < 0 ? 0 : (at + by + matches.Count) % matches.Count;
         GoTo(next);
     }
@@ -128,7 +128,7 @@ public sealed partial class TreeSearch(MainViewModel main) : ObservableObject
             MatchNumber = 0;
             return;
         }
-        var start = fromSelection && main.Selected is { } selected ? rows.IndexOf(selected) : -1;
+        var start = fromSelection && appSelection.Selected is { } selected ? rows.IndexOf(selected) : -1;
         var first = start < 0 ? 0 : matches.FindIndex(m => rows.IndexOf(m) >= start);
         GoTo(first < 0 ? 0 : first);
     }
@@ -145,10 +145,10 @@ public sealed partial class TreeSearch(MainViewModel main) : ObservableObject
         {
             at.IsExpanded = true;
         }
-        main.Selected = node;
-        if (ReferenceEquals(main.Selected, node))
+        appSelection.Selected = node;
+        if (ReferenceEquals(appSelection.Selected, node))
         {
-            main.RaiseItemShown(node);
+            appSelection.RaiseItemShown(node);
         }
     }
 
@@ -161,7 +161,7 @@ public sealed partial class TreeSearch(MainViewModel main) : ObservableObject
     internal IEnumerable<NodeViewModel> AllRows()
     {
         IEnumerable<NodeViewModel> Below(NodeViewModel node) => node.Children.SelectMany(c => Below(c).Prepend(c));
-        return main.Roots.SelectMany(r => Below(r).Prepend(r));
+        return appSelection.Roots.SelectMany(r => Below(r).Prepend(r));
     }
 
     private static int IndexIn(string name, string text) =>
@@ -171,7 +171,7 @@ public sealed partial class TreeSearch(MainViewModel main) : ObservableObject
     internal void ReapplySearch()
     {
         var text = FilterText.Trim();
-        foreach (var root in main.Roots)
+        foreach (var root in appSelection.Roots)
         {
             FilterRows(root, text, aboveMatches: false);
         }

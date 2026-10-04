@@ -228,32 +228,32 @@ public sealed record InspectorHeader(NodeViewModel Node, string Name, string Kin
 
 // The inspector's header and the editing of forms in place (the Edit tab is gone: a form opens from the header's
 // Edit button, in the Preview tab, until Apply or Cancel).
-public sealed partial class InspectorActions(MainViewModel main) : ObservableObject
+public sealed partial class InspectorActions(IAppSelection appSelection, IAppParts appParts) : ObservableObject
 {
     /// <summary>The selection's header; null with nothing selected.</summary>
     public InspectorHeader? Header
     {
         get
         {
-            var header = InspectorHeader.For(main.Selected, main.FormEditing.IsEditingForm ? main.Forms.Form?.DraftLength : null);
-            if (header is not null && main.AliasActions.SelectedAlias is { } alias && ReferenceEquals(alias.Alias, main.Selected))
+            var header = InspectorHeader.For(appSelection.Selected, appParts.FormEditing.IsEditingForm ? appParts.Forms.Form?.DraftLength : null);
+            if (header is not null && appParts.AliasActions.SelectedAlias is { } alias && ReferenceEquals(alias.Alias, appSelection.Selected))
             {
                 header = header with { Kind = InspectorHeader.AliasKind(alias), Original = alias.Path };
             }
 
             // A resource shown through a template says which (boards/template-form.md).
-            return header is not null && main.Forms.Form is TemplateForm { ShownThrough: { } through }
+            return header is not null && appParts.Forms.Form is TemplateForm { ShownThrough: { } through }
                 ? header with { Facts = [.. header.Facts, new InspectorFact("Shown through", through, false)] }
                 : header;
         }
     }
 
     /// <summary>What the header's Export… does for the selection: save a resource, export a file's or type's resources, or extract all.</summary>
-    public IRelayCommand HeaderExportCommand => main.Selected switch
+    public IRelayCommand HeaderExportCommand => appSelection.Selected switch
     {
-        ResourceNode => main.ExportActions.SaveResourceAsCommand,
-        FileNode or ResourceTypeNode or InputNode { Root.Children.Count: 0 } => main.ExportActions.ExportResourcesCommand,
-        _ => main.ExportActions.ExtractAllCommand,
+        ResourceNode => appParts.ExportActions.SaveResourceAsCommand,
+        FileNode or ResourceTypeNode or InputNode { Root.Children.Count: 0 } => appParts.ExportActions.ExportResourcesCommand,
+        _ => appParts.ExportActions.ExtractAllCommand,
     };
 
     /// <summary>The selection's large icon for the header's tile (PNG), once loaded; null while loading or when it has none.</summary>
@@ -272,7 +272,7 @@ public sealed partial class InspectorActions(MainViewModel main) : ObservableObj
         }
 
         var png = await Task.Run(() => NodeImages.LargeIcon(node));
-        if (ReferenceEquals(main.Selected, node))
+        if (ReferenceEquals(appSelection.Selected, node))
         {
             HeaderIconPng = png;
         }
@@ -284,13 +284,13 @@ public sealed partial class InspectorActions(MainViewModel main) : ObservableObj
     // The header, its Export… and editing follow the selection.
     internal void OnSelectionChangedForInspector()
     {
-        main.FormEditing.IsEditingForm = false;
-        main.FormEditing.LastApplied = null;
+        appParts.FormEditing.IsEditingForm = false;
+        appParts.FormEditing.LastApplied = null;
         HeaderIconPng = null;
-        HeaderIconTask = LoadHeaderIconAsync(main.Selected);
+        HeaderIconTask = LoadHeaderIconAsync(appSelection.Selected);
         OnPropertyChanged(nameof(Header));
         OnPropertyChanged(nameof(HeaderExportCommand));
-        main.SoundHeaderActions.OnSelectionChangedForSoundHeader();
-        main.FormEditing.EditFormCommand.NotifyCanExecuteChanged();
+        appParts.SoundHeaderActions.OnSelectionChangedForSoundHeader();
+        appParts.FormEditing.EditFormCommand.NotifyCanExecuteChanged();
     }
 }

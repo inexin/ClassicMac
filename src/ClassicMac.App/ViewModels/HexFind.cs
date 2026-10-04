@@ -111,7 +111,7 @@ public static class HexSearch
 
 // Find in the Hex tab: the match is selected (read only) or put under the cursor (editing), highlighted, and its line
 // scrolled into view.
-public sealed partial class HexFind(MainViewModel main) : ObservableObject
+public sealed partial class HexFind(IAppServices appServices, IAppView appView, IAppParts appParts) : ObservableObject
 {
     /// <summary>The Find box's text.</summary>
     [ObservableProperty]
@@ -161,12 +161,12 @@ public sealed partial class HexFind(MainViewModel main) : ObservableObject
 
         byte[] data;
         long position;
-        if (main.EditActions.HexEdit is { } editor)
+        if (appParts.EditActions.HexEdit is { } editor)
         {
             data = editor.ToArray();
             position = editor.Cursor;
         }
-        else if (main.HexSource is { } source && source.Data.Length <= main.ReadOptions.MaxResourceSize)
+        else if (appView.HexSource is { } source && source.Data.Length <= appServices.ReadOptions.MaxResourceSize)
         {
             data = source.Data.ToArray();
             position = hexSelectedOffset;
@@ -185,15 +185,15 @@ public sealed partial class HexFind(MainViewModel main) : ObservableObject
             return;
         }
 
-        if (main.EditActions.HexEdit is { } editing)
+        if (appParts.EditActions.HexEdit is { } editing)
         {
             editing.MoveTo(found);
             editing.Lines.ShowMatch(found, pattern.Length);
         }
         else
         {
-            main.EditActions.SelectHexByte(found);
-            main.HexLines?.ShowMatch(found, pattern.Length);
+            appParts.EditActions.SelectHexByte(found);
+            appView.HexLines?.ShowMatch(found, pattern.Length);
         }
 
         FindStatus = string.Create(CultureInfo.InvariantCulture,

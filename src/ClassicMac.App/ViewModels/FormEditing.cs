@@ -22,7 +22,7 @@ namespace ClassicMac.App.ViewModels;
 //  - SelectRow(row): a double-click on a read-only row edits with that row selected; the view passes the row's
 //    DataContext as EditFormCommand's parameter (FormHostView marks rows with the "form-row" class).
 //  - A live preview of its own, if any, follows its Edited event (MenuForm.Preview).
-public sealed partial class FormEditing(MainViewModel main) : ObservableObject
+public sealed partial class FormEditing(IAppSelection appSelection, IAppView appView, IAppParts appParts) : ObservableObject
 {
     /// <summary>Whether the selection's form is open for editing (in the Preview tab).</summary>
     [ObservableProperty]
@@ -37,7 +37,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
     private string? lastApplied;
 
     /// <summary>Whether the Preview tab shows the host (the form) rather than the resource's plain preview.</summary>
-    public bool ShowsForm => main.Forms.Form is { } form && (IsEditingForm || form.HasReadOnlyView);
+    public bool ShowsForm => appParts.Forms.Form is { } form && (IsEditingForm || form.HasReadOnlyView);
 
     /// <summary>The preview panel's title: "Preview", or "Live preview · unapplied changes" while editing.</summary>
     public string FormPreviewTitle => IsEditingForm ? "Live preview · unapplied changes" : "Preview";
@@ -46,9 +46,9 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
     public string FormReadOnlyNote => "Read only. Press Edit or double-click a row to change it.";
 
     /// <summary>The editing footer's hint: the form's own.</summary>
-    public string FormHint => main.Forms.Form?.EditHint ?? "";
+    public string FormHint => appParts.Forms.Form?.EditHint ?? "";
 
-    private bool CanEditForm(object? row) => main.Forms.Form is not null && main.Selected is ResourceNode && !IsEditingForm;
+    private bool CanEditForm(object? row) => appParts.Forms.Form is not null && appSelection.Selected is ResourceNode && !IsEditingForm;
 
     /// <summary>Opens the selection's form for editing in the Preview tab; with a row (a double-click), that row selected.</summary>
     [RelayCommand(CanExecute = nameof(CanEditForm))]
@@ -59,28 +59,28 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
             return;
         }
 
-        main.Forms.Form!.SelectRow(row);
+        appParts.Forms.Form!.SelectRow(row);
         IsEditingForm = true;
         LastApplied = null;
-        main.SelectedTab = 1;
+        appView.SelectedTab = 1;
     }
 
     /// <summary>Drops the form's unapplied values and ends editing.</summary>
     [RelayCommand(CanExecute = nameof(IsEditingForm))]
     private void CancelForm()
     {
-        main.Drafts.DiscardDraft();
+        appParts.Drafts.DiscardDraft();
         IsEditingForm = false;
     }
 
     partial void OnIsEditingFormChanged(bool value)
     {
-        if (main.Forms.Form is { } form)
+        if (appParts.Forms.Form is { } form)
         {
             form.IsEditing = value;
         }
 
-        main.InspectorActions.NotifyHeader();
+        appParts.InspectorActions.NotifyHeader();
     }
 
     private ResourceForm? sizedForm;
@@ -90,7 +90,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
     {
         if (IsEditingForm)
         {
-            main.InspectorActions.NotifyHeader();
+            appParts.InspectorActions.NotifyHeader();
         }
     }
 
@@ -115,7 +115,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
 
         OnPropertyChanged(nameof(ShowsForm));
         OnPropertyChanged(nameof(FormHint));
-        main.InspectorActions.NotifyHeader();
+        appParts.InspectorActions.NotifyHeader();
     }
 
     /// <summary>A dialog's or alert's item list link: selects that 'DITL' among its file's resources.</summary>
@@ -128,7 +128,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
             WindowForm { IsDialog: true } dialog => (short)dialog.ItemsId,
             _ => (short?)null,
         };
-        if (id is null || main.Selected is not ResourceNode { Parent.Parent: { } file })
+        if (id is null || appSelection.Selected is not ResourceNode { Parent.Parent: { } file })
         {
             return;
         }
@@ -137,7 +137,7 @@ public sealed partial class FormEditing(MainViewModel main) : ObservableObject
             .Children.OfType<ResourceNode>().FirstOrDefault(r => r.Resource.Id == id);
         if (target is not null)
         {
-            main.Selected = target;
+            appSelection.Selected = target;
         }
     }
 }

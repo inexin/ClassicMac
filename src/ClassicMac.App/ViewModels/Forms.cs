@@ -14,7 +14,7 @@ using CommunityToolkit.Mvvm.Input;
 namespace ClassicMac.App.ViewModels;
 
 // The selection's form: the typed or template editor, Apply, and the template switch.
-public sealed partial class Forms(MainViewModel main) : ObservableObject
+public sealed partial class Forms(IAppSelection appSelection, IAppServices appServices, IAppParts appParts) : ObservableObject
 {
     /// <summary>The typed editor for the selection, or null.</summary>
     [ObservableProperty]
@@ -25,10 +25,10 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
 
     partial void OnFormChanged(ResourceForm? value)
     {
-        main.FormEditing.EditFormCommand.NotifyCanExecuteChanged();
-        main.EditActions.SaveCommand.NotifyCanExecuteChanged();
+        appParts.FormEditing.EditFormCommand.NotifyCanExecuteChanged();
+        appParts.EditActions.SaveCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(HasForm));
-        main.FormEditing.HostForm(value);
+        appParts.FormEditing.HostForm(value);
     }
 
     internal void UpdateForm(NodeViewModel? node)
@@ -36,8 +36,8 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
         ResourceForm? typed = null, template = null;
         if (node is ResourceNode r && EditActions.FileOwner(r) is { } owner)
         {
-            typed = ResourceForm.For(r.Resource, r.Fork, main.ReadOptions);
-            template = main.TemplateFinder.TemplateFormFor(r, owner);
+            typed = ResourceForm.For(r.Resource, r.Fork, appServices.ReadOptions);
+            template = appParts.TemplateFinder.TemplateFormFor(r, owner);
         }
         HasTemplateChoice = typed is not null && template is not null;
         var form = UseTemplate ? template ?? typed : typed ?? template;
@@ -45,11 +45,11 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
         // A draft can be saved (Save applies it first): Save's state follows the form's values.
         if (form is not null)
         {
-            form.Edited += (_, _) => main.EditActions.SaveCommand.NotifyCanExecuteChanged();
+            form.Edited += (_, _) => appParts.EditActions.SaveCommand.NotifyCanExecuteChanged();
         }
 
         Form = form;
-        main.FormLivePreview.WatchForm(Form, node as ResourceNode);
+        appParts.FormLivePreview.WatchForm(Form, node as ResourceNode);
     }
 
     private bool useTemplate;
@@ -68,29 +68,29 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
                 return;
             }
 
-            if (main.Drafts.askingDraft || main.Drafts.HasDraft)
+            if (appParts.Drafts.askingDraft || appParts.Drafts.HasDraft)
             {
-                if (!main.Drafts.askingDraft)
+                if (!appParts.Drafts.askingDraft)
                 {
-                    main.DraftTask = UseTemplateAfterDraftAsync(value);
+                    appSelection.DraftTask = UseTemplateAfterDraftAsync(value);
                 }
                 // The check box (bound two-way) already shows the new value: told again, it shows the kept one.
                 if (useTemplate != value)
                 {
                     OnPropertyChanged(nameof(UseTemplate));
-                    main.Drafts.Refuse(nameof(UseTemplate));
+                    appParts.Drafts.Refuse(nameof(UseTemplate));
                 }
 
                 return;
             }
             SetProperty(ref useTemplate, value);
-            UpdateForm(main.Selected);
+            UpdateForm(appSelection.Selected);
         }
     }
 
     private async Task UseTemplateAfterDraftAsync(bool value)
     {
-        if (await main.Drafts.ResolveDraftAsync())
+        if (await appParts.Drafts.ResolveDraftAsync())
         {
             UseTemplate = value;
         }
@@ -101,12 +101,12 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
     private bool hasTemplateChoice;
 
 
-    private bool CanApplyForm() => Form is not null && main.Selected is ResourceNode && main.FormLivePreview.FormError is null;
+    private bool CanApplyForm() => Form is not null && appSelection.Selected is ResourceNode && appParts.FormLivePreview.FormError is null;
 
     [RelayCommand(CanExecute = nameof(CanApplyForm))]
     internal void ApplyForm()
     {
-        if (Form is not { } form || main.Selected is not ResourceNode node || EditActions.FileOwner(node) is not { } owner)
+        if (Form is not { } form || appSelection.Selected is not ResourceNode node || EditActions.FileOwner(node) is not { } owner)
         {
             return;
         }
@@ -114,18 +114,18 @@ public sealed partial class Forms(MainViewModel main) : ObservableObject
         IResourceEdit edit;
         try
         {
-            edit = form.BuildEdit(main.EditActions.StateFor(owner).Session.Fork);
+            edit = form.BuildEdit(appParts.EditActions.StateFor(owner).Session.Fork);
         }
         catch (ArgumentException e)
         {
-            main.Status = e.Message;
+            appServices.Status = e.Message;
             return;
         }
         var resource = form.Resource;
         // Applied: no longer a draft, so the selection the edit moves to is not refused.
         form.MarkClean();
-        main.EditActions.Execute(owner, edit, () => resource);
-        main.FormEditing.IsEditingForm = false;
-        main.FormEditing.LastApplied = $"Applied · {main.EditActions.UndoTitle.Replace("_", "", StringComparison.Ordinal)} (Ctrl+Z)";
+        appParts.EditActions.Execute(owner, edit, () => resource);
+        appParts.FormEditing.IsEditingForm = false;
+        appParts.FormEditing.LastApplied = $"Applied · {appParts.EditActions.UndoTitle.Replace("_", "", StringComparison.Ordinal)} (Ctrl+Z)";
     }
 }
