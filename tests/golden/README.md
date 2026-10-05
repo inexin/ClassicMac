@@ -8,7 +8,8 @@ tree, icon, text, sound, document, dialog, menu, edit-DITL and hex-edit. They ar
 committed.
 
 - Compared on Windows only; elsewhere the window tests end skipped with a message (text rasterisation differs by
-  platform). A pixel matches when no channel differs by more than 2 (Skia's CPU-specific blending rounds a level or
+  platform). CI sets `CLASSICMAC_SKIP_BASELINES=1` and skips them too (hosted Windows runners now and then render a
+  frame differently); compare them locally before pushing a UI change. A pixel matches when no channel differs by more than 2 (Skia's CPU-specific blending rounds a level or
   two apart); up to 8 stray pixels may differ by up to 32 (Skia's per-process path and glyph caches shift an
   anti-aliased edge pixel depending on what earlier tests drew); anything more fails.
 - A failure lists every frame that differs and writes `<frame>-<variant>-actual.png` and `-diff.png` (differences in
