@@ -21,6 +21,7 @@
     <Compile Include="..\Shared\CorpusFolders.cs" Link="Shared\CorpusFolders.cs" />
     <Compile Include="..\Shared\Mutations.cs" Link="Shared\Mutations.cs" />
     <Compile Include="..\ClassicMac.Graphics.Tests\Fonts\FontBuilder.cs" Link="Builders\FontBuilder.cs" />
+    <Compile Include="..\ClassicMac.Graphics.Tests\Fonts\TrueTypeBuilder.cs" Link="Builders\TrueTypeBuilder.cs" />
     <Compile Include="..\ClassicMac.Code.Tests\PefBuilder.cs" Link="Builders\PefBuilder.cs" />
     <Compile Include="..\ClassicMac.Core.Tests\CompoundFileBuilder.cs" Link="Builders\CompoundFileBuilder.cs" />
     <Compile Include="..\ClassicMac.Code.Tests\CodeCorpus.cs" Link="Shared\CodeCorpus.cs" />

@@ -681,7 +681,7 @@ exporter, and `Unpacker.Extract` reports a file-system exception as a failed for
 ### 5.3 The extract command
 
 ```
-classicmac extract <input> [-o <dir>] [--raw] [--keep-raw] [-t <type>]… [--overwrite] [--screen-depth <n>] [--no-documents]
+classicmac extract <input> [-o <dir>] [--raw] [--keep-raw] [-t <type>]… [--overwrite] [--screen-depth <n>] [--no-documents] [--loadable-fonts]
 ```
 
 | Option | Maps to |
@@ -693,6 +693,7 @@ classicmac extract <input> [-o <dir>] [--raw] [--keep-raw] [-t <type>]… [--ove
 | `--overwrite` | `Overwrite` |
 | `--screen-depth <n>` | `DecodeOptions.ScreenDepth`; one of 1, 2, 4, 8, 16, 32 (default 32) |
 | `--no-documents` | `Documents` empty. By default the built-in converter runs (§3.14) |
+| `--loadable-fonts` | `DecodeOptions.LoadableFonts`: TrueType fonts written so modern systems load them ([outline-fonts.md §3.1](../resources/outline-fonts.md#31-making-a-font-loadable)) |
 | `--max-resource-size`, `--max-nesting-depth`, `--max-expanded-bytes`, `--verify`, `--strict`, `-q` | The options every command takes: limits (`ReadOptions`, `ContainerReadOptions`), exit-code strictness and quiet output |
 
 `MaxPathLength` is not exposed (200). The other decode options use their defaults; the QuickDraw model follows

@@ -169,4 +169,18 @@ public class ExtractTests : IDisposable
         Assert.Contains("do not describe a resource fork", error);
         Assert.Equal(ExitCodes.Unreadable, Run("extract", data, "-o", Path.Combine(folder, "out2")).Code);
     }
+    // --loadable-fonts (outline-fonts.md §3): a TrueType font is written so modern systems load it.
+    [Fact]
+    public void Loadable_fonts_adds_what_modern_systems_need()
+    {
+        var sfnt = ClassicMac.Graphics.Tests.Fonts.TrueTypeBuilder.Mac().Build();
+        var input = Path.Combine(folder, "Font.rsrc");
+        File.WriteAllBytes(input, Fork(("sfnt", 128, null, sfnt)));
+
+        Assert.Equal(ExitCodes.Success, Run("extract", input, "-o", Path.Combine(folder, "plain")).Code);
+        Assert.Equal(ExitCodes.Success, Run("extract", input, "-o", Path.Combine(folder, "loadable"), "--loadable-fonts").Code);
+
+        Assert.Equal(sfnt, File.ReadAllBytes(Path.Combine(folder, "plain", "sfnt", "128.ttf")));
+        Assert.Equal(ClassicMac.Graphics.Fonts.LoadableFont.Make(sfnt), File.ReadAllBytes(Path.Combine(folder, "loadable", "sfnt", "128.ttf")));
+    }
 }

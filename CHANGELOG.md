@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Loadable fonts (resources/outline-fonts.md §3.1): `LoadableFont.Make` and `DecodeOptions.LoadableFonts` (the CLI's
+  `extract --loadable-fonts`) write a Mac TrueType font so Windows and other modern systems load it: version $00010000,
+  a Windows Unicode `cmap`, the Windows names it lacks (the unique name GDI needs among them), `OS/2` and `post` when
+  missing, checksums made again. GDI loads all 60 TrueType fonts of Mac OS 9's Fonts folder made so; it refuses 30 as
+  they are.
+
 - Names written in other encodings (codecs/text-encodings.md §5): an HFS volume's names are written in
   `InputEditSession.NameEncoding` (the CLI's `--encoding`, the app's View ▸ Text Encoding): paths name items by their
   characters, new names are stored as that encoding's bytes, a name it cannot hold is refused. Fixed: the app's export

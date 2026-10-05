@@ -331,16 +331,20 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
             }
         });
         var overwrite = new Option<bool>("--overwrite") { Description = "Write into output folders that already hold files" };
+        var loadableFonts = new Option<bool>("--loadable-fonts")
+        {
+            Description = "Write TrueType fonts so Windows and other modern systems load them (a Windows cmap, names, OS/2 and post added where missing)",
+        };
         var command = new Command("extract", "Extract resources into a folder with a manifest")
         {
-            input, outputDir, raw, keepRaw, types, overwrite, screenDepth, noDocuments,
+            input, outputDir, raw, keepRaw, types, overwrite, screenDepth, noDocuments, loadableFonts,
         };
         command.SetAction(result =>
         {
             var chosen = result.GetValue(types) is { Length: > 0 } list
                 ? list.Select(FourCC.FromString).ToHashSet()                  // the validator above refused any other
                 : null;
-            var decodeOptions = DecodeOptionsFrom(result, screenDepth);
+            var decodeOptions = DecodeOptionsFrom(result, screenDepth) with { LoadableFonts = result.GetValue(loadableFonts) };
             var decode = !result.GetValue(raw);
             return new ExtractCommand(output, error).Run(
                 result.GetRequiredValue(input), result.GetValue(outputDir),

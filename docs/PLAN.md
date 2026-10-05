@@ -138,7 +138,7 @@ In rough priority; each item names what blocks it, if anything.
    cache between runs. Crashes are kept as artifacts and replayed with `Fuzz replay`; those found so far are tests.
    Still to do: targets for the other writers (HFS edits, StuffIt and archive writers, PICT recording). The seeded
    mutation tests (`tests/Shared/Mutations.cs`) stay in the suite; `CLASSICMAC_MUTANTS` runs them deeper.
-3. **Decoders, later**: a "make loadable" option for exported fonts, lossless WebP.
+3. **Decoders, later**: lossless WebP; the app's exports offering loadable fonts.
 4. **App**: packaging (macOS bundle icon, Linux icons and `.desktop` file).
 5. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
    encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types; Word 98 and fast-saved Word 6 documents; a

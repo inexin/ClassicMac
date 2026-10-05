@@ -51,6 +51,13 @@ public sealed record DecodeOptions
 
     /// <summary>Whose QuickDraw pictures are drawn as: Mac OS 9's (the default) or the 68k ROM's.</summary>
     public ResourceManagerModel QuickDraw { get; init; } = ResourceManagerModel.MacOS9;
+
+    /// <summary>
+    /// Whether a TrueType <c>'sfnt'</c> is exported made loadable by Windows and other modern loaders
+    /// (<see cref="ClassicMac.Graphics.Fonts.LoadableFont"/>: a Windows Unicode cmap, Windows names, OS/2 and post added
+    /// where missing), instead of as the data it is. Default false.
+    /// </summary>
+    public bool LoadableFonts { get; init; }
 }
 
 // The types a built-in decoder handles (for the golden tests' coverage check).

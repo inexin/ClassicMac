@@ -45,7 +45,7 @@ internal sealed class FontDecoder(DecodeOptions options, string name, params str
             {
                 "NFNT" or "FONT" => Bitmap(input),
                 "FOND" => Family(input),
-                "sfnt" => Outline(input),
+                "sfnt" => Outline(input, options),
                 _ => Colors(input),
             };
         }
@@ -387,9 +387,12 @@ internal sealed class FontDecoder(DecodeOptions options, string name, params str
         }), MacText.EncodingName(options.TextEncoding))];
     }
 
-    private static IReadOnlyList<DecodedFile> Outline(DecodeInput input)
+    private static IReadOnlyList<DecodedFile> Outline(DecodeInput input, DecodeOptions options)
     {
         var font = OutlineFont.Read(input.Data, input.Diagnostics);
+        // Made loadable when asked (outline-fonts.md §3): what was added is listed.
+        var added = new List<string>();
+        var data = options.LoadableFonts && font.IsTrueType ? LoadableFont.Make(input.Data, added) : input.Data;
         var json = MacText.Json(w =>
         {
             w.WriteStartObject();
@@ -408,10 +411,21 @@ internal sealed class FontDecoder(DecodeOptions options, string name, params str
                 w.WriteEndObject();
             }
             w.WriteEndArray();
+            if (options.LoadableFonts && font.IsTrueType)
+            {
+                w.WriteStartArray("loadable");
+                foreach (var item in added)
+                {
+                    w.WriteStringValue(item);
+                }
+
+                w.WriteEndArray();
+            }
+
             w.WriteEndObject();
         });
         // The data is the font file itself: TrueType as .ttf; anything else (a PostScript 'typ1' sfnt) as .sfnt.
-        return [new DecodedFile(font.IsTrueType ? ".ttf" : ".sfnt", input.Data), new DecodedFile(".json", json)];
+        return [new DecodedFile(font.IsTrueType ? ".ttf" : ".sfnt", data), new DecodedFile(".json", json)];
     }
 
     private static IReadOnlyList<DecodedFile> Colors(DecodeInput input)
