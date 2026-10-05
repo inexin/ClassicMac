@@ -129,7 +129,7 @@ In rough priority; each item names what blocks it, if anything.
    Digital Corpora journaled Mac OS X image checks out; HFS Plus repairs on Mac OS 9-made volumes (valences, header
    counts, the alternate header, a fragmented wrapped disk) pass it too. HFSX has been tried only on built volumes, and
    the in-place extents-tree edits and multi-partition writes await a live check.
-2. **Writing, still to do**: segmented NDIF images; new NDIF images from a disk.
+2. **Writing, still to do**: edits written back into a segmented NDIF image's parts.
 3. **Fuzzing**: `tools/Fuzz` runs libFuzzer through SharpFuzz nightly (`.github/workflows/fuzz.yml`, five minutes a
    target) on seven targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
    code, PEF, PICT on both QuickDraws, and First Aid. A reader fault the unwrapper or a decoder reports

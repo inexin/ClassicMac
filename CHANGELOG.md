@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- New NDIF (Disk Copy 6) images (disk-images/ndif.md §3.2, §3.3): `NdifWriter.Create` lays a disk out as Disk Copy
+  6.3.3 does (read/write, read-only, or compressed with ADC or KenCode in chunks of a chosen size; on HFS, free space
+  past the last used block left out), byte for byte the data fork and map Disk Copy writes for the same volume;
+  `NdifWriter.Split` cuts an image into the parts of a segmented image. The CLI's `ndif` command writes them as an
+  AppleDouble pair or a Basilisk II entry.
+- Fixed: a read-only or compressed NDIF image (Disk Copy's own included) was taken as a plain HFS volume when edited or
+  checked, because its data fork starts with the disk's raw boot blocks and MDB; its disk is now read from its chunks.
+
 - The app's hex editor types in the Mac OS Roman column too: a click on a character or Tab (Shift+Tab) moves typing
   there, where characters become their Mac OS Roman bytes (overwriting, inserting or appending as digits do; one Mac
   OS Roman lacks types nothing). The column that types shows the cursor, the other its shadow.

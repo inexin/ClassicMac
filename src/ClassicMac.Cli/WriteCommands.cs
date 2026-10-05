@@ -44,6 +44,7 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
         yield return LockCommand("unlock", "Unlock a file", false);
         yield return BlessCommand();
         yield return FormatCommand();
+        yield return new NdifCommand(output, error, cli).Build();
         yield return ResizeCommand();
         yield return RepairCommand();
         yield return DefragCommand();

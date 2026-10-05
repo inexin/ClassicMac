@@ -739,7 +739,10 @@ public sealed class InputEditSession
 
     // The disk is the data file itself, alone or with an AppleDouble header or Basilisk II companions beside it (its
     // type, creator and resource fork), which an edit leaves alone.
-    private static bool DataFileIsDisk(HostFile host) => host.Layout is HostLayout.Plain or HostLayout.AppleDouble or HostLayout.BasiliskII;
+    // Whether the host file's data is a disk as it lies. Not an NDIF image's: its data fork holds the chunks, which in a
+    // read-only or compressed image start with the disk's raw boot blocks and MDB but are not the disk.
+    private static bool DataFileIsDisk(HostFile host) =>
+        host.Layout is HostLayout.Plain or HostLayout.AppleDouble or HostLayout.BasiliskII && !NdifReader.Instance.CanRead(host.File);
 
     // The input's companions written beside destination: the pair written with no data in a temporary folder, its
     // files other than the data file moved into place.

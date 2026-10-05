@@ -9,8 +9,8 @@ or the partition-map reader to open next.
 | | |
 | --- | --- |
 | Identified by | Types `'dimg'`, `'rohd'`, `'hdro'` (creator `'ddsk'`), `'hdc '`, `'hdcm'`; `'APPL'`/`'oneb'` (self-mounting); `'dseg'`/`'ddsk'` for later parts ([raw-images.md §2.1](raw-images.md#21-how-disk-copy-chooses-a-format)). No signature in the data fork: a `'bcem'` 128 resource |
-| ClassicMac | Reads; `ClassicMac.Files.Hfs.NdifReader`. Rewrites an image around a changed disk: `NdifWriter` |
-| Verified against | Disk Copy 6.1.2, 6.3.3 and 6.5b13 images made in SheepShaver (Mac OS 9.0), each decoded back to its source sectors with the stored checksum matching<br>Hand-built version 2 images mounted by Disk Copy 6.1.2<br>Damaged and segmented images as Disk Copy 6.3.3 handled them |
+| ClassicMac | Reads; `ClassicMac.Files.Hfs.NdifReader`. Writes: `NdifWriter` rewrites an image around a changed disk, makes a new one of a disk and cuts one into the parts of a segmented image |
+| Verified against | Disk Copy 6.1.2, 6.3.3 and 6.5b13 images made in SheepShaver (Mac OS 9.0), each decoded back to its source sectors with the stored checksum matching<br>Hand-built version 2 images mounted by Disk Copy 6.1.2<br>Damaged and segmented images as Disk Copy 6.3.3 handled them<br>New Read-Only, ADC and segmented images byte for byte against Disk Copy 6.3.3's of the same volumes |
 | Sources | Disk Copy 6.1.2, 6.3.3 and 6.5b13 (disassembly: the `.HDI` block driver, its `'bcem'` validator and version converter, the `'hdi1'`/`'hdi2'` codec plug-ins); Aaru and ShrinkWrap 2.1 for behaviour only |
 
 Contents
@@ -247,6 +247,8 @@ gives −39 [Code: 6.3.3].
 
 ## 3. Writing
 
+### 3.1 Rewriting an image
+
 An image is made again around a changed disk of the same size, keeping what Disk Copy reads (§2.1) valid:
 
 1. The map keeps its version and header; only map versions 10 to 12 that are not segmented are rewritten.
@@ -271,8 +273,59 @@ An image is made again around a changed disk of the same size, keeping what Disk
    `'vers'` 1 text's "CRC: $…" or "CRC28: $…" gets the new value (same length).
 5. Every other resource, the name and the Finder info stay.
 
-[ClassicMac], following §1–§2. Writing a new image from a disk (choosing chunks and compressing) is not done. The edit
-session names the sectors it changed, so a chunk is found unchanged without the old disk being decoded.
+[ClassicMac], following §1–§2. The edit session names the sectors it changed, so a chunk is found unchanged without
+the old disk being decoded.
+
+### 3.2 A new image
+
+A disk becomes an image laid out as Disk Copy 6.3.3 lays it out ([§4.3](#43-what-disk-copy-writes)):
+
+1. **Read/Write** (`'dimg'`, version 10): the whole disk as one raw chunk; CRC 0.
+2. **Read-Only** (`'rohd'`, version 10) and **Read-Only Compressed** (`'rohd'`; ADC version 11, KenCode version 10), on a
+   plain HFS disk:
+   - sectors 0 to `drAlBlSt` − 1 (boot blocks, MDB, bitmap) as one raw chunk;
+   - the **used area**, from `drAlBlSt` to the end of the last allocation block the bitmap marks used: read-only, one
+     raw chunk; compressed, chunks of the chunk size (512 sectors by default) from `drAlBlSt`, the last one shorter,
+     each compressed with the image's codec as Disk Copy's encoder does ([adc.md §3](../codecs/adc.md#3-writing),
+     [kencode.md §3](../codecs/kencode.md#3-writing)) or stored raw when that does not shrink it. Free blocks inside
+     the used area keep their bytes;
+   - from there to the second-last sector, a zero chunk (none when the used area reaches it);
+   - the second-last sector (the alternate MDB) raw, and the last sector as a zero chunk.
+3. Stored bytes follow one another in entry order from data start 0; the end entry's offset is the data's end and its
+   length 0.
+4. `+$48` is the largest of each compressed chunk's sectors plus its decoder's overrun in whole sectors; 0 when nothing
+   is compressed. The CRC (§1.5) is of the disk as the image stores it (what lies past the used area as zeros).
+5. The map's name, and `'bcem'` 128's resource name, is the volume name (`drVN`).
+
+[Verified: the Read-Only and Read-Only Compressed (ADC) images of an 800 KB and a 5 MB volume made this way from their
+Read/Write images have the same data fork and the same `'bcem'` as Disk Copy 6.3.3's, byte for byte]. ClassicMac's
+own choices [ClassicMac]:
+
+- A disk that is not a plain HFS volume (no `BD` MDB, or one whose allocation area does not fit the disk) has no used
+  area to find: all of it is stored, read-only as one raw chunk, compressed in chunks from sector 0.
+- No `'STR '` −16396, which names Disk Copy as the writer (6.5b13 writes none either). `'vers'` 1 is version 1.0
+  final with "ClassicMac" as the short string and Disk Copy's text as the long one: "Mac™ OS HFS *n*K image", or
+  "*n*K disk image" for another disk, then "CRC: $*xxxxxxxx*" on its own line when there is a CRC, so §3.1 can renew it.
+- Type and creator are set (`'ddsk'`); the Finder flags are left 0.
+- The new image is read back, with its checksum verified, before it is returned.
+
+### 3.3 A segmented image
+
+An image is cut into parts as Disk Copy 6.3.3 cuts it ([§1.6](#16-segmented-images)):
+
+1. Its data fork is cut raw into parts of ceil(sectors / parts) sectors (sectors of the data fork, rounded up); the
+   last part takes the rest. 2 to 128 parts, none empty.
+2. Part 1 keeps the image's Finder info and its resources, the `'bcem'` made version 12 with `+$54` = 1 and its
+   resource name dropped. The other parts are typed `'dseg'` (the creator kept) and hold only `'bcm#'` 128 and a
+   `'vers'` 1 whose long string is "Part *n*/*M* of a disk image" (its numbers and short string taken from the
+   image's `'vers'` 1).
+3. Every part's `'bcm#'` 128 holds its number, the count, the image ID and the CRC28 of its own data fork (0 when the
+   image has no CRC).
+4. Parts are named "*name* *N*of*M*", *N* zero-padded to the width of *M*, the name cut so the whole fits 31 characters.
+
+[Verified: the four parts of Disk Copy 6.3.3's segmented 5 MB image, made again from its whole image, have the same
+names, types, data forks, `'bcem'` and `'bcm#'` numbers and CRCs]. The image ID is the date and 12 random bytes
+[ClassicMac]: Disk Copy's mixes the date, the tick count, a random number and a CRC-32, and readers only compare it.
 
 ## 4. Variants
 
@@ -335,9 +388,13 @@ The later readers are broken for version 2, so they are not the reference [Code]
 
 - On an HFS volume the compressed layouts keep sectors 0–3 as a raw chunk (unless 6.3.3's "Compress Volume Header" is
   on), then chunks up to the last used allocation block, a zero chunk, the alternate MDB (second-last sector) raw, and
-  the last sector as zeros. Free space is never stored, so deleted files do not survive.
+  the last sector as zeros. Free space past the last used block is never stored.
 - The chunk size is 32 sectors in Disk Copy 6.1.2 and 512 by default in 6.3.3 and 6.5b13; 6.3.3's hidden dialog
   allows others (20 and 64 were tried).
+- The compressed layouts' used area ends with the last allocation block in use, and every block before it is stored:
+  free blocks inside it keep their bytes (deleted files there survive), and only what lies past it is left out
+  [Verified: 5 MB volumes before and after deleting files, 6.3.3]. Read-Only lays out the same chunks, but stores the
+  used area as one raw chunk.
 - **KenCode is chosen in a hidden dialog.** Holding Control while clicking Save in a Read-Only Compressed save shows
   "Override Image Parameters": Smaller (KC) or Faster (ADC, the default), Match Len (67), and in 6.3.3 Chunk Size (512)
   and Compress Volume Header [Verified: 6.1.2, 6.3.3]. 6.5b13 has no such dialog and writes only ADC.
@@ -352,9 +409,12 @@ segmented image is NDIF version 12 cut into parts ([§1.6](#16-segmented-images)
 
 ## 5. ClassicMac
 
+- **New images**: `NdifWriter.Create` makes an image of a disk (§3.2) with `NdifCreateOptions` (`Format`:
+  `ReadWrite`, `ReadOnly`, `Adc` (the default) or `KenCode`; `ChunkSectors`, 512 by default), and `NdifWriter.Split`
+  cuts one into the parts of a segmented image (§3.3); the CLI's `ndif` writes them.
 - **Writing**: an image of a plain HFS disk, given as an AppleDouble pair, a Basilisk II entry, or in MacBinary,
   AppleSingle or BinHex, is writable: the edit session (`InputEditSession`) edits the decoded disk as a volume
-  ([hfs.md §3](../file-systems/hfs.md#3-writing)) and saves the image made again (§3) in the input's own layout, as a new
+  ([hfs.md §3](../file-systems/hfs.md#3-writing)) and saves the image made again (§3.1) in the input's own layout, as a new
   file or in place (each file written kept as `.orig` the first time). Its disk is not resized. The CLI's `check` runs
   the writer's checks on the disk.
 
@@ -435,7 +495,12 @@ a changed chunk compressed again in an ADC image and in a KenCode image, an imag
 changed ones raw, the CRC made again, an
 unchanged disk giving the same data and map, a changed chunk's zero runs stored as zero chunks, a read/write image
 staying raw with no CRC, and the refusals.
-`NdifSessionTests.cs` edits images given as an AppleDouble pair (saved as a new pair and in place) and in MacBinary.
+`NdifSessionTests.cs` edits images given as an AppleDouble pair (saved as a new pair and in place) and in MacBinary,
+and reads the disk of every kind of image, also one whose data fork starts with the disk's raw boot blocks and MDB.
+`NdifCreateTests.cs` covers §3.2 and §3.3: the read-only layout, free space past the used area read as zeros, ADC and
+KenCode chunks of a chosen size, a read/write image, a disk that is not HFS, the `'vers'` text, a split into parts
+read back through its siblings, part names, and the refusals; and, with the corpus, `New_images_match_Disk_Copy_s_own`
+(below).
 
 Synthetic images, `tests/ClassicMac.Files.Tests/NdifTests.cs` (built by `NdifBuilder.cs`):
 
@@ -465,10 +530,14 @@ Images made by Disk Copy in SheepShaver, read from the `CLASSICMAC_CORPUS` folde
   `seg_ok`, `seg_renamed`, `seg_missing3` and `seg_foreign2`, with what Disk Copy 6.3.3 did with each: a bad CRC or
   damaged ADC refused only with "Verify checksum" on, a missing or foreign part −8821, renamed parts mounted
   (`Damaged_images_are_reported_as_Disk_Copy_refuses_them`).
+- `S800 RW.img` and `S5M RW.img` made into Read-Only and ADC images match `S800 RO.img`, `S800 ADC.img`, `S5M RO.img`
+  and `S5M ADC.img` in data fork and map; `seg/S5M RO.img` split into four matches `seg/S5M RO seg 1of4` to `4of4`
+  (`New_images_match_Disk_Copy_s_own`).
 
 ## 8. Not covered
 
-- Writing new NDIF images, compressing changed chunks, and rewriting version 2 or segmented images.
+- Rewriting version 2 or segmented images (a segmented image's parts are joined to read it, but an edit is not
+  written back into them); a new image's KenCode chunks compared with Disk Copy's own (only ADC was).
 - Checking rewritten images against Disk Copy itself (mounting one in SheepShaver with "Verify checksum" on).
 - **Version 2's real layout.** No image from Disk Image Mounter or Disk Copy 6.0.x has been seen. Disk Copy 6.1.2's
   8-byte layout ([§4.2](#42-version-2)) was verified only on hand-built images; ShrinkWrap 2.1 reads such files with the

@@ -359,6 +359,18 @@ and checked before it is written. An existing file is replaced only with `--over
 name HFS cannot hold is a usage error (exit 2). It prints `Wrote <file> (HFS "<name>", <size> bytes, <n>-byte blocks)`;
 `--json`: `{ "written": [file], "name", "size", "blockSize" }`.
 
+`classicmac ndif <disk> <image> [--format adc|kencode|read-only|read-write] [--chunk-size <n>] [--segments <n>]
+[--layout appledouble|basilisk] [--overwrite] [--json]` writes a new Disk Copy 6 (NDIF) image of a disk, laid out as
+Disk Copy 6.3.3 lays it out ([ndif.md §3.2](formats/disk-images/ndif.md#32-a-new-image)): `adc` (Read-Only Compressed,
+the default), `kencode`, `read-only` or `read-write`; `--chunk-size` the sectors in each compressed chunk (default
+512). The disk is the one a volume or disk image the write commands edit holds (a plain volume, a Disk Copy 4.2 or
+NDIF image), or any other plain file's bytes (whole 512-byte sectors). The image is written as an AppleDouble pair
+(default) or a Basilisk II entry; `--segments` 2 to 128 cuts it into the parts of a segmented image, named
+"*image name* *N*of*M*" beside it ([§3.3](formats/disk-images/ndif.md#33-a-segmented-image)). It prints
+`Wrote <file> (NDIF ADC, "<volume>", <size>-byte disk)` for each file written (`, part n of M` added); `--json`:
+`{ "written": [files], "format", "name", "diskSize", "segments" }`. An existing file is replaced only with
+`--overwrite` (exit 4 otherwise); a disk that is not whole sectors, or an option out of range, is a usage error (exit 2).
+
 `classicmac resize <file> --size <n> [--block-size <n>]` grows or shrinks a plain HFS volume image, with the write options (`-o`, `--in-place`,
 `--dry-run`, `--json`): grown, the new space is free at the end ([hfs.md §3.2](formats/file-systems/hfs.md#32-growing-a-volume));
 shrunk, what lies past the new end is moved down first ([hfs.md §3.3](formats/file-systems/hfs.md#33-shrinking-a-volume)).

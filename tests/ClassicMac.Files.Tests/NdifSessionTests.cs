@@ -82,4 +82,24 @@ public sealed class NdifSessionTests : IDisposable
         Assert.Contains(Folders(Disk(target)), f => f.MacPath == "Docs");
         Assert.Throws<InvalidOperationException>(() => session.Resize(800 * 1024));
     }
+
+    // The session's disk is the image's disk, also when the image's data fork starts with the disk's raw boot blocks and
+    // MDB (read-only and compressed images), which once made it look like a plain volume.
+    [Theory]
+    [InlineData(NdifFormat.ReadOnly)]
+    [InlineData(NdifFormat.Adc)]
+    [InlineData(NdifFormat.ReadWrite)]
+    public void The_session_reads_the_disk_of_every_kind_of_image(NdifFormat format)
+    {
+        var volume = HfsWriter.Format(400 * 1024, "Test Disk");
+        volume = HfsWriter.CreateFile(ForkData.FromBytes(volume), "Read Me", "hello"u8.ToArray(), Array.Empty<byte>(), FinderInfo.Empty);
+        HostFiles.Write(NdifWriter.Create(volume, "Kind.img", NdifCreateOptions.Default with { Format = format }), directory,
+            new HostWriteOptions { Layout = HostLayout.AppleDouble });
+
+        var session = InputEditSession.Open(Path.Combine(directory, "Kind.img"));
+
+        Assert.Equal(InputEditKind.HfsVolume, session.Kind);
+        Assert.Equal(volume, session.Volume);
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(session.Volume)));
+    }
 }

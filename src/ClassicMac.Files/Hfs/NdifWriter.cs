@@ -210,6 +210,24 @@ public static class NdifWriter
         return result;
     }
 
+    /// <summary>
+    /// A new image of <paramref name="disk"/> named <paramref name="fileName"/>, laid out as Disk Copy 6.3.3 lays it out
+    /// (docs/formats/disk-images/ndif.md §3.2): read/write, read-only, or compressed with ADC or KenCode. On a plain HFS
+    /// disk what lies past the last block in use is not stored and reads back as zeros.
+    /// </summary>
+    /// <exception cref="ArgumentException">The disk is empty, not whole 512-byte sectors, or too large for NDIF.</exception>
+    public static MacFile Create(ReadOnlyMemory<byte> disk, string fileName, NdifCreateOptions? options = null) =>
+        NdifCreation.Create(disk, fileName, options);
+
+    /// <summary>
+    /// <paramref name="image"/> cut into the <paramref name="parts"/> files of a segmented image (§3.3), named
+    /// "<paramref name="baseName"/> <i>N</i>of<i>M</i>"; part 1 holds the map.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">Fewer than 2 or more than 128 parts, or more than its data makes.</exception>
+    /// <exception cref="InvalidDataException">The image is not NDIF version 10 to 12, or is already segmented.</exception>
+    public static IReadOnlyList<MacFile> Split(MacFile image, int parts, string baseName, DateTime? created = null) =>
+        NdifCreation.Split(image, parts, baseName, created);
+
     private static void Entry(BigEndianWriter entries, uint word, long offset, long stored)
     {
         entries.WriteUInt32(word);
