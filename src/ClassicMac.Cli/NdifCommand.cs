@@ -23,7 +23,7 @@ internal sealed class NdifCommand(TextWriter output, TextWriter error, CommandLi
         var file = new Argument<FileInfo>("image") { Description = "The new image" };
         var format = new Option<string>("--format")
         {
-            Description = "adc (Read-Only Compressed, the default), kencode (compressed smaller), read-only or read-write",
+            Description = "adc (Read-Only Compressed, the default), kencode (Disk Copy's \"Smaller (KC)\", not always smaller), read-only or read-write",
             DefaultValueFactory = _ => "adc",
         };
         format.AcceptOnlyFromAmong(Formats);

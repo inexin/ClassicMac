@@ -11,7 +11,7 @@ dates and both forks, and edits plain HFS volumes conservatively, returning a ne
 | --- | --- |
 | Identified by | `$4244` (`'BD'`) at byte 1024; on a partitioned disk, an `Apple_HFS` partition ([partition-map.md](partition-map.md)) |
 | ClassicMac | Reads and writes: `ClassicMac.Files.Hfs` (`HfsReader`, `HfsWriter`); `ForkSaver.SaveHfsImageAs` |
-| Verified against | Volumes Mac OS wrote, in Disk Copy 6 images made in Basilisk II<br>Images Disk Copy 6.1.2 made in SheepShaver, Mac OS 9.0<br>hfsutils-formatted volumes, edited and remounted with hfsutils |
+| Verified against | Volumes Mac OS wrote, in Disk Copy 6 images made in Basilisk II<br>Images Disk Copy 6.1.2 made in SheepShaver, Mac OS 9.0<br>hfsutils-formatted volumes, edited and remounted with hfsutils<br>Edits of Mac OS-made volumes with overflow extents, verified by Disk First Aid 8.5.5 and remounted in Mac OS 9.0 |
 | Sources | *Inside Macintosh: Files*, *Text*, *Macintosh Toolbox Essentials*; TN1150; the Mac OS 9.0 ROM's File Manager and B-tree manager, the System 7.1 File Manager, Disk Copy 6.3.3 (disassembly); Apple's `fsck_hfs` source; hfsutils (behaviour only) |
 
 Contents
@@ -611,7 +611,8 @@ the largest) grow and shrink a plain volume image.
    empty and in one extent from block 0.
 2. The catalog keeps its nodes, records and size, in one extent after the extents tree.
 3. Each file's forks, in catalog order, take one extent each after the catalog. Its file record gets that extent and a
-   physical length of whole blocks; nothing else in it changes, and no overflow record is left.
+   physical length of its logical length in whole blocks (a fork Mac OS allocated past its data, such as the Desktop
+   file's clump, gives the rest back); nothing else in it changes, and no overflow record is left.
 4. The bitmap marks the blocks laid out, so the free space is one run at the end; `drFreeBks` stays, `drAllocPtr` is
    the first free block, and `drLsMod` and `drWrCnt` change as for any write. The MDB's other fields and the boot
    blocks stay, and the MDB is copied to N' − 2.
@@ -1076,6 +1077,11 @@ First Aid's verify and repair, Defragment and Resize take an `IProgress<VolumePr
   `A_folder_whose_parent_is_missing_is_reported_and_its_path_starts_there` cover `ReadFolders`, with `DInfo`,
   `DXInfo` and dates `HfsBuilder` writes into the root's and a folder's records. `A_classic_hfs_catalog_with_mac_os_key_lengths_that_leave_out_the_alignment_byte_reads_cleanly`
   covers the `6 + n` key lengths of §1.9.
+- Live [Verified: Mac OS 9.0, Disk First Aid 8.5.5]: on Mac OS-made volumes whose files the Mac fragmented into a
+  depth-2 extents tree of 32 overflow records (data and resource forks), deleting a fragmented file (the tree back to
+  depth 1), adding a 2 MB file into 100 KB holes (6 overflow records more), defragmenting (the tree empty), and
+  repairing an overflow key's start block each passed Disk First Aid and remounted, every fork byte for byte the
+  source's. Disk First Aid does not check an overflow key's start block (§5.6), which ClassicMac reports and repairs.
 - `HfsTests.Corpus_disk_images_read_cleanly` reads every disk image under `CLASSICMAC_CORPUS` (not in the repository)
   and requires no Error and no `hfs.counts`: Disk Copy 6 images of volumes Mac OS wrote in Basilisk II, whose
   `6 + n` catalog keys established §1.9 [Verified].

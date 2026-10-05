@@ -310,7 +310,7 @@ Each write command changes one thing on a Mac path, through the library's `Input
 
 | Command | Arguments and options | Does |
 | --- | --- | --- |
-| `put` | `<host file> <Mac path>` `[--name N] [--type T] [--creator C] [--text]` | Adds a host file: into the folder the path names (keeping its name), or as the file the path names. The host file is read with its AppleDouble or Basilisk II companions, MacBinary, AppleSingle and BinHex unwrapped, else its bytes are the data fork. `--text`: a UTF-8 text file (a byte order mark dropped) made Mac OS Roman with CR line ends, type `TEXT`, creator `ttxt`; a character Mac OS Roman has not is refused, naming its line |
+| `put` | `<host file> <Mac path>` `[--name N] [--type T] [--creator C] [--text]` | Adds a host file: into the folder the path names (keeping its name), or as the file the path names. The host file is read with its AppleDouble or Basilisk II companions, MacBinary, AppleSingle and BinHex unwrapped, else its bytes are the data fork, with type and creator 0 unless `--type` and `--creator` give them. `--text`: a UTF-8 text file (a byte order mark dropped) made Mac OS Roman with CR line ends, type `TEXT`, creator `ttxt`; a character Mac OS Roman has not is refused, naming its line |
 | `mkdir` | `<Mac path>` | Makes an empty folder |
 | `rm` | `<Mac path> [--recursive/-r]` | Deletes a file, or a folder (with everything in it only with `-r`); each alias on the volume whose original it deletes is named in a warning (`  warning: <alias> will no longer find its original, <path>`; in JSON the change's `warnings`), also with `--dry-run` |
 | `rename` | `<Mac path> <new name>` | Renames a file or folder in its folder (names are at most 31 bytes, unique as HFS compares them) |
@@ -367,7 +367,7 @@ name HFS cannot hold is a usage error (exit 2). It prints `Wrote <file> (HFS "<n
 `classicmac ndif <disk> <image> [--format adc|kencode|read-only|read-write] [--chunk-size <n>] [--segments <n>]
 [--layout appledouble|basilisk] [--overwrite] [--json]` writes a new Disk Copy 6 (NDIF) image of a disk, laid out as
 Disk Copy 6.3.3 lays it out ([ndif.md §3.2](formats/disk-images/ndif.md#32-a-new-image)): `adc` (Read-Only Compressed,
-the default), `kencode`, `read-only` or `read-write`; `--chunk-size` the sectors in each compressed chunk (default
+the default), `kencode` (Disk Copy's "Smaller (KC)", not always smaller than ADC), `read-only` or `read-write`; `--chunk-size` the sectors in each compressed chunk (default
 512). The disk is the one a volume or disk image the write commands edit holds (a plain volume, a Disk Copy 4.2 or
 NDIF image), or any other plain file's bytes (whole 512-byte sectors). The image is written as an AppleDouble pair
 (default) or a Basilisk II entry; `--segments` 2 to 128 cuts it into the parts of a segmented image, named

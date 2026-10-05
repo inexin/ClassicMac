@@ -10,7 +10,7 @@ the volume readers to open.
 | --- | --- |
 | Identified by | `'ER'` (`$4552`) or a zero word at byte 0, and `'PM'` (`$504D`) at byte 512 or 2048 |
 | ClassicMac | Reads: `ClassicMac.Files.Hfs` (`PartitionMapReader`) |
-| Verified against | Nothing yet: SheepShaver uses its own disk and CD drivers, not Apple's |
+| Verified against | Writes: three Mac OS-made HFS volumes in one map, each partition edited and one repaired by name, then verified by Disk First Aid 8.5.5 and mounted in Mac OS 9.0 (SheepShaver mounts a map's first HFS partition; the others were mounted from byte-exact extracts) |
 | Sources | *Inside Macintosh: Devices*; TN1150; the Mac OS 9.0 ROM, Apple CD/DVD Driver 1.3.1 and Disk Copy 6.5 (disassembly) |
 
 Contents

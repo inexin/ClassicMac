@@ -552,6 +552,11 @@ Images made by Disk Copy in SheepShaver, read from the `CLASSICMAC_CORPUS` folde
   `seg_ok`, `seg_renamed`, `seg_missing3` and `seg_foreign2`, with what Disk Copy 6.3.3 did with each: a bad CRC or
   damaged ADC refused only with "Verify checksum" on, a missing or foreign part −8821, renamed parts mounted
   (`Damaged_images_are_reported_as_Disk_Copy_refuses_them`).
+- Live [Verified: Disk Copy 6.3.3, Disk First Aid 8.5.5, Mac OS 9.0]: new images of a 12 MB Mac OS-made volume
+  (ADC, ADC in 64-sector chunks, KenCode, Read-Only, Read-Only in three parts, Read/Write) mounted in Disk Copy with
+  "Verify checksum" on, the checksum valid (none for Read/Write), and passed Disk First Aid; so did Disk Copy's own ADC
+  image and four-part image edited in place (the latter's every part rewritten). KenCode's images came out a little
+  larger than ADC's on these volumes.
 - `S800 RW.img` and `S5M RW.img` made into Read-Only and ADC images match `S800 RO.img`, `S800 ADC.img`, `S5M RO.img`
   and `S5M ADC.img` in data fork and map; `seg/S5M RO.img` split into four matches `seg/S5M RO seg 1of4` to `4of4`
   (`New_images_match_Disk_Copy_s_own`).
@@ -560,7 +565,6 @@ Images made by Disk Copy in SheepShaver, read from the `CLASSICMAC_CORPUS` folde
 
 - Rewriting version 2 images; a new image's KenCode chunks compared with Disk Copy's own (only ADC was); an edited
   segmented image mounted in Disk Copy.
-- Checking rewritten images against Disk Copy itself (mounting one in SheepShaver with "Verify checksum" on).
 - **Version 2's real layout.** No image from Disk Image Mounter or Disk Copy 6.0.x has been seen. Disk Copy 6.1.2's
   8-byte layout ([§4.2](#42-version-2)) was verified only on hand-built images; ShrinkWrap 2.1 reads such files with the
   12-byte layout. That version 2 was written by those two programs is inferred from the release history and from 6.1.2

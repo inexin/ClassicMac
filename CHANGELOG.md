@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Verified live (Mac OS 9.0, Disk First Aid 8.5.5, Disk Copy 6.3.3): edits of volumes with overflow extents, writes
+  to several partitions, and new and edited NDIF images. `ndif --format kencode`'s help no longer promises a smaller
+  image.
+
 - The app's Export menu has Images as WebP and Loadable Fonts: its exports write images as lossless WebP and TrueType
   fonts made loadable, both off by default and kept between sessions.
 
