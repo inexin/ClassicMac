@@ -105,13 +105,17 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
     internal static NodeViewModel? VolumeItem(NodeViewModel? node) =>
         node is FileNode or ContainerFileNode or FolderNode && TreeLayout.FolderOf(node) is { } parent && VolumeFolder(parent) == parent ? node : null;
 
-    // A folder node's Mac path below the volume's root ("" for the root).
+    // A name typed in the input's name encoding as the bytes the volume stores (the session has taken it already).
+    private static MacString Encoded(NodeViewModel folder, string text) => new(MacEncodings.Encode(text, folder.Input.ContainerOptions.NameEncoding));
+
+    // A folder node's Mac path below the volume's root ("" for the root), its names as text in the input's name
+    // encoding, as the edit session takes them (text-encodings.md §5).
     private static List<string> FolderNames(NodeViewModel folder)
     {
         var names = new List<string>();
         for (var at = folder; at is FolderNode; at = at.Parent!)
         {
-            names.Insert(0, at.BaseTitle);
+            names.Insert(0, at is FolderNode { MacName: { } name } ? NodeViewModel.NameText(at.Parent!, name) : at.BaseTitle);
         }
 
         return names;
@@ -119,8 +123,9 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
 
     private static string ItemName(NodeViewModel item) => item switch
     {
-        FileNode f => f.File.Name.ToMacRoman(),
-        ContainerFileNode c => c.File.Name.ToMacRoman(),
+        FileNode f => NodeViewModel.NameText(f.Parent!, f.File.Name),
+        ContainerFileNode c => NodeViewModel.NameText(c.Parent!, c.File.Name),
+        FolderNode { MacName: { } name } folder => NodeViewModel.NameText(folder.Parent!, name),
         _ => item.BaseTitle,
     };
 
@@ -152,7 +157,7 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
             return;
         }
 
-        AddFile(folder, new MacFile { Name = MacString.FromMacRoman(choice.Name), FinderInfo = finder });
+        AddFile(folder, choice.Name, new MacFile { Name = new MacString([]), FinderInfo = finder });
     }
 
     /// <summary>
@@ -199,7 +204,7 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
             return;
         }
 
-        AddFile(folder, imported with { Name = MacString.FromMacRoman(choice.Name), FinderInfo = finder });
+        AddFile(folder, choice.Name, imported with { FinderInfo = finder });
     }
 
     private FinderInfo? FinderInfoFor(NewFileChoice choice, FinderInfo initial)
@@ -231,7 +236,7 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
             return;
         }
 
-        var node = new FolderNode(folder, name);
+        var node = new FolderNode(folder, Encoded(folder, name));
         Insert(folder, node);
         appServices.Status = $"Created folder {name}; Save As ▸ HFS Volume Image writes it.";
     }
@@ -439,21 +444,23 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
     private static IEnumerable<NodeViewModel> Descendants(NodeViewModel node) =>
         TreeLayout.Contents(node).SelectMany(c => Descendants(c).Prepend(c));
 
-    private void AddFile(NodeViewModel folder, MacFile file)
+    // Adds a file named name (text in the input's name encoding, which the session stores it in) to a folder.
+    private void AddFile(NodeViewModel folder, string name, MacFile file)
     {
         var folderPath = FolderNames(folder);
-        var path = SessionPath(folder, file.Name.ToMacRoman());
+        var path = SessionPath(folder, name);
         var data = file.DataFork.ToArray();
         var resource = file.ResourceFork.ToArray();
         var added = file with { DataFork = ForkData.FromBytes(data), ResourceFork = ForkData.FromBytes(resource) };
-        if (!ChangeVolume(folder.Input, session => session.AddFile(path, added), $"create {file.Name.ToMacRoman()}"))
+        if (!ChangeVolume(folder.Input, session => session.AddFile(path, added), $"create {name}"))
         {
             return;
         }
 
         var created = file with
         {
-            FolderPath = folderPath.Select(MacString.FromMacRoman).ToList(),
+            Name = Encoded(folder, name),
+            FolderPath = folderPath.Select(n => Encoded(folder, n)).ToList(),
             DataFork = ForkData.FromBytes(data),
             ResourceFork = ForkData.FromBytes(resource),
             UnicodeName = null,

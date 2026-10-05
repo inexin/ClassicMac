@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Names written in other encodings (codecs/text-encodings.md §5): an HFS volume's names are written in
+  `InputEditSession.NameEncoding` (the CLI's `--encoding`, the app's View ▸ Text Encoding): paths name items by their
+  characters, new names are stored as that encoding's bytes, a name it cannot hold is refused. Fixed: the app's export
+  commands no longer fail on a folder whose title is not Mac OS Roman text.
+
 - A volume's encoding (codecs/text-encodings.md §5): a file's text is read in the encoding its volume says, in place
   of the default Mac OS Roman: an HFS Plus file's text encoding hint (`MacFile.TextEncoding`), else the volume's
   System file's region (`FileEncodings`). The CLI's `cat`, `get`, `extract` and `convert` and the app's preview and

@@ -541,6 +541,37 @@ public sealed class EditTests : EditTestsBase
         return image;
     }
 
+    // In another name encoding (View ▸ Text Encoding, text-encodings.md §5) new folders and files are named in it: their
+    // names are stored as its bytes, and a name it cannot hold is refused.
+    [Fact]
+    public async Task Volume_commands_name_items_in_the_app_s_encoding()
+    {
+        var (model, input, dialogs, _, _, _) = await OpenVolume();
+        model.TextEncoding = MacTextEncoding.Japanese;
+        model.Selected = input;
+
+        dialogs.FolderName = "漢字";
+        await model.VolumeActions.NewFolderCommand.ExecuteAsync(null);
+        var folder = Assert.IsType<FolderNode>(model.Selected);
+        Assert.Equal("漢字", folder.Title);
+        dialogs.NewFile = c => c with { Name = "手紙", Type = "TEXT", Creator = "ttxt" };
+        await model.VolumeActions.NewFileCommand.ExecuteAsync(null);
+        Assert.Equal("手紙", Assert.IsType<FileNode>(model.Selected).Title);
+        model.Selected = input;
+        dialogs.FolderName = "한";
+        await model.VolumeActions.NewFolderCommand.ExecuteAsync(null);
+        Assert.DoesNotContain(input.Children, n => n.Title == "한");
+
+        // Extracting the folder names the host folder by its characters (the title no longer goes through Mac OS Roman).
+        model.Selected = folder;
+        await model.ExportActions.ExtractAllCommand.ExecuteAsync(null);
+        Assert.True(Directory.Exists(Path.Combine(this.folder, "漢字 resources")));
+
+        var volume = input.VolumeSession.Volume;
+        var file = HfsReader.Instance.Read(ForkData.FromBytes(volume), new ContainerContext()).Single(f => f.Name.Bytes.SequenceEqual(MacEncodings.Encode("手紙", MacTextEncoding.Japanese)));
+        Assert.Equal(MacEncodings.Encode("漢字", MacTextEncoding.Japanese), file.FolderPath.Single().Bytes.ToArray());
+    }
+
     [Fact]
     public async Task Volume_commands_create_import_and_delete_files_and_folders_until_save_as()
     {

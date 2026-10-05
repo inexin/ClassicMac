@@ -801,7 +801,8 @@ public sealed partial class EditActions(IAppSelection appSelection, IAppServices
 
         var forks = EditedFiles(input)
             .Where(e => e.Node is FileNode && VolumeActions.VolumeItem(e.Node) is not null && (e.State.Session.IsDirty || ReferenceEquals(e.Node, selectedOwner)))
-            .Select(e => new HfsForkReplacement(input.SessionPath(e.Node, e.State.File.MacPath), e.State.Session.Fork, e.State.ForkInDataFork))
+            .Select(e => new HfsForkReplacement(input.SessionPath(e.Node,
+                string.Join(":", e.State.File.FolderPath.Append(e.State.File.Name).Select(n => NodeViewModel.NameText(e.Node, n)))), e.State.Session.Fork, e.State.ForkInDataFork))
             .ToList();
         var extension = Path.GetExtension(input.Path) is { Length: > 0 } imageExtension ? imageExtension : ".img";
         var path = await appServices.FilePicker.PickSaveFileAsync($"Save {input.BaseTitle} As", Path.GetFileNameWithoutExtension(input.Path) + "-edited" + extension, [extension]);

@@ -71,7 +71,9 @@ code page. The limit options of every command (`--max-resource-size`, `--max-nes
 paths are listed and matched, and as host file names `unpack` and `extract` write. Text that says its own script (a
 styled run's font, a `'vers'` region) is read in it whatever `--encoding` says. Without `--encoding`, a file whose
 volume says its encoding (an HFS Plus file's hint, or the volume's System file's region) is read in it by `cat`, `get`,
-`extract` and `convert` ([text-encodings.md §5](formats/codecs/text-encodings.md#5-classicmac)).
+`extract` and `convert` ([text-encodings.md §5](formats/codecs/text-encodings.md#5-classicmac)). The write commands
+(§3) take and write an HFS volume's names in `--encoding`: a path names an item by its name's characters in it, and a
+new name is stored as its bytes in it.
 
 `ls`, `cat` and `get` take `--follow`: an alias file (the Finder's isAlias flag) stands for its original, resolved on
 the volume holding it ([aliases.md §2](formats/resources/aliases.md#2-reading)), through aliases of aliases (at most

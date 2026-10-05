@@ -225,8 +225,8 @@ internal static class MacEdits
     private static bool IsVolumeFolder(MacPathTree tree, MacPathEntry entry) =>
         VolumeOf(tree, entry) is { } volume && (entry == volume || entry.Kind == MacPathKind.Folder);
 
-    // An item's path in the volume: its folders and its name, as Mac OS Roman text (empty for the root), after its
-    // partition's name on a disk with several.
+    // An item's path in the volume: its folders and its name, as text in the tree's name encoding (the session's too,
+    // text-encodings.md §5; empty for the root), after its partition's name on a disk with several.
     private static string VolumePath(MacPathTree tree, MacPathEntry entry)
     {
         if (VolumeOf(tree, entry) is not { } volume || entry != volume && entry.Kind is not (MacPathKind.Folder or MacPathKind.File or MacPathKind.Container))
@@ -236,8 +236,8 @@ internal static class MacEdits
 
         var prefix = volume == tree.Root ? [] : new[] { volume.Name };
         var names = entry == volume ? []
-            : entry.Kind == MacPathKind.Folder ? entry.FolderPath!.Select(n => n.ToMacRoman())
-            : entry.File!.FolderPath.Select(n => n.ToMacRoman()).Append(entry.File.Name.ToMacRoman());
+            : entry.Kind == MacPathKind.Folder ? entry.FolderPath!.Select(tree.NameText)
+            : entry.File!.FolderPath.Select(tree.NameText).Append(tree.NameText(entry.File.Name));
         return string.Join(":", prefix.Concat(names));
     }
 

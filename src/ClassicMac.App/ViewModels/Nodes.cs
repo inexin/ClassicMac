@@ -383,6 +383,7 @@ public sealed class InputNode : NodeViewModel
     internal void SetNameEncoding(MacTextEncoding encoding)
     {
         ContainerOptions = ContainerOptions with { NameEncoding = encoding };
+        VolumeSession.NameEncoding = encoding;
         Retitle();
     }
 

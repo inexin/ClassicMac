@@ -132,7 +132,7 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
         }
 
         var root = await Whole(node);
-        var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " resources");
+        var target = ExportFolders.CreateNew(parent, HostNameOf(node) + " resources");
         var progress = appParts.StatusLine.BeginProgress($"Extracting {NameOf(node)}…", root.Leaves().Count());
         var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
         var result = await Task.Run(() =>
@@ -170,7 +170,7 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
         }
 
         var root = await Whole(node);
-        var name = HostNames.ToHostName(MacString.FromMacRoman(NameOf(node)));
+        var name = HostNameOf(node);
         var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
         var progress = appParts.StatusLine.BeginProgress($"Converting {NameOf(node)}…", root.Leaves().Count());
         var (target, result) = await Task.Run(() =>
@@ -233,7 +233,7 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
         }
 
         var root = await Whole(node);
-        var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " unpacked");
+        var target = ExportFolders.CreateNew(parent, HostNameOf(node) + " unpacked");
         var progress = appParts.StatusLine.BeginProgress($"Unpacking {NameOf(node)}…", root.Leaves().Count());
         var diagnostics = new List<Diagnostic>();
         var result = await Task.Run(() => Unpacker.Unpack(root, target, HostWriteOptions.Default with { Layout = layout, NameEncoding = appView.TextEncoding }, diagnostics, progress));
@@ -322,9 +322,26 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
     private static string NameOf(NodeViewModel node) => node switch
     {
         InputNode i => Path.GetFileNameWithoutExtension(i.Path),
-        ContainerFileNode c => c.File.Name.ToMacRoman(),
-        FileNode f => f.File.Name.ToMacRoman(),
+        ContainerFileNode c => NodeViewModel.NameText(c.Parent!, c.File.Name),
+        FileNode f => NodeViewModel.NameText(f.Parent!, f.File.Name),
+        FolderNode { MacName: { } name } folder => NodeViewModel.NameText(folder.Parent!, name),
         _ => node.Title,
+    };
+
+    // A host name for what a node holds: the input's own file name, else its Mac name made a host name in the app's
+    // encoding (text-encodings.md §5); a name with no Mac bytes (a grouping) as Mac OS Roman text, '?' for the rest.
+    private string HostNameOf(NodeViewModel node) => node switch
+    {
+        InputNode i => Path.GetFileNameWithoutExtension(i.Path),
+        _ => HostNames.ToHostName(MacNameOf(node), appView.TextEncoding),
+    };
+
+    private static MacString MacNameOf(NodeViewModel node) => node switch
+    {
+        ContainerFileNode c => c.File.Name,
+        FileNode f => f.File.Name,
+        FolderNode { MacName: { } name } => name,
+        _ => new MacString([.. node.Title.Select(c => MacRoman.TryGetByte(c, out var b) ? b : (byte)'?').Take(255)]),
     };
 
     // The part of the tree a node stands for with the containers not yet expanded read (off the UI thread), as
@@ -364,7 +381,7 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
 
                 var items = new List<ContainerNode>();
                 Collect(folder, items, depth);
-                return new ContainerNode("selection", new MacFile { Name = MacString.FromMacRoman(folder.Title) }, items);
+                return new ContainerNode("selection", new MacFile { Name = MacNameOf(folder) }, items);
             default:
                 throw new InvalidOperationException("Nothing to export.");
         }

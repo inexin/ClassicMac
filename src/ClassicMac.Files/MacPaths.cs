@@ -734,4 +734,7 @@ public sealed class MacPathTree : IDisposable
 
     // A name stored as bytes, as text in the options' name encoding.
     private string Text(MacString name) => MacEncodings.Decode(name.Bytes, context.Options.NameEncoding);
+
+    /// <summary>A Mac name as text in the tree's name encoding (<see cref="ContainerReadOptions.NameEncoding"/>), as paths give it.</summary>
+    public string NameText(MacString name) => Text(name);
 }

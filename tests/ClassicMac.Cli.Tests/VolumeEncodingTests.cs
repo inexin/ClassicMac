@@ -103,4 +103,20 @@ public sealed class VolumeEncodingTests : IDisposable
         Assert.Contains("日本", string.Concat(Directory.EnumerateFiles(Path.Combine(folder, "docs"), "*.html", SearchOption.AllDirectories).Select(File.ReadAllText)),
             StringComparison.Ordinal);
     }
+    // The write commands write names in --encoding: a new folder's name is stored as its bytes, and listed back so.
+    [Fact]
+    public void Names_are_written_in_the_chosen_encoding()
+    {
+        var disk = Path.Combine(folder, "blank.img");
+        Assert.Equal(ExitCodes.Success, Run("format", disk, "--size", "800K").Code);
+        var edited = Path.Combine(folder, "edited.img");
+
+        var (code, _, error) = Run("mkdir", disk + ":漢字", "-o", edited, "--encoding", "japanese");
+
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.Contains("漢字", Run("ls", edited, "--encoding", "japanese").Output, StringComparison.Ordinal);
+        Assert.Equal(ExitCodes.Success, Run("rename", edited + ":漢字", "日本", "--in-place", "--encoding", "japanese").Code);
+        Assert.Contains("日本", Run("ls", edited, "--encoding", "japanese").Output, StringComparison.Ordinal);
+        Assert.NotEqual(ExitCodes.Success, Run("mkdir", edited + ":한", "--in-place", "--encoding", "japanese").Code);
+    }
 }

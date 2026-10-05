@@ -65,6 +65,7 @@ public sealed class InputEditSession
     {
         Path = System.IO.Path.GetFullPath(path);
         this.options = options;
+        NameEncoding = options.NameEncoding;
         this.host = host;
         // A plain HFS volume image, known by its MDB (an empty volume has no files to show it), or an HFS Plus one; also
         // one the reader refused, which First Aid may still repair.
@@ -285,9 +286,23 @@ public sealed class InputEditSession
             throw NotVolume(what);
         }
 
-        return Find(macPath) ?? throw new InvalidOperationException(
+        var (volume, inner) = Find(macPath) ?? throw new InvalidOperationException(
             $"{System.IO.Path.GetFileName(Path)} has several partitions: a path starts with the name of one ClassicMac writes ({string.Join(", ", PartitionNames)}).");
+        return (volume, volume.Kind == InputEditKind.HfsVolume ? string.Join(':', inner.Split(':').Select(Stored)) : inner);
     }
+
+    // An HFS name as the writer takes it (text-encodings.md §5): in a name encoding other than Mac OS Roman, the string
+    // whose Mac OS Roman bytes are the name's bytes in that encoding, so the writer stores (and finds) those bytes. A
+    // character the encoding cannot hold is refused (ArgumentException).
+    private string Stored(string name) =>
+        NameEncoding == MacTextEncoding.Roman || name.Length == 0 ? name : MacRoman.Decode(MacEncodings.Encode(name, NameEncoding));
+
+    /// <summary>
+    /// The encoding of the HFS names in the paths the session takes and the names it writes (text-encodings.md §5): a
+    /// path names items by their names' characters in it, and a new name is stored as its bytes in it. Starts as the
+    /// options' <see cref="ContainerReadOptions.NameEncoding"/>; HFS Plus names are Unicode and unaffected.
+    /// </summary>
+    public MacTextEncoding NameEncoding { get; set; }
 
     // An HFS volume (signature 'BD') that does not wrap HFS Plus, an HFS Plus or HFSX volume ('H+', 'HX', or 'BD'
     // wrapping HFS Plus), or neither.
@@ -438,7 +453,7 @@ public sealed class InputEditSession
 
         var (volume, inner) = Route(macPath, "hold files");
         Prepare(volume);
-        volume.Overlay = HfsWriter.Rename(Overlay(volume), inner, newName);
+        volume.Overlay = HfsWriter.Rename(Overlay(volume), inner, volume.Kind == InputEditKind.HfsVolume ? Stored(newName) : newName);
         var parent = macPath.Contains(':') ? macPath[..(macPath.LastIndexOf(':') + 1)] : "";
         var renamed = parent + newName;
         foreach (var key in forks.Keys.Where(k => Within(k, macPath)).ToList())

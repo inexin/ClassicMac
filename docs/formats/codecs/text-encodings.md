@@ -103,7 +103,10 @@ None.
 - Names stored as bytes are read in `ContainerReadOptions.NameEncoding` in Mac paths (listing and matching), and in
   `HostWriteOptions.NameEncoding` and `ExportOptions.NameEncoding` as host names (`HostNames.ToHostName(name, encoding)`:
   each character whole, a code that is no text escaped byte by byte, `%XX`); SheepShaver's layout keeps the bytes.
-  Names written into a volume stay Mac OS Roman. [ClassicMac]
+  [ClassicMac]
+- Names written into an HFS volume are in `InputEditSession.NameEncoding` (the options' `NameEncoding` to start with;
+  the CLI's `--encoding`, the app's View ▸ Text Encoding): a path names items by their names' characters in it, and a
+  new name is stored as its bytes in it; a character it cannot hold is refused. HFS Plus names are Unicode. [ClassicMac]
 - The app's View ▸ Text Encoding sets the encoding of names in the tree, of decoded text and of the host names its
   exports write, kept between sessions; choosing another retitles the open files' names in place. [ClassicMac]
 - The decoders read text in `DecodeOptions.TextEncoding`, Mac OS Roman by default, and record its IANA name in the
@@ -144,14 +147,17 @@ None.
 - `tests/ClassicMac.Files.Tests/FileEncodingsTests.cs`: HFS Plus hints, a System file's region, the blessed folder's
   System chosen, Roman and damaged ones saying nothing. `tests/ClassicMac.Resources.Tests/ExportTests.cs`,
   `A_file_s_encoding_chooses_its_decoders`. `tests/ClassicMac.Cli.Tests/VolumeEncodingTests.cs`: `extract`, `cat` and
-  `convert` in a hinted file's and a Japanese System's encoding, and `--encoding` winning. The app's
-  `TextEncodingTests`, `A_file_previews_in_its_volume_s_encoding`.
+  `convert` in a hinted file's and a Japanese System's encoding, and `--encoding` winning; names written in
+  `--encoding`. The app's `TextEncodingTests`, `A_file_previews_in_its_volume_s_encoding`, and `EditTests`,
+  `Volume_commands_name_items_in_the_app_s_encoding`.
+- `tests/ClassicMac.Files.Tests/NameEncodingWriteTests.cs`: new names stored in the encoding, items named by their
+  characters to rename, move and delete, a name the encoding cannot hold refused, Mac OS Roman unchanged.
 
 ## 8. Not covered
 
 - Codes .NET's code pages define that Apple's tables do not are left as .NET reads them.
-- Writing names in other encodings into a volume; the folders `convert` and `disasm` name; an MFS or HFS volume's
-  encoding from anything but its System file (a Finder's or font's region).
+- The folders `convert` and `disasm` name; an MFS or HFS volume's encoding from anything but its System file (a
+  Finder's or font's region).
 - Symbol, Dingbats, the Indic scripts, Farsi, Celtic, Gaelic and Inuit.
 
 ## 9. References
