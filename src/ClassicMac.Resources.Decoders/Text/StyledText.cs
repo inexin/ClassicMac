@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using ClassicMac.Core;
 
 namespace ClassicMac.Resources.Decoders.Text;
 
@@ -59,7 +60,7 @@ public sealed record StyledText(string Text, IReadOnlyList<TextRun> Runs, bool C
     /// </summary>
     public static StyledText Read(ReadOnlySpan<byte> text, ReadOnlyMemory<byte> styl, DecodeOptions? options = null)
     {
-        var decoded = MacText.Decode(text, options ?? DecodeOptions.Default);
+        options ??= DecodeOptions.Default;
         var complete = true;
         var styles = styl.IsEmpty ? [] : StyleRuns.Read(styl, out complete);
         if (styles.Count == 0)
@@ -71,9 +72,9 @@ public sealed record StyledText(string Text, IReadOnlyList<TextRun> Runs, bool C
         // it): in stored order from the start of the text, each run up to where the next run's start says (a run's
         // own start is never read), in either direction when they are out of order, a later run overwriting an
         // earlier one. Starts compare unsigned (a negative one is past the end); once a run reaches the end of the
-        // text, the rest are ignored.
-        var styleOf = new int[decoded.Length];
-        var length = (uint)decoded.Length;
+        // text, the rest are ignored. Starts count bytes.
+        var styleOf = new int[text.Length];
+        var length = (uint)text.Length;
         uint position = 0;
         for (var i = 0; i < styles.Count && position < length; i++)
         {
@@ -83,20 +84,35 @@ public sealed record StyledText(string Text, IReadOnlyList<TextRun> Runs, bool C
             styleOf.AsSpan(low, high - low).Fill(i);
             position = end;
         }
+
+        // Each run's bytes in its font's script (text-encodings.md §2.1): a font family in a non-Roman script's range
+        // reads its run in that script's encoding, any other in the options' encoding.
+        var decoded = new System.Text.StringBuilder(text.Length);
         var runs = new List<TextRun>();
-        for (var start = 0; start < decoded.Length;)
+        for (var start = 0; start < text.Length;)
         {
             var end = start + 1;
-            while (end < decoded.Length && styleOf[end] == styleOf[start])
+            while (end < text.Length && styleOf[end] == styleOf[start])
             {
                 end++;
             }
 
             var s = styles[styleOf[start]];
-            runs.Add(new TextRun(start, end - start, s.Font, StyleRuns.FontName(s.Font), s.Size > 0 ? s.Size : 12, s.Face,
+            var piece = MacEncodings.Decode(text[start..end], EncodingOf(s.Font, options));
+            runs.Add(new TextRun(decoded.Length, piece.Length, s.Font, StyleRuns.FontName(s.Font), s.Size > 0 ? s.Size : 12, s.Face,
                 (byte)(s.Red >> 8), (byte)(s.Green >> 8), (byte)(s.Blue >> 8), s.Height, s.Ascent));
+            decoded.Append(piece);
             start = end;
         }
-        return new StyledText(decoded, runs, complete);
+
+        return new StyledText(decoded.ToString(), runs, complete);
     }
+
+    // A run's encoding: its font family's script when that is not Roman and ClassicMac reads it (with automatic
+    // encodings on), else the options' encoding.
+    private static MacTextEncoding EncodingOf(short font, DecodeOptions options) =>
+        options.AutomaticEncoding && MacScripts.ScriptOfFontFamily((ushort)font) is var script and not 0
+            && MacScripts.Encoding(script, 0) is { } encoding
+            ? encoding
+            : options.TextEncoding;
 }

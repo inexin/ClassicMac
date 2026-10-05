@@ -125,12 +125,16 @@ internal sealed class VersionDecoder(DecodeOptions options) : IResourceDecoder, 
         var region = new BigEndianReader(input.Data).ReadInt16At(4);
         var offset = 6;
         var complete = MacText.TryReadPascal(data, ref offset, out var shortText);
-        var shortVersion = MacText.Decode(shortText, options);
+        // The strings are in the region's system's encoding (text-encodings.md §5) when that is not Mac OS Roman.
+        var encoding = options.AutomaticEncoding && MacScripts.EncodingOfRegion(region) is var regional && regional != MacTextEncoding.Roman
+            ? regional
+            : options.TextEncoding;
+        var shortVersion = MacEncodings.Decode(shortText, encoding);
         var longVersion = "";
         if (complete && offset < data.Length)
         {
             complete = MacText.TryReadPascal(data, ref offset, out var longText);
-            longVersion = MacText.Decode(longText, options);
+            longVersion = MacEncodings.Decode(longText, encoding);
         }
         if (!complete)
         {

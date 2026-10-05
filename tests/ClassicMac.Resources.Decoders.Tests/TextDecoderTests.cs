@@ -184,6 +184,35 @@ public class TextDecoderTests
         Assert.Equal("4.8.4 © 1986-1998 Green Mountain Software", json.GetProperty("longVersion").GetString());
     }
 
+    // Text that says its script (text-encodings.md §5): a styled run's font family, a 'vers' resource's region.
+    [Fact]
+    public void Styled_runs_in_a_Japanese_font_read_as_Mac_OS_Japanese()
+    {
+        byte[] text = [.. "Name: "u8, 0x93, 0xFA, 0x96, 0x7B];                    // 日本 in Mac OS Japanese
+        var styl = Styl((0, 3, 0, 12, 0, 0, 0), (6, 0x4000, 0, 12, 0, 0, 0));      // Geneva, then the first Japanese family
+
+        var styled = Text.StyledText.Read(text, styl);
+
+        Assert.Equal("Name: 日本", styled.Text);
+        Assert.Equal([(0, 6), (6, 2)], styled.Runs.Select(r => (r.Start, r.Length)));
+        var manual = Text.StyledText.Read(text, styl, DecodeOptions.Default with { AutomaticEncoding = false });
+        Assert.Equal(10, manual.Text.Length);                                       // as Mac OS Roman, a byte a character
+    }
+
+    [Fact]
+    public void A_version_reads_in_its_regions_encoding_and_writes_back_in_it()
+    {
+        byte[] japanese = [0x93, 0xFA, 0x96, 0x7B];
+        byte[] data = [0x01, 0x00, 0x80, 0x00, 0x00, 14, 3, .. "1.0"u8, (byte)(japanese.Length + 4), .. "1.0 "u8, .. japanese];   // region 14, verJapan
+
+        var (files, _) = Decode(Res("vers", 1, data));
+        Assert.Equal("1.0 日本", JsonDocument.Parse(files[0].Content).RootElement.GetProperty("longVersion").GetString());
+
+        var version = Text.VersionResource.Read(data)!;
+        Assert.Equal("1.0 日本", version.LongVersion);
+        Assert.Equal(data, version.Write());
+    }
+
     [Fact]
     public void Too_short_versions_are_left_raw()
     {

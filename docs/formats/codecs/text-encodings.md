@@ -10,7 +10,7 @@ every encoding below and, by default, Mac OS Roman.
 | Used by | Every text the decoders read: `TEXT`, `STR `, `STR#`, `styl` documents, menus, dialogs, aliases, Finder resources, Help pages ([help-pages.md](../resources/help-pages.md)) |
 | ClassicMac | Reads and writes; `ClassicMac.Core` (`MacEncodings`, `MacTextEncoding`) |
 | Verified against | Apple's mapping tables, every code of all 16 (§7) |
-| Sources | Apple's Mac OS mapping tables (unicode.org `VENDORS/APPLE`, version 2.x, Apple's licence); Apple's TextCommon.h (Universal Interfaces 3.4), the base encodings; *Inside Macintosh: Text* |
+| Sources | Apple's Mac OS mapping tables (unicode.org `VENDORS/APPLE`, version 2.x, Apple's licence); Apple's TextCommon.h and Script.h (Universal Interfaces 3.4): base encodings, script and region codes, font ranges; *Inside Macintosh: Text* |
 
 Contents
 
@@ -60,6 +60,23 @@ Hebrew) or a character from Apple's corporate-use area [Doc].
 
 [Doc]
 
+### 2.1 Which encoding
+
+Text carries no encoding of its own; what says it is the script and region it was written in [Doc: Script.h, TextCommon.h,
+Apple's mapping tables]:
+
+- **Script and region:** a script code is the encoding of the same number (smJapanese 1 is Mac OS Japanese, …), except
+  that Roman script (0) is Mac OS Icelandic on a system of region verIceland (21), Turkish on verTurkey (24), Croatian
+  on verCroatia (68) or verYugoCroatian (25), Romanian on verRomania (39) and Greek on verGreece (20), and Cyrillic
+  script (7) is Mac OS Ukrainian on verUkraine (62).
+- **A font family's script:** IDs from smFondStart ($4000) to smFondEnd ($C000) belong to the non-Roman scripts, 512
+  a script in script-code order (16384–16895 Japanese, 16896–17407 Traditional Chinese, …); every other ID is Roman.
+- **A region's system:** each region is a locale (verJapan ja_JP, verKorea ko_KR …), so its system's script is its
+  language's: Japan 14, Taiwan 53, China 52, Korea 51, Israel 13, Arabic 16, the Cyrillic regions (Russia 49,
+  Byelorussia 61, Ukraine 62, Bulgaria 72, Serbia 65, Macedonia 67), Thailand 54, the Central European regions (Czech
+  56, Slovak 57, Poland 42, Hungary 43, Lithuania 41, Estonia 44, Latvia 45); the rest Roman. Norway, like the other
+  Western regions, is Mac OS Roman.
+
 ## 3. Writing
 
 Each character becomes its code; where a sequence maps to one code, the sequence is written as that code. A character
@@ -82,8 +99,12 @@ None.
   is read on its own. [ClassicMac]
 - Writing takes the longest text at each place that maps to a code (codes of one byte before codes of two); a
   character the encoding does not hold is refused. [ClassicMac]
+- `MacScripts` gives §2.1's rules: `Encoding(script, region)`, `ScriptOfFontFamily`, `EncodingOfRegion`. [ClassicMac]
 - The decoders read text in `DecodeOptions.TextEncoding`, Mac OS Roman by default, and record its IANA name in the
-  manifest. The CLI's `--encoding` sets it ([cli.md §2](../../cli.md#2-read-commands)). [ClassicMac]
+  manifest. With `DecodeOptions.AutomaticEncoding` (on by default), text that says its script is read in it first: a
+  styled run (`TEXT` and `styl`, SimpleText and DOCMaker documents) whose font family is in a non-Roman script's range
+  reads in that script's encoding, run by run; a `'vers'` resource's strings read, and are written back, in its region's
+  system's encoding when that is not Mac OS Roman. [ClassicMac] The CLI's `--encoding` sets it ([cli.md §2](../../cli.md#2-read-commands)). [ClassicMac]
 
 ## 6. Diagnostics
 
@@ -96,13 +117,15 @@ None.
   an encoding cannot hold. With Apple's mapping tables in `tests/golden/encodings` (gitignored, never committed), every
   code of every table is checked: all 16 match.
 - `tests/ClassicMac.Cli.Tests/PathCommandTests.cs`, `Encoding_reads_text_in_another_Mac_script`.
+- `tests/ClassicMac.Core.Tests/MacScriptsTests.cs`: font family ranges, script and region pairs, regions' systems.
+- `tests/ClassicMac.Resources.Decoders.Tests/TextDecoderTests.cs`: a styled run in a Japanese font, with and without
+  automatic encodings; a Japanese `'vers'` read and written back.
 
 ## 8. Not covered
 
 - Codes .NET's code pages define that Apple's tables do not are left as .NET reads them.
-- File and resource names (`MacString`) are shown as Mac OS Roman.
-- Choosing the encoding from what a file says: a font family's script, a `'vers'` region code, a `styl` run's font,
-  HFS Plus's text encoding hints; and an encoding setting in the app.
+- Names (`MacString`) in other encodings; HFS Plus's text encoding hints and a System file's region as the encoding of
+  a volume's files.
 - Symbol, Dingbats, the Indic scripts, Farsi, Celtic, Gaelic and Inuit.
 
 ## 9. References

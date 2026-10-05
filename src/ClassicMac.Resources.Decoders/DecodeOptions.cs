@@ -27,6 +27,12 @@ public sealed record DecodeOptions
     /// <summary>The encoding text in resources and documents is read with (docs/formats/codecs/text-encodings.md). Default Mac OS Roman.</summary>
     public MacTextEncoding TextEncoding { get; init; } = MacTextEncoding.Roman;
 
+    /// <summary>
+    /// Whether text that says its own script is read in it, before <see cref="TextEncoding"/>: a styled run in a font of
+    /// a non-Roman script, a <c>'vers'</c> resource's region (text-encodings.md §5). On by default.
+    /// </summary>
+    public bool AutomaticEncoding { get; init; } = true;
+
     /// <summary>How line breaks are written in <c>.txt</c> output. Default LF.</summary>
     public LineEndings LineEndings { get; init; } = LineEndings.Lf;
 

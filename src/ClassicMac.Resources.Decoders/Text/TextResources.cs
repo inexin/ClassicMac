@@ -26,6 +26,10 @@ public static class TextResources
     /// <exception cref="ArgumentException">The text is not Mac OS Roman, or is over 255 bytes.</exception>
     public static byte[] WriteString(string text) => Pascal(text);
 
+    /// <summary>A Pascal string of <paramref name="text"/> in <paramref name="encoding"/>.</summary>
+    /// <exception cref="ArgumentException">The encoding cannot hold the text, or it is over 255 bytes.</exception>
+    public static byte[] WriteString(string text, MacTextEncoding encoding) => Pascal(text, encoding);
+
     /// <summary>The strings of a <c>'STR#'</c>, as many as its data holds.</summary>
     public static IReadOnlyList<string> ReadStringList(ReadOnlyMemory<byte> data)
     {
@@ -115,9 +119,9 @@ public static class TextResources
         return (text, StyleRuns.Write(kept));
     }
 
-    private static byte[] Pascal(string text)
+    private static byte[] Pascal(string text, MacTextEncoding encoding = MacTextEncoding.Roman)
     {
-        var bytes = ToMac(text);
+        var bytes = ToMac(text, encoding);
         if (bytes.Length > 255)
         {
             throw new ArgumentException($"A Pascal string holds at most 255 bytes; this is {bytes.Length}.", nameof(text));
@@ -128,10 +132,15 @@ public static class TextResources
 
     private static string FromMac(ReadOnlySpan<byte> bytes) => MacRoman.Decode(bytes).Replace('\r', '\n');
 
-    private static byte[] ToMac(string text)
+    private static byte[] ToMac(string text, MacTextEncoding encoding = MacTextEncoding.Roman)
     {
         ArgumentNullException.ThrowIfNull(text);
         var mac = text.Replace("\r\n", "\r").Replace('\n', '\r');
+        if (encoding != MacTextEncoding.Roman)
+        {
+            return MacEncodings.Encode(mac, encoding);
+        }
+
         return MacRoman.TryEncode(mac, out var bytes)
             ? bytes
             : throw new ArgumentException("The text has characters Mac OS Roman cannot hold.", nameof(text));
@@ -158,20 +167,21 @@ public sealed record VersionResource(int Major, int Minor, int BugFix, byte Stag
         var nonRelease = (bytes[3] >> 4) <= 9 && (bytes[3] & 0x0F) <= 9 ? Bcd(bytes[3]) : bytes[3];
         var offset = 6;
         MacText.TryReadPascal(bytes, ref offset, out var shortText);
-        var shortVersion = MacRoman.Decode(shortText);
+        var reader = new BigEndianReader(data);
+        var encoding = MacScripts.EncodingOfRegion(reader.ReadInt16At(4));                 // the region's system's encoding
+        var shortVersion = MacEncodings.Decode(shortText, encoding);
         var longVersion = "";
         if (offset < bytes.Length && MacText.TryReadPascal(bytes, ref offset, out var longText))
         {
-            longVersion = MacRoman.Decode(longText).Replace('\r', '\n');
+            longVersion = MacEncodings.Decode(longText, encoding).Replace('\r', '\n');
         }
 
-        var reader = new BigEndianReader(data);
         return new VersionResource(Bcd(bytes[0]), bytes[1] >> 4, bytes[1] & 0x0F, bytes[2], nonRelease, reader.ReadInt16At(4),
             shortVersion, longVersion);
     }
 
     /// <summary>The resource: BCD numbers (the non-release number BCD too, as Apple writes it), then the two Pascal strings.</summary>
-    /// <exception cref="ArgumentException">A number is out of range, or a string is not Mac OS Roman or over 255 bytes.</exception>
+    /// <exception cref="ArgumentException">A number is out of range, or a string is not in the region's encoding or over 255 bytes.</exception>
     public byte[] Write()
     {
         if (Major is < 0 or > 99 || Minor is < 0 or > 15 || BugFix is < 0 or > 15 || NonRelease is < 0 or > 99)
@@ -186,8 +196,9 @@ public sealed record VersionResource(int Major, int Minor, int BugFix, byte Stag
         writer.WriteByte(Stage);
         writer.WriteByte(Bcd(NonRelease));
         writer.WriteInt16(Region);
-        writer.WriteBytes(TextResources.WriteString(ShortVersion));
-        writer.WriteBytes(TextResources.WriteString(LongVersion));
+        var encoding = MacScripts.EncodingOfRegion(Region);                                 // the region's system's encoding
+        writer.WriteBytes(TextResources.WriteString(ShortVersion, encoding));
+        writer.WriteBytes(TextResources.WriteString(LongVersion, encoding));
         return writer.ToArray();
     }
 }
