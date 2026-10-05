@@ -158,6 +158,42 @@ public class ExportTests : IDisposable
     }
 
     // Decodes TEXT into two files; throws for id 2, gives nothing for id 3.
+    // A file whose volume says its encoding (text-encodings.md §5): its resources go to the decoders made for that
+    // encoding; a file that says none, to the export's own.
+    [Fact]
+    public void A_file_s_encoding_chooses_its_decoders()
+    {
+        var made = new List<MacTextEncoding>();
+        var options = ExportOptions.Default with
+        {
+            Decoders = [new NamedDecoder("default")],
+            DecodersFor = e =>
+            {
+                made.Add(e);
+                return [new NamedDecoder(e.ToString())];
+            },
+        };
+        var fork = Fork(Res("TEXT", 128, "x"u8.ToArray()));
+
+        ResourceExporter.Export(fork, Path.Combine(folder, "a"), Source with { TextEncoding = MacTextEncoding.Japanese }, options);
+        ResourceExporter.Export(fork, Path.Combine(folder, "b"), Source, options);
+
+        Assert.Equal("Japanese", File.ReadAllText(Path.Combine(folder, "a", "TEXT", "128.txt")));
+        Assert.Equal("default", File.ReadAllText(Path.Combine(folder, "b", "TEXT", "128.txt")));
+        Assert.Equal([MacTextEncoding.Japanese], made);
+    }
+
+    private sealed class NamedDecoder(string name) : IResourceDecoder
+    {
+        public string Name => "named";
+
+        public int Version => 1;
+
+        public bool CanDecode(FourCC type) => true;
+
+        public IReadOnlyList<DecodedFile> Decode(DecodeInput input) => [new(".txt", System.Text.Encoding.UTF8.GetBytes(name))];
+    }
+
     private sealed class StubDecoder : IResourceDecoder
     {
         public string Name => "stub";

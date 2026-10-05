@@ -350,6 +350,9 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
                     KeepRaw = result.GetValue(keepRaw),
                     Decoders = decode ? ClassicMac.Resources.Decoders.ResourceDecoders.Create(decodeOptions) : [],
                     Documents = decode && !result.GetValue(noDocuments) ? ClassicMac.Resources.Decoders.ResourceDecoders.CreateDocumentConverters(decodeOptions) : [],
+                    // A file whose volume says its encoding is decoded in it (text-encodings.md §5).
+                    DecodersFor = decode ? ClassicMac.Resources.Decoders.ResourceDecoders.CreateFor(decodeOptions) : null,
+                    DocumentsFor = decode && !result.GetValue(noDocuments) ? ClassicMac.Resources.Decoders.ResourceDecoders.CreateDocumentConvertersFor(decodeOptions) : null,
                     Types = chosen,
                     Overwrite = result.GetValue(overwrite),
                     ReadOptions = ReadOptionsFrom(result),
@@ -375,7 +378,8 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         command.SetAction(result => new ConvertCommand(output, error).Run(
             result.GetRequiredValue(input), result.GetValue(outputDir),
             ClassicMac.Resources.Decoders.ResourceDecoders.CreateDocumentConverters(DecodeOptionsFrom(result, screenDepth)), ReadOptionsFrom(result),
-            ContainerOptionsFrom(result), result.GetValue(overwrite), result.GetValue(strict), result.GetValue(quiet)));
+            ContainerOptionsFrom(result), result.GetValue(overwrite), result.GetValue(strict), result.GetValue(quiet),
+            ClassicMac.Resources.Decoders.ResourceDecoders.CreateDocumentConvertersFor(DecodeOptionsFrom(result, screenDepth))));
         return command;
     }
 

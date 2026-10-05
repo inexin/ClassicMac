@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ClassicMac.Core;
 
@@ -40,6 +41,16 @@ public sealed record ExportOptions
     /// </summary>
     public IReadOnlyList<IDocumentConverter> Documents { get; init; } = [];
 
+    /// <summary>
+    /// The decoders for a file whose volume says its text is in an encoding (<see cref="ExportSource.TextEncoding"/>,
+    /// text-encodings.md §5), in place of <see cref="Decoders"/>; null (the default) uses <see cref="Decoders"/> for every
+    /// file. <c>ClassicMac.Resources.Decoders</c>' <c>ResourceDecoders.CreateFor</c> makes it.
+    /// </summary>
+    public Func<MacTextEncoding, IReadOnlyList<IResourceDecoder>>? DecodersFor { get; init; }
+
+    /// <summary>The document converters for such a file, in place of <see cref="Documents"/>, as <see cref="DecodersFor"/>.</summary>
+    public Func<MacTextEncoding, IReadOnlyList<IDocumentConverter>>? DocumentsFor { get; init; }
+
     /// <summary>Limits and the Resource Manager model for decompressing resources.</summary>
     public ReadOptions ReadOptions { get; init; } = ReadOptions.Default;
 }
@@ -50,4 +61,8 @@ public sealed record ExportOptions
 /// <param name="Type">The file type.</param>
 /// <param name="Creator">The creator.</param>
 /// <param name="Flags">The Finder flags.</param>
-public sealed record ExportSource(MacString Name, IReadOnlyList<string> Formats, FourCC Type, FourCC Creator, ushort Flags);
+public sealed record ExportSource(MacString Name, IReadOnlyList<string> Formats, FourCC Type, FourCC Creator, ushort Flags)
+{
+    /// <summary>The encoding the file's volume says its text is in (text-encodings.md §5), or null.</summary>
+    public MacTextEncoding? TextEncoding { get; init; }
+}

@@ -99,7 +99,10 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
         }
 
         var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(file.Name) + " resources");
-        var source = new ExportSource(file.Name, [], file.FinderInfo.Type, file.FinderInfo.Creator, (ushort)file.FinderInfo.Flags);
+        var source = new ExportSource(file.Name, [], file.FinderInfo.Type, file.FinderInfo.Creator, (ushort)file.FinderInfo.Flags)
+        {
+            TextEncoding = VolumeEncodings.Of(fileNode),
+        };
         var progress = appParts.StatusLine.BeginProgress($"Exporting {file.Name.ToMacRoman()}…", fork.Resources.Count(r => types is null || types.Contains(r.Type)));
         ExportResult result;
         try
@@ -279,6 +282,9 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
             NameEncoding = appView.TextEncoding,
             Decoders = ResourceDecoders.Create(CurrentDecodeOptions),
             Documents = ResourceDecoders.CreateDocumentConverters(CurrentDecodeOptions),
+            // A file whose volume says its encoding is decoded in it (text-encodings.md §5).
+            DecodersFor = ResourceDecoders.CreateFor(CurrentDecodeOptions),
+            DocumentsFor = ResourceDecoders.CreateDocumentConvertersFor(CurrentDecodeOptions),
             Types = types,
             ReadOptions = appServices.ReadOptions,
         };
@@ -287,7 +293,8 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
     internal (IReadOnlyList<DecodedFile> Outputs, ReadOnlyMemory<byte> Raw) Decode(ResourceNode node, List<Diagnostic> diagnostics)
     {
         var raw = ResourceDecompression.Default.GetData(node.Resource, node.Fork, appServices.ReadOptions, diagnostics);
-        var decoder = ResourceDecoders.Create(CurrentDecodeOptions).FirstOrDefault(d => d.CanDecode(node.Resource.Type));
+        var options = CurrentDecodeOptions with { TextEncoding = VolumeEncodings.For(node, appView.TextEncoding) };
+        var decoder = ResourceDecoders.Create(options).FirstOrDefault(d => d.CanDecode(node.Resource.Type));
         IReadOnlyList<DecodedFile> outputs = decoder?.Decode(new DecodeInput(node.Resource, raw, node.Fork, appServices.ReadOptions, diagnostics)) ?? [];
         // One file per kind, named by its last extension: the first of several numbered images (SICN, PAT#: ".1.png"
         // is offered as ".png"), and a sidecar JSON only when it is the only output.

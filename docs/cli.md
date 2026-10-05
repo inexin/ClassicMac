@@ -69,7 +69,9 @@ code page. The limit options of every command (`--max-resource-size`, `--max-nes
 ([text-encodings.md](formats/codecs/text-encodings.md)). It applies to `cat`'s text and decoded resources,
 `find --contains`, the text `extract` and `convert` decode, and names stored as bytes (HFS, MFS, most archives): as
 paths are listed and matched, and as host file names `unpack` and `extract` write. Text that says its own script (a
-styled run's font, a `'vers'` region) is read in it whatever `--encoding` says.
+styled run's font, a `'vers'` region) is read in it whatever `--encoding` says. Without `--encoding`, a file whose
+volume says its encoding (an HFS Plus file's hint, or the volume's System file's region) is read in it by `cat`, `get`,
+`extract` and `convert` ([text-encodings.md §5](formats/codecs/text-encodings.md#5-classicmac)).
 
 `ls`, `cat` and `get` take `--follow`: an alias file (the Finder's isAlias flag) stands for its original, resolved on
 the volume holding it ([aliases.md §2](formats/resources/aliases.md#2-reading)), through aliases of aliases (at most

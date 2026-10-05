@@ -60,4 +60,34 @@ public sealed class TextEncodingTests : IDisposable
         model.ShellActions.SetTextEncodingCommand.Execute(MacTextEncoding.Korean);
         Assert.Equal(MacTextEncoding.Korean, model.TextEncoding);
     }
+    // A file whose volume says its encoding (here an HFS Plus hint, text-encodings.md §5) previews in it while the app's
+    // encoding is the default Mac OS Roman; another encoding chosen wins.
+    [Fact]
+    public async Task A_file_previews_in_its_volume_s_encoding()
+    {
+        var builder = new HfsPlusBuilder();
+        var fork = new ClassicMac.Resources.ResourceFork();
+        byte[] text = [4, .. Nihongo];
+        fork.Add(new ClassicMac.Resources.Resource(FourCC.FromString("STR "), 128, text));
+        var note = builder.File(HfsPlusBuilder.Root, "Note", [], fork.ToArray());
+        builder.TextEncoding(note, 1);
+        var path = Path.Combine(folder, "plus.img");
+        File.WriteAllBytes(path, builder.Build("Plus"));
+        var model = new MainViewModel(new MemorySettingsStore());
+        var input = (await model.OpenAsync(path))!;
+        var file = input.Children.Single(n => n.Title == "Note");
+        await file.EnsureLoadedAsync();
+        var str = file.Children.OfType<ResourceTypeNode>().Single().Children.Single();
+        await str.EnsureLoadedAsync();
+
+        model.Selected = str;
+        await model.PreviewTask;
+        Assert.Contains("日本", model.Preview.Text, StringComparison.Ordinal);
+
+        model.TextEncoding = MacTextEncoding.Greek;
+        model.Selected = file;
+        model.Selected = str;
+        await model.PreviewTask;
+        Assert.DoesNotContain("日本", model.Preview.Text, StringComparison.Ordinal);
+    }
 }

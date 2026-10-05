@@ -313,8 +313,11 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
             return ExitCodes.Success;
         }
 
+        // Text in the encoding the file's volume says, in place of the default Mac OS Roman (text-encodings.md §5).
+        var encoding = TextEncoding == MacTextEncoding.Roman && tree.EncodingOf(entry) is { } said ? said : TextEncoding;
+
         // A resource without --hex: decoded, as JSON or text; otherwise a hex dump.
-        if (entry.Kind == MacPathKind.Resource && !hex && MacPathJson.Decode(entry, all, readOptions, TextEncoding) is { } decoded)
+        if (entry.Kind == MacPathKind.Resource && !hex && MacPathJson.Decode(entry, all, readOptions, encoding) is { } decoded)
         {
             if (decoded.Extension == ".json")
             {
@@ -362,7 +365,7 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
             return ExitCodes.Success;
         }
 
-        WriteText(MacCommands.Text(bytes, TextEncoding));
+        WriteText(MacCommands.Text(bytes, encoding));
         return ExitCodes.Success;
 
         void Header(Utf8JsonWriter w, string encoding)

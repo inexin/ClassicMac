@@ -505,7 +505,7 @@ internal static class HfsPlusReader
                 ReadFork(image, data.AsMemory(88, 80), blockSize, totalBlocks, overflow, 0, fileId,
                     allocationExtents, ordinaryForkExtents),
                 ReadFork(image, data.AsMemory(168, 80), blockSize, totalBlocks, overflow, 0xFF, fileId,
-                    allocationExtents, ordinaryForkExtents));
+                    allocationExtents, ordinaryForkExtents), dataReader.ReadUInt32At(80));
             if (IsHardLinkFile(finderInfo) && dataReader.ReadUInt32At(88 + 12) != 0)
             {
                 context.Report(DiagnosticSeverity.Warning, "hfs.plus-hardlink-alias-has-data",
@@ -723,6 +723,7 @@ internal static class HfsPlusReader
                     HardLinkReference = isHardLink ? file.Special : null,
                     CatalogId = fileId,
                     ParentId = parent,
+                    TextEncoding = Hint(content.TextEncoding),
                 });
             }
         }
@@ -824,6 +825,11 @@ internal static class HfsPlusReader
             throw new InvalidDataException("The HFS Plus catalog has a thread for a missing node.");
         }
     }
+
+    // A catalog record's textEncoding (TN1150): a TextEncodingBase, whose numbers MacTextEncoding's are. Mac OS Roman (0)
+    // says nothing, as every name written without a hint has it [ClassicMac]; one ClassicMac does not read is null.
+    private static MacTextEncoding? Hint(uint textEncoding) =>
+        textEncoding is > 0 and <= ushort.MaxValue && Enum.IsDefined((MacTextEncoding)textEncoding) ? (MacTextEncoding)textEncoding : null;
 
     private static void AddCatalogTextEncoding(BigEndianReader record, ref ulong requiredBitmap)
     {
@@ -974,7 +980,7 @@ internal static class HfsPlusReader
 
     internal readonly record struct CatalogFileData(uint FileId, string Name, uint Parent, uint Special,
         uint PreviousLinkId, uint NextLinkId, ushort RecordFlags, ushort Mode,
-        FinderInfo FinderInfo, MacDate? Created, MacDate? Modified, ForkData DataFork, ForkData ResourceFork);
+        FinderInfo FinderInfo, MacDate? Created, MacDate? Modified, ForkData DataFork, ForkData ResourceFork, uint TextEncoding);
     private readonly record struct CatalogNode(uint Parent, string Name, bool IsFolder);
     private readonly record struct CatalogThread(uint Parent, string Name, bool IsFolder);
     private static MacString LegacyName(string name)

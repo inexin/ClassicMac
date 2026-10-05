@@ -106,6 +106,7 @@ public static class Unpacker
 
         var failed = new List<string>();
         int resources = 0, files = 0;
+        var encodingOf = FileEncodings.Of(root);
         foreach (var entry in forks)
         {
             var file = entry.Node.File;
@@ -117,7 +118,10 @@ public static class Unpacker
             }
             var target = Path.Combine([directory, .. parts]);
             var relative = string.Join('/', parts).Length + (parts.Count > 0 ? 1 : 0);
-            var source = new ExportSource(file.Name, entry.Chain, file.FinderInfo.Type, file.FinderInfo.Creator, (ushort)file.FinderInfo.Flags);
+            var source = new ExportSource(file.Name, entry.Chain, file.FinderInfo.Type, file.FinderInfo.Creator, (ushort)file.FinderInfo.Flags)
+            {
+                TextEncoding = encodingOf(entry.Node),
+            };
             try
             {
                 var result = ResourceExporter.Export(entry.Fork, target, source,
@@ -155,7 +159,8 @@ public static class DocumentConverter
     /// </summary>
     public static ConvertResult Convert(ContainerNode root, IReadOnlyList<ForkToExtract> forks, string directory,
         IReadOnlyList<IDocumentConverter> converters, ReadOptions? readOptions = null, bool overwrite = false,
-        ICollection<(string Source, Diagnostic Diagnostic)>? diagnostics = null, IProgress<int>? progress = null)
+        ICollection<(string Source, Diagnostic Diagnostic)>? diagnostics = null, IProgress<int>? progress = null,
+        Func<MacTextEncoding, IReadOnlyList<IDocumentConverter>>? convertersFor = null)
     {
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(forks);
@@ -170,13 +175,16 @@ public static class DocumentConverter
         // Converted first, to know whether there are several.
         var converted = new List<(ForkToExtract Entry, IDocumentConverter Converter, IReadOnlyList<DocumentFile> Files)>();
         var looked = 0;
+        var encodingOf = FileEncodings.Of(root);
         foreach (var entry in forks)
         {
             var file = entry.Node.File;
             var found = new List<Diagnostic>();
+            // A file whose volume says its encoding is converted by the converters made for it (text-encodings.md §5).
+            var fileConverters = encodingOf(entry.Node) is { } encoding && convertersFor is not null ? convertersFor(encoding) : converters;
             var input = new DocumentInput(entry.Fork, () => file.DataFork.ToArray(readOptions.MaxResourceSize), file.FinderInfo.Type,
                 file.FinderInfo.Creator, file.Name.ToString(), readOptions, found);
-            if (DocumentExport.Convert(converters, input) is var (converter, files))
+            if (DocumentExport.Convert(fileConverters, input) is var (converter, files))
             {
                 converted.Add((entry, converter, files));
             }

@@ -220,4 +220,27 @@ public class TextDecoderTests
         Assert.Empty(files);
         Assert.Equal("text.vers-short", Assert.Single(diagnostics).Code);
     }
+    // Decoders for a file's own encoding (its volume's, text-encodings.md §5): they read in it when the export reads in
+    // the default Mac OS Roman with AutomaticEncoding on; an encoding chosen, or AutomaticEncoding off, wins. One set per
+    // encoding.
+    [Fact]
+    public void A_file_s_encoding_replaces_only_the_default()
+    {
+        byte[] nihongo = [4, 0x93, 0xFA, 0x96, 0x7B];
+        string Read(Func<MacTextEncoding, IReadOnlyList<IResourceDecoder>> decodersFor)
+        {
+            var resource = Res("STR ", 128, nihongo);
+            var decoder = decodersFor(MacTextEncoding.Japanese).First(d => d.CanDecode(resource.Type));
+            var fork = new ResourceFork();
+            fork.Add(resource);
+            return System.Text.Encoding.UTF8.GetString(decoder.Decode(new DecodeInput(resource, resource.GetData(), fork)).First().Content.Span);
+        }
+
+        var automatic = ResourceDecoders.CreateFor(DecodeOptions.Default);
+        Assert.Equal("日本", Read(automatic));
+        Assert.Same(automatic(MacTextEncoding.Japanese), automatic(MacTextEncoding.Japanese));
+        Assert.NotEqual("日本", Read(ResourceDecoders.CreateFor(DecodeOptions.Default with { TextEncoding = MacTextEncoding.Greek })));
+        Assert.NotEqual("日本", Read(ResourceDecoders.CreateFor(DecodeOptions.Default with { AutomaticEncoding = false })));
+        Assert.NotEmpty(ResourceDecoders.CreateDocumentConvertersFor(DecodeOptions.Default)(MacTextEncoding.Japanese));
+    }
 }

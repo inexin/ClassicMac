@@ -15,7 +15,8 @@ namespace ClassicMac.Cli;
 internal sealed class ConvertCommand(TextWriter output, TextWriter error)
 {
     public int Run(FileInfo input, DirectoryInfo? outputDirectory, IReadOnlyList<IDocumentConverter> converters, ReadOptions readOptions,
-        ContainerReadOptions containerOptions, bool overwrite, bool strict, bool quiet)
+        ContainerReadOptions containerOptions, bool overwrite, bool strict, bool quiet,
+        Func<MacTextEncoding, IReadOnlyList<IDocumentConverter>>? convertersFor = null)
     {
         var reporter = new Reporter(error, strict, quiet);
         Input opened;
@@ -47,7 +48,7 @@ internal sealed class ConvertCommand(TextWriter output, TextWriter error)
         try
         {
             result = DocumentConverter.Convert(opened.Root, forks.Select(f => new ForkToExtract(f.Node, f.Chain, f.Fork ?? new ResourceFork())).ToList(), root,
-                converters, readOptions, overwrite, found);
+                converters, readOptions, overwrite, found, convertersFor: convertersFor);
         }
         catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {

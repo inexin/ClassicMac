@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- A volume's encoding (codecs/text-encodings.md §5): a file's text is read in the encoding its volume says, in place
+  of the default Mac OS Roman: an HFS Plus file's text encoding hint (`MacFile.TextEncoding`), else the volume's
+  System file's region (`FileEncodings`). The CLI's `cat`, `get`, `extract` and `convert` and the app's preview and
+  exports read in it; an encoding chosen wins. Exports take it through `ExportSource.TextEncoding` and
+  `ExportOptions.DecodersFor`/`DocumentsFor` (`ResourceDecoders.CreateFor`).
+
 - Segmented NDIF images are writable (disk-images/ndif.md §3.4): edited through part 1, the image is made again and
   cut into as many parts, each keeping its name, Finder info and the image ID; saved in place every part is written
   over itself (`.orig` kept), saved as a new file the parts are written beside it. `NdifWriter.RewriteSegmented` does

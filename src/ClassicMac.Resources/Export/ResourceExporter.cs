@@ -50,6 +50,8 @@ public static class ResourceExporter
         }
 
         var diagnostics = new List<Diagnostic>(fork.Diagnostics);
+        // A file whose volume says its encoding is decoded by the decoders made for it (text-encodings.md §5).
+        var decoders = source.TextEncoding is { } encoding && options.DecodersFor is { } decodersFor ? decodersFor(encoding) : options.Decoders;
         var resources = fork.Resources.Where(r => options.Types is null || options.Types.Contains(r.Type)).ToList();
         // Types that differ only in case get their bytes appended, on disks that ignore case.
         var folded = resources.Select(r => r.Type).Distinct()
@@ -69,7 +71,7 @@ public static class ResourceExporter
             // The first decoder for the type, or the data itself; a decoder that fails leaves the data.
             IReadOnlyList<DecodedFile> outputs = [new DecodedFile(Extension, data)];
             var (decoderName, decoderVersion) = ("raw", 1);
-            if (options.Decoders.FirstOrDefault(d => d.CanDecode(resource.Type)) is { } decoder)
+            if (decoders.FirstOrDefault(d => d.CanDecode(resource.Type)) is { } decoder)
             {
                 IReadOnlyList<DecodedFile> decoded = [];
                 try
@@ -136,11 +138,13 @@ public static class ResourceExporter
         }
 
         ManifestDocument? document = null;
-        if (options.Documents.Count > 0 && options.Types is null)
+        var documents = source.TextEncoding is { } documentEncoding && options.DocumentsFor is { } documentsFor
+            ? documentsFor(documentEncoding) : options.Documents;
+        if (documents.Count > 0 && options.Types is null)
         {
             var input = new DocumentInput(fork, dataFork ?? (() => ReadOnlyMemory<byte>.Empty), source.Type, source.Creator,
                 source.Name.ToString(), options.ReadOptions, diagnostics);
-            document = DocumentExport.Write(options.Documents, input, Path.Combine(directory, DocumentFolder), DocumentFolder + "/");
+            document = DocumentExport.Write(documents, input, Path.Combine(directory, DocumentFolder), DocumentFolder + "/");
             if (document is not null)
             {
                 files.AddRange(document.Files.Select(f => Path.Combine([directory, .. f.Path.Split('/')])));

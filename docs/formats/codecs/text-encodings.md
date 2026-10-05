@@ -111,6 +111,17 @@ None.
   styled run (`TEXT` and `styl`, SimpleText and DOCMaker documents) whose font family is in a non-Roman script's range
   reads in that script's encoding, run by run; a `'vers'` resource's strings read, and are written back, in its region's
   system's encoding when that is not Mac OS Roman. [ClassicMac] The CLI's `--encoding` sets it ([cli.md §2](../../cli.md#2-read-commands)). [ClassicMac]
+- **A volume's encoding.** A file's text is read in the encoding its volume says, in place of the default Mac OS Roman
+  (an encoding chosen, or `AutomaticEncoding` off, wins) [ClassicMac]:
+  - an HFS Plus catalog record's `textEncoding` hint ([hfs-plus.md §1](../file-systems/hfs-plus.md)), a TextEncodingBase
+    whose numbers `MacTextEncoding`'s are, as `MacFile.TextEncoding`; 0 (Mac OS Roman, which every name written
+    without a hint has) and encodings ClassicMac does not read say nothing;
+  - else the volume's System file (`'zsys'`/`'MACS'`, the blessed folder's when there are several): its `'vers'` 1
+    region's system's encoding (`FileEncodings.OfSystem`), unless that is Mac OS Roman.
+  `FileEncodings.Of(root)` gives each node's; exports take it through `ExportSource.TextEncoding` and
+  `ExportOptions.DecodersFor`/`DocumentsFor` (made by `ResourceDecoders.CreateFor`/`CreateDocumentConvertersFor`, a set
+  of decoders per encoding), the CLI's `cat`, `get`, `extract` and `convert` and the app's preview and exports read
+  in it. The hint is the name's encoding, taken as the text's too.
 
 ## 6. Diagnostics
 
@@ -129,13 +140,18 @@ None.
 - `tests/ClassicMac.App.Tests/TextEncodingTests.cs`: names retitled and text read again on a change, the choice kept
   for the next session, the menu's choices.
 - `tests/ClassicMac.Resources.Decoders.Tests/TextDecoderTests.cs`: a styled run in a Japanese font, with and without
-  automatic encodings; a Japanese `'vers'` read and written back.
+  automatic encodings; a Japanese `'vers'` read and written back; a file's encoding replacing only the default.
+- `tests/ClassicMac.Files.Tests/FileEncodingsTests.cs`: HFS Plus hints, a System file's region, the blessed folder's
+  System chosen, Roman and damaged ones saying nothing. `tests/ClassicMac.Resources.Tests/ExportTests.cs`,
+  `A_file_s_encoding_chooses_its_decoders`. `tests/ClassicMac.Cli.Tests/VolumeEncodingTests.cs`: `extract`, `cat` and
+  `convert` in a hinted file's and a Japanese System's encoding, and `--encoding` winning. The app's
+  `TextEncodingTests`, `A_file_previews_in_its_volume_s_encoding`.
 
 ## 8. Not covered
 
 - Codes .NET's code pages define that Apple's tables do not are left as .NET reads them.
-- Writing names in other encodings into a volume; the folders `convert` and `disasm` name; HFS Plus's text encoding
-  hints and a System file's region as the encoding of a volume's files.
+- Writing names in other encodings into a volume; the folders `convert` and `disasm` name; an MFS or HFS volume's
+  encoding from anything but its System file (a Finder's or font's region).
 - Symbol, Dingbats, the Indic scripts, Farsi, Celtic, Gaelic and Inuit.
 
 ## 9. References

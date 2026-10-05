@@ -661,7 +661,12 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
                 return;
             }
 
-            result = await PreviewViewModel.BuildAsync(node, DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager, TextEncoding = TextEncoding },
+            result = await PreviewViewModel.BuildAsync(node, DecodeOptions.Default with
+            {
+                ScreenDepth = ScreenDepth,
+                QuickDraw = ReadOptions.ResourceManager,
+                TextEncoding = VolumeEncodings.For(node, TextEncoding),
+            },
                 ReadOptions, diagnostics, cancellation.Token,
                 node is ResourceNode { Resource.Type: var type } && type.ToString() is "DLOG" or "ALRT" or "DITL"
                     || node is FolderNode or InputNode or ContainerFileNode or NoNameGroupNode ? DialogSources.From(Roots) : null);

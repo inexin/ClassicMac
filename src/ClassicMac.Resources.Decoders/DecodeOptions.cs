@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Text;
@@ -61,6 +62,31 @@ internal interface IBuiltInDecoder
 /// <summary>The built-in decoders.</summary>
 public static class ResourceDecoders
 {
+    /// <summary>
+    /// The built-in decoders for a file whose volume says its text is in an encoding (text-encodings.md §5), for
+    /// <see cref="ExportOptions.DecodersFor"/>: with <see cref="DecodeOptions.AutomaticEncoding"/> on and the default
+    /// Mac OS Roman as <see cref="DecodeOptions.TextEncoding"/>, decoders reading in the file's encoding (made once per
+    /// encoding); otherwise the encoding chosen wins and every file gets <paramref name="options"/>' decoders.
+    /// </summary>
+    public static Func<MacTextEncoding, IReadOnlyList<IResourceDecoder>> CreateFor(DecodeOptions? options = null) =>
+        For(options ?? DecodeOptions.Default, Create);
+
+    /// <summary>The document converters for such a file, for <see cref="ExportOptions.DocumentsFor"/>, as <see cref="CreateFor"/>.</summary>
+    public static Func<MacTextEncoding, IReadOnlyList<IDocumentConverter>> CreateDocumentConvertersFor(DecodeOptions? options = null) =>
+        For(options ?? DecodeOptions.Default, CreateDocumentConverters);
+
+    private static Func<MacTextEncoding, IReadOnlyList<T>> For<T>(DecodeOptions options, Func<DecodeOptions, IReadOnlyList<T>> create)
+    {
+        var own = create(options);
+        if (!options.AutomaticEncoding || options.TextEncoding != MacTextEncoding.Roman)
+        {
+            return _ => own;
+        }
+
+        var made = new System.Collections.Concurrent.ConcurrentDictionary<MacTextEncoding, IReadOnlyList<T>>();
+        return encoding => made.GetOrAdd(encoding, e => create(options with { TextEncoding = e }));
+    }
+
     /// <summary>The built-in decoders with <paramref name="options"/>, for <see cref="ExportOptions.Decoders"/>.</summary>
     public static IReadOnlyList<IResourceDecoder> Create(DecodeOptions? options = null)
     {

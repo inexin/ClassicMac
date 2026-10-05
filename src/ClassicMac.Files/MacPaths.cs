@@ -235,6 +235,40 @@ public sealed class MacPathTree : IDisposable
     /// <summary>The host file.</summary>
     public MacPathEntry Root { get; }
 
+    private readonly Dictionary<ContainerNode, MacTextEncoding?> systemEncodings = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// The encoding the volume says the file an entry is (or is in) has its text in (text-encodings.md §5): the file's
+    /// own <see cref="MacFile.TextEncoding"/>, else its volume's System file's region (<see cref="FileEncodings.OfSystem"/>,
+    /// read once per volume); null when neither says anything, or the entry is on no volume.
+    /// </summary>
+    public MacTextEncoding? EncodingOf(MacPathEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        var file = entry;
+        while (file is not null && file.File is null)
+        {
+            file = file.Parent;
+        }
+
+        if (file?.File?.TextEncoding is { } own)
+        {
+            return own;
+        }
+
+        if (file?.Holder?.Contents is not { Volume: { } volume } contents)
+        {
+            return null;
+        }
+
+        if (!systemEncodings.TryGetValue(contents, out var system))
+        {
+            systemEncodings[contents] = system = FileEncodings.OfSystem(contents.Children.Select(c => c.File), volume.BlessedFolderId);
+        }
+
+        return system;
+    }
+
     /// <summary>How the host file was stored (plain, with an AppleDouble file, MacBinary…).</summary>
     public HostLayout HostLayout { get; }
 

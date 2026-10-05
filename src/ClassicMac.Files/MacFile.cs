@@ -57,6 +57,12 @@ public sealed record MacFile
     /// <summary>The ID of the folder holding the file in its volume's catalog (2 for the root); null outside a volume.</summary>
     public uint? ParentId { get; init; }
 
+    /// <summary>
+    /// The text encoding the volume says the file's name was made in (an HFS Plus catalog record's text encoding hint),
+    /// when it names one ClassicMac reads other than Mac OS Roman; null otherwise (docs/formats/codecs/text-encodings.md §2.1).
+    /// </summary>
+    public ClassicMac.Core.MacTextEncoding? TextEncoding { get; init; }
+
     /// <summary>The Mac path inside the container, folders and name joined with ':' as the Mac wrote paths.</summary>
     public string MacPath => UnicodeName is { } name
         ? string.Join(":", (UnicodeFolderPath ?? FolderPath.Select(n => n.ToString()).ToArray()).Append(name))

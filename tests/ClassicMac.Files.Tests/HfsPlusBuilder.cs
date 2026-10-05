@@ -18,6 +18,7 @@ internal sealed class HfsPlusBuilder
     private readonly Dictionary<uint, (ushort Flags, uint Special)> folderLinks = [];
     private uint nextId = 16;
     private uint? privateFiles, privateFolders;
+    private readonly Dictionary<uint, uint> textEncodings = [];
 
     /// <summary>An HFSX volume ('HX', version 5): case-folding names, or case-sensitive with <see cref="CaseSensitive"/>.</summary>
     public bool Hfsx { get; init; }
@@ -42,6 +43,9 @@ internal sealed class HfsPlusBuilder
         files.Add((parent, name, nextId, data, resource, fragments, FourCC.FromString(type), FourCC.FromString(creator)));
         return nextId++;
     }
+
+    /// <summary>Sets a file's text encoding hint (the catalog record's textEncoding, TN1150).</summary>
+    public void TextEncoding(uint fileId, uint encoding) => textEncodings[fileId] = encoding;
 
     internal static byte[] CatalogKey(uint parent, string name)
     {
@@ -374,6 +378,7 @@ internal sealed class HfsPlusBuilder
             w.WriteUInt32At(8, file.Id);
             w.WriteFourCCAt(48, file.Type);
             w.WriteFourCCAt(52, file.Creator);
+            w.WriteUInt32At(80, textEncodings.GetValueOrDefault(file.Id));
             if (fileLinks.TryGetValue(file.Id, out var link))
             {
                 w.WriteUInt16At(2, (ushort)(0x0002 | link.Flags));

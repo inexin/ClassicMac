@@ -175,7 +175,7 @@ File record:
 | +$20 | 16 | `permissions` | BSD info: `ownerID` (u32), `groupID` (u32), `adminFlags` (u8), `ownerFlags` (u8), `fileMode` (u16), `special` (u32: inode number, link count or device) |
 | +$30 | 16 | `userInfo` | `FInfo` |
 | +$40 | 16 | `finderInfo` | `FXInfo` |
-| +$50 | 4 | `textEncoding` | The name's encoding hint |
+| +$50 | 4 | `textEncoding` | The name's encoding hint; ClassicMac reads it as `MacFile.TextEncoding`, the file's text's encoding too ([text-encodings.md §5](../codecs/text-encodings.md#5-classicmac)) |
 | +$54 | 4 | `reserved2` | |
 | +$58 | 80 | `dataFork` | Fork data (§1.3) |
 | +$A8 | 80 | `resourceFork` | |
