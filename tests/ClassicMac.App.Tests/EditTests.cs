@@ -980,6 +980,30 @@ public sealed class EditTests : EditTestsBase
     }
 
     // An image reader that returns one image whatever the path.
+    // A load that adds to the tree while the edited files are walked (closing, saving) does not break the walk.
+    [Fact]
+    public async Task The_edited_files_walk_survives_a_load_adding_to_the_tree()
+    {
+        var (model, file, _, _, _) = await Open();
+        var state = model.EditActions.StateFor(file);
+        var input = (InputNode)file.Parent!;
+
+        using var walk = EditActions.EditedFiles(input).GetEnumerator();
+        Assert.True(walk.MoveNext());
+        Assert.Equal((file, state), (walk.Current.Node, walk.Current.State));
+        var late = new FolderNode(input, "Loaded late");
+        if (input.Items is { } items)
+        {
+            items.Add(late);
+        }
+        else
+        {
+            input.Children.Add(late);
+        }
+
+        Assert.False(walk.MoveNext());
+    }
+
     private sealed class FixedImage(RgbaBitmap image) : IImageReader
     {
         public RgbaBitmap Read(string path) => image;

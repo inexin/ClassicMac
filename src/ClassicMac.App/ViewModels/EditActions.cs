@@ -175,7 +175,8 @@ public sealed partial class EditActions(IAppSelection appSelection, IAppServices
             yield return (root, state);
         }
 
-        foreach (var child in TreeLayout.Contents(root))
+        // Each level copied first: a load finishing while the caller walks (a close's questions are awaited) adds to the lists.
+        foreach (var child in TreeLayout.Contents(root).ToArray())
         {
             foreach (var found in EditedFiles(child))
             {
