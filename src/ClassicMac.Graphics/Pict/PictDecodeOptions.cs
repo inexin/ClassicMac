@@ -35,6 +35,12 @@ public sealed class PictDecodeOptions
     /// </summary>
     public RgbaColor? HiliteColor { get; init; }
 
+    /// <summary>
+    /// The most pixels a picture may draw into (its canvas's width × height); a larger picture is refused with
+    /// <see cref="System.IO.InvalidDataException"/> before anything is allocated. Defaults to 64 Mi (8192 × 8192).
+    /// </summary>
+    public long MaxPixels { get; init; } = 64L * 1024 * 1024;
+
     /// <summary>The size to draw the picture at. Defaults to <see cref="PictResolution.Native"/>.</summary>
     public PictResolution Resolution { get; init; } = PictResolution.Native;
 

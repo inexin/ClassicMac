@@ -114,6 +114,10 @@ The pattern alignment patAlign (§2.13) and the HiliteMode flag (§2.12) are glo
 
 [Code: 68k ROM]
 
+- Damaged data whose rows leave an odd number of points open: the unpaired point flips everything right of it, and a
+  region is scanned only within its rgnBBox, so its span runs to rgnBBox.right; a point at or past that edge adds
+  nothing. Both modes. [ClassicMac, from the rule above; not traced]
+
 ### 1.4 Polygons
 
 | Offset | Size | Field | Notes |

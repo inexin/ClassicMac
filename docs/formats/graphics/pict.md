@@ -587,6 +587,10 @@ Picture recording (§3.3) differs [Code: 68k ROM $077D] [Code: Mac OS 9.0 QuickD
   error). A BitMap or PixMap whose rowBytes is too small for its width is drawn with its rows overlapping as QuickDraw
   reads them; what the last row would read past the pixel data is zeros, where the Mac reads whatever memory follows.
   Both modes. [ClassicMac]
+- **Size limit:** a picture whose canvas (§2.2) has more than `PictDecodeOptions.MaxPixels` pixels (64 Mi by
+  default) is refused with `InvalidDataException` before anything is allocated; the Mac has no such limit, as
+  DrawPicture draws into the port, clipped to it. `ClassicMac.Resources.Decoders` passes `DecodeOptions.MaxImagePixels`.
+  [ClassicMac]
 - **Writing:** `PictWriter` writes §3: `PictWriteOptions.Format` (`Indexed1`, `Indexed2`, `Indexed4`, `Indexed8`,
   `Rgb555`, `Rgb888` (the default), `Argb8888`), `Palette` (else the bitmap's own colours, which must fit), the
   resolutions (72 dpi by default), `IccProfile`, and `FileHeader` (true by default; false writes a bare picture for a
@@ -616,7 +620,7 @@ resource ([export-manifest.md](../output/export-manifest.md)), it reports:
 | Code | Severity | When | ClassicMac does | The Mac does |
 | --- | --- | --- | --- | --- |
 | `image.too-large` | Warning | picFrame covers more than `DecodeOptions.MaxImagePixels` | Does not draw the picture; writes the resource raw | No such limit |
-| `image.undecodable` | Warning | The library refused the data (truncated, a bad structure, an unsupported variant) | Writes the resource raw | Not traced |
+| `image.undecodable` | Warning | The library refused the data (truncated, a bad structure, an unsupported variant, a canvas over `MaxImagePixels` once the header's resolution is applied) | Writes the resource raw | Not traced |
 | `image.decoder-fault` | Error | The decoder failed on the data with an index or arithmetic exception: a ClassicMac bug (found by mutation testing), not damaged data | Writes the resource raw | Not applicable |
 
 ## 7. Verification

@@ -70,7 +70,8 @@ public static class CodeExport
                 stem.Add((byte)' ');
                 stem.AddRange(name.Bytes);
             }
-            var file = HostNames.MakeUnique(HostNames.ToHostName(new MacString(stem.ToArray()), 120) + ".s", taken);
+            // A Pascal string's 255 bytes at most: the host name is cut to 120 below in any case.
+            var file = HostNames.MakeUnique(HostNames.ToHostName(new MacString(stem.Take(255).ToArray()), 120) + ".s", taken);
             files.Add(new CodeFile(file, Encoding.UTF8.GetBytes(text)));
             listed[(r.Type, r.Id)] = file;
             return file;

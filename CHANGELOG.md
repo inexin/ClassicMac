@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `PictDecodeOptions.MaxPixels` (64 Mi by default): a picture whose canvas is larger is refused with
+  `InvalidDataException` before anything is allocated, where a huge frame used to overflow (found by fuzzing,
+  pict.md §5). The `PICT` decoder passes `DecodeOptions.MaxImagePixels`.
+- Found by fuzzing: a region with an unpaired inversion point no longer fails when framed (its span runs to the
+  region's box, quickdraw.md §1.3), and a code resource with a 255-byte name is listed (`disasm`, `code.resource`).
+
 - Automatic text encodings (codecs/text-encodings.md §2.1, §5): `MacScripts` maps scripts, regions and font family IDs
   to encodings as Apple's headers and tables give them; styled runs in a non-Roman script's fonts read in that script,
   run by run, and `'vers'` strings in their region's encoding (read and written), unless

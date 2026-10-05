@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -55,6 +56,7 @@ public static class PictReader
     /// <param name="cancellationToken">Cancels decoding between opcodes.</param>
     /// <exception cref="NotSupportedException">The picture uses an unsupported pixel format.</exception>
     /// <exception cref="EndOfStreamException">The picture data is truncated.</exception>
+    /// <exception cref="InvalidDataException">The picture is larger than <see cref="PictDecodeOptions.MaxPixels"/>.</exception>
     public static RgbaBitmap Decode(ReadOnlyMemory<byte> data, PictDecodeOptions? options = null,
         CancellationToken cancellationToken = default) => Read(data, options, cancellationToken).Bitmap;
 
@@ -69,7 +71,14 @@ public static class PictReader
         var info = PictHeader.Parse(b, out bool v1);
         var bounds = info.BoundsRect;
         var canvasRect = options.Resolution == PictResolution.PictureFrame ? info.FrameRect : bounds;
-        var canvas = new RgbaBitmap(Math.Max(1, canvasRect.Width), Math.Max(1, canvasRect.Height));
+        int width = Math.Max(1, canvasRect.Width), height = Math.Max(1, canvasRect.Height);
+        if ((long)width * height > options.MaxPixels)
+        {
+            throw new InvalidDataException(string.Create(CultureInfo.InvariantCulture,
+                $"The picture is {width} × {height} pixels, over the {options.MaxPixels}-pixel limit."));
+        }
+
+        var canvas = new RgbaBitmap(width, height);
         var port = new GrafPort(canvas, info.FrameRect, bounds, options);
         Play(b, info, v1, port, options, cancellationToken);
         return new PictPicture(canvas, info);

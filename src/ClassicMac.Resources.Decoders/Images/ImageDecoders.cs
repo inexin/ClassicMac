@@ -91,6 +91,7 @@ internal sealed class PictureDecoder(DecodeOptions options) : ImageDecoder(optio
         {
             ScreenDepth = options.ScreenDepth,
             QuickDraw = options.QuickDraw == ResourceManagerModel.Rom68k ? QuickDrawVersion.MacRom : QuickDrawVersion.MacOS9,
+            MaxPixels = options.MaxImagePixels,
         });
 }
 

@@ -184,7 +184,7 @@ public sealed class Region
             i++;                                                    // row terminator
             rows.Add((y, xs));
         }
-        return FromInversionRows(rows);
+        return FromInversionRows(rows, bbox.Right);
     }
 
     // A Region operand in a picture: u16 rgnSize (bytes, including itself and the bounding box), Rect rgnBBox,
@@ -214,9 +214,27 @@ public sealed class Region
         return FromQuickDrawData(bbox, data);
     }
 
-    // Builds a region from inversion-point rows (any order; points toggle, so duplicates cancel).
-    internal static Region FromInversionRows(IEnumerable<(int y, List<int> xs)> rows)
+    // Builds a region from inversion-point rows (any order; points toggle, so duplicates cancel). An unpaired point
+    // (damaged data) flips everything right of it: its span runs to `right`, the rgnBBox edge QuickDraw scans to, and
+    // without one, or from at or past it, adds nothing [ClassicMac].
+    internal static Region FromInversionRows(IEnumerable<(int y, List<int> xs)> rows, int? right = null)
     {
+        int[] Spans(SortedSet<int> points)
+        {
+            var spans = points.ToArray();
+            if (spans.Length % 2 == 0)
+            {
+                return spans;
+            }
+
+            if (right is int edge && edge > spans[^1])
+            {
+                return [.. spans, edge];
+            }
+
+            return spans[..^1];
+        }
+
         var byY = new SortedDictionary<int, HashSet<int>>();
         foreach (var (y, xs) in rows)
         {
@@ -238,9 +256,9 @@ public sealed class Region
         int? top = null;
         foreach (var (y, toggles) in byY)
         {
-            if (top is int t && current.Count > 0)
+            if (top is int t && Spans(current) is { Length: > 0 } spans)
             {
-                Append(result, t, y, current.ToArray());
+                Append(result, t, y, spans);
             }
 
             foreach (var x in toggles)

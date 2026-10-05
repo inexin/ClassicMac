@@ -23,6 +23,18 @@ public class CodeExportTests
     private static JsonElement Model(IReadOnlyList<CodeFile> files) =>
         JsonDocument.Parse(files.Single(f => f.Name == "code.json").Content).RootElement.Clone();
 
+    // A 255-byte resource name (found by fuzzing): the listing's name is cut to fit, as any long name is.
+    [Fact]
+    public void A_segment_with_the_longest_name_is_listed()
+    {
+        var name = new string('n', 255);
+        var fork = Fork(Res("CODE", 0, Application0), Res("CODE", 1, Code1, name));
+
+        var (files, _) = Run(fork, []);
+
+        Assert.Contains(files, f => f.Name.StartsWith("CODE-1 nnn", StringComparison.Ordinal) && f.Name.Length <= 124);
+    }
+
     [Fact]
     public void A_fat_application_gives_every_listing_and_the_model()
     {

@@ -39,4 +39,38 @@ public class MalformedPictureTests
 
         Assert.Equal((8, 2), (bitmap.Width, bitmap.Height));
     }
+
+    // A frame too big to draw (found by libFuzzer: -32768…32767 square is 2³² pixels, whose RGBA size overflowed) is
+    // refused before anything is allocated; PictDecodeOptions.MaxPixels sets the limit [ClassicMac].
+    [Fact]
+    public void A_picture_over_the_pixel_limit_is_refused_before_drawing()
+    {
+        var huge = PictBuilder.V2(-32768, -32768, 32767, 32767).U16(0x00FF).ToArray();
+        var small = PictBuilder.V2(0, 0, 100, 100).U16(0x00FF).ToArray();
+
+        var e = Assert.Throws<InvalidDataException>(() => PictReader.Decode(huge));
+        Assert.Equal("The picture is 65535 × 65535 pixels, over the 67108864-pixel limit.", e.Message);
+        Assert.Equal(64L * 1024 * 1024, PictDecodeOptions.Default.MaxPixels);
+        Assert.Throws<InvalidDataException>(() => PictReader.Decode(small, new PictDecodeOptions { MaxPixels = 9_999 }));
+        Assert.Equal(100, PictReader.Decode(small, new PictDecodeOptions { MaxPixels = 10_000 }).Width);
+    }
+
+    // A region row with an unpaired inversion point (found by libFuzzer: it reached InsetRgn as an odd span list). The
+    // point flips every pixel right of it, and QuickDraw scans a region only within its rgnBBox, so the span runs to
+    // the box's right edge; a point at or past that edge adds nothing [ClassicMac, from §1.3's rule].
+    [Fact]
+    public void An_unpaired_inversion_point_runs_to_the_region_box()
+    {
+        var box = new PictRect(0, 0, 10, 20);
+        var region = Region.FromQuickDrawData(box, [0, 5, 0x7FFF, 4, 5, 0x7FFF, 0x7FFF]);
+
+        Assert.True(region.Contains(5, 0));
+        Assert.True(region.Contains(19, 3));
+        Assert.False(region.Contains(20, 0));
+        Assert.False(region.Contains(4, 0));
+        Assert.False(region.Contains(5, 4));
+        Assert.Equal(new PictRect(0, 5, 4, 20), region.Bounds);
+        Assert.Equal(new PictRect(1, 6, 3, 19), region.Inset(1, 1).Bounds);
+        Assert.True(Region.FromQuickDrawData(box, [0, 2, 4, 25, 0x7FFF, 4, 2, 4, 25, 0x7FFF, 0x7FFF]).Bands.All(b => b.Spans.Length == 2));
+    }
 }
