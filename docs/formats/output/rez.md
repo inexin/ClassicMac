@@ -3,12 +3,12 @@
 Rez is MPW's resource compiler: it reads source of `data` statements (and typed `resource` statements over `type`
 templates) and writes a resource fork; DeRez writes a fork back as such source. Retro68 ships a Rez of its own that
 reads most of the same source. ClassicMac writes a resource fork as MPW DeRez's output, byte for byte, or in the subset
-both compilers read alike.
+both compilers read alike, and compiles `data`, `read` and `include` statements as MPW's Rez does.
 
 | | |
 | --- | --- |
 | Identified by | Text files, extension `.r`; MPW's are Mac OS Roman with CR line ends, type `'TEXT'`, creator `'MPS '` |
-| ClassicMac | Writes; `ClassicMac.Resources.Rez` (`RezWriter`), the CLI's `derez` |
+| ClassicMac | Reads (`data`, `read`, `include`) and writes; `ClassicMac.Resources.Rez` (`RezCompiler`, `RezWriter`), the CLI's `rez` and `derez` |
 | Verified against | MPW 3.6 (MPW-GM) Rez and DeRez on Mac OS 9.0 in SheepShaver: 44 source files compiled and decompiled, and DeRez's output compared byte for byte (§7) |
 | Sources | Apple, *Building and Managing Programs in MPW* (Rez and DeRez); MPW 3.6's Rez and DeRez, run; Retro68's Rez (GPL), behaviour only |
 
@@ -49,7 +49,21 @@ data 'TYPE' (id[, "name"][, attributes]) {
 
 ## 2. Reading
 
-Compiling Rez source is not done by ClassicMac (§8).
+MPW's Rez compiles [Verified: MPW 3.6 Rez]:
+
+1. **Lexing:** keywords case-insensitive; `/* */` and `//` comments; the integers, strings, escapes and hex strings of
+   §1; adjacent strings and hex strings in a body join.
+2. **`data` 'TYPE' (id[, name][, attributes]) { values };** a resource of the values joined. A hex string in place of
+   the type makes **no resource and no error**. Attribute keywords set or clear their bit; a set and a clear of the
+   same bit is an error ("Too many or conflicting resource attributes"); `changed` and `unchanged` are errors; a number
+   sets the byte, bit $02 is an error ("Invalid resource attributes (126)") and bits $80 and $01 a warning ("Illegal or
+   reserved resource attributes set").
+3. **`read` 'TYPE' (…) "file";** a resource of the file's data fork; **`$$Read("file")`** the same bytes as a value.
+4. **`include` "file" ['TYPE' [(id)]];** the file's resources (all, of the type, or the one), copied as they are:
+   names (an empty one too), every attribute bit (the changed bit too) and any type.
+5. **`$$Format("format", values…)`** a string; `$$CountOf` and the typed statements (`type`, `resource`) work over
+   templates.
+6. Any error: the fork is not written.
 
 ## 3. Writing
 
@@ -96,14 +110,30 @@ differently or fail [Verified: MPW 3.6 DeRez] [Reference: Retro68].
   four printable characters (or holds `'` or `\`) is written in MPW's form (`rez.type`). [ClassicMac]
 - `classicmac derez <path> [-o file] [--portable] [-e]` writes a file's resource fork
   ([cli.md §2.8](../../cli.md#28-derez)). [ClassicMac]
+- **Compiling** (`RezCompiler.Compile`, `classicmac rez`, [cli.md §2.9](../../cli.md#29-rez)) reads §2's `data`,
+  `read` and `include` statements and `$$Read` and `$$Format` (`%d %i %x %X %c %s %%`, an `l` ignored), with MPW's
+  escapes or, with `RezCompileOptions.Retro68Escapes`, Retro68's. The files `read` and `include` name are found beside
+  the source. A resource defined twice is an error (`rez.duplicate`). Preprocessor lines (`#include "Types.r"` …) are
+  skipped with a warning, and typed statements (`type`, `resource`, `change`, `delete`, `enum`, `symbol`) are an error
+  (`rez.typed`). The fork is written by ClassicMac's fork writer, which clears the changed bit as the Resource Manager
+  does, where MPW's Rez keeps an included resource's. [ClassicMac]
 
 ## 6. Diagnostics
 
 | Code | Severity | When | ClassicMac does | The Mac does |
 | --- | --- | --- | --- | --- |
 | `rez.attributes` | Warning | The portable dialect meets attribute bits $80, $02 or $01 | Leaves them out | MPW Rez warns on $80 and $01 and refuses $02; Retro68 has no numeric attributes [Verified: MPW 3.6 Rez] |
+| `rez.conflicting-attributes` | Error | A keyword sets and another clears the same attribute | Writes no fork | The same error [Verified: MPW 3.6 Rez] |
+| `rez.duplicate` | Error | Two resources of one type and ID | Writes no fork | Not tried |
 | `rez.empty-name` | Warning | The portable dialect meets an empty name | Leaves the name out | `""` makes no name in MPW Rez [Verified: MPW 3.6 Rez] |
+| `rez.file` | Error | A file `read`, `$$Read` or `include` names cannot be read | Writes no fork | An error [Verified: MPW 3.6 Rez] |
+| `rez.hex-type` | Info | A hex string in place of a type | Makes no resource | The same, silently [Verified: MPW 3.6 Rez] |
+| `rez.invalid-attributes` | Error | A numeric attribute sets bit $02 | Writes no fork | "Invalid resource attributes" [Verified: MPW 3.6 Rez] |
+| `rez.preprocessor` | Warning | A `#` line | Skips it | Preprocesses it |
+| `rez.reserved-attributes` | Warning | A numeric attribute sets bit $80 or $01 | Sets them | The same warning [Verified: MPW 3.6 Rez] |
+| `rez.syntax` | Error | Source Rez does not read: a bad escape, `changed`, an odd hex string, an unknown statement | Writes no fork | An error [Verified: MPW 3.6 Rez] |
 | `rez.type` | Warning | The portable dialect meets a type that is not four printable characters, or holds `'` or `\` | Writes MPW's form | Retro68's character literals take no escapes [Reference: Retro68] |
+| `rez.typed` | Error | A typed statement (`type`, `resource` …) | Writes no fork | Compiles it through its template |
 
 ## 7. Verification
 
@@ -114,12 +144,17 @@ differently or fail [Verified: MPW 3.6 DeRez] [Reference: Retro68].
   tools, not committed) compares every one byte for byte: 43 files, among them a resource with every byte value,
   names with quotes, backslashes, CR, Mac OS Roman and control bytes, attributes $C1, $7E and $80, an empty name,
   three-character and control-byte types, and `-e`.
+- `tests/ClassicMac.Resources.Tests/RezCompilerTests.cs`: every escape and integer form, Retro68's escapes, types,
+  names and attributes, the errors, the hex-string type, `read`, `$$Read` and `include`, and what `RezWriter` writes
+  (both dialects) compiling back to the same fork.
+- `tests/ClassicMac.Cli.Tests/PathCommandTests.cs`: `Rez_compiles_source_into_a_resource_fork`, and
+  `Rez_compiles_what_MPWs_Rez_compiles`, which with `CLASSICMAC_MPW_DISK` compiles each test source on that disk and
+  compares the resources with MPW's Rez output (the changed bit aside), and refuses what MPW refused.
 
 ## 8. Not covered
 
-- Compiling Rez source into a resource fork.
-- Typed `resource` statements (writing a resource through its `type` template) and DeRez's `-only`, `-skip` and
-  include-file options.
+- Typed statements (`type`, `resource` and their templates), the preprocessor, `$$CountOf` and the other functions,
+  and DeRez's `-only`, `-skip` and include-file options.
 - Whether MPW Rez reads the portable dialect's LF line ends as it reads CR (not yet compiled there).
 
 ## 9. References

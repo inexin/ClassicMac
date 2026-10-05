@@ -184,6 +184,67 @@ public sealed class PathCommandTests : IDisposable
         Assert.True(compared > 0);
     }
 
+    // rez (docs/cli.md §2.9): source compiled into a resource fork; read and include take files beside it.
+    [Fact]
+    public void Rez_compiles_source_into_a_resource_fork()
+    {
+        var source = Path.Combine(folder, "app.r");
+        File.WriteAllText(source, "data 'STR ' (128, \"Hello\", purgeable) { $\"05\" \"Hello\" };\nread 'TEXT' (1) \"note.txt\";\n");
+        File.WriteAllText(Path.Combine(folder, "note.txt"), "a note");
+        var output = Path.Combine(folder, "app.rsrc");
+
+        var (code, text, error, _) = Run("rez", source, "-o", output);
+
+        Assert.True(code == 0, error);
+        Assert.Contains("2 resources to", text);
+        var fork = ClassicMac.Resources.ResourceFork.Read(File.ReadAllBytes(output));
+        var str = fork.Find(ClassicMac.Core.FourCC.FromString("STR "), 128)!;
+        Assert.Equal(("Hello", ClassicMac.Resources.ResourceAttributes.Purgeable), (str.Name!.Value.ToMacRoman(), str.Attributes));
+        Assert.Equal("a note"u8.ToArray(), fork.Find(ClassicMac.Core.FourCC.FromString("TEXT"), 1)!.GetData().ToArray());
+
+        File.WriteAllText(source, "data 'TEST' (1, changed) { };");
+        var failed = Run("rez", source, "-o", Path.Combine(folder, "none.rsrc"));
+        Assert.Equal(1, failed.Code);
+        Assert.Contains("rez.syntax", failed.Error);
+        Assert.False(File.Exists(Path.Combine(folder, "none.rsrc")));
+    }
+
+    // With CLASSICMAC_MPW_DISK set: every X.r on the disk that MPW's Rez compiled (X.out) compiles to the same resources;
+    // those it refused are refused; typed resources (type and resource statements) are not compiled. The changed bit,
+    // which MPW's Rez keeps from an include and ClassicMac's fork writer clears as the Resource Manager does, is left out.
+    [Fact]
+    public void Rez_compiles_what_MPWs_Rez_compiles()
+    {
+        var mpw = Environment.GetEnvironmentVariable("CLASSICMAC_MPW_DISK");
+        Assert.SkipWhen(string.IsNullOrEmpty(mpw) || !File.Exists(mpw), "CLASSICMAC_MPW_DISK is not set.");
+        var listing = Json(Run("ls", mpw + ":tests", "--json").Output);
+        var names = listing.GetProperty("entries").EnumerateArray().Select(e => e.GetProperty("name").GetString()!).ToHashSet();
+        string[] typed = ["f02.r", "f03.r", "k03.r"];
+        int compared = 0;
+        foreach (var source in names.Where(n => n.EndsWith(".r", StringComparison.Ordinal) && !typed.Contains(n)).Order(StringComparer.Ordinal))
+        {
+            var output = Path.Combine(folder, source + ".rsrc");
+            var (code, _, error, _) = Run("rez", mpw + ":tests:" + source, "-o", output);
+            var mpwOutput = source[..^2] + ".out";
+            if (!names.Contains(mpwOutput))
+            {
+                Assert.True(code != 0, $"{source}: MPW's Rez refused it, ClassicMac's did not");
+                continue;
+            }
+
+            Assert.True(code == 0, $"{source}: {error}");
+            var expected = ClassicMac.Resources.ResourceFork.Read(Run("cat", mpw + ":tests:" + mpwOutput, "--raw", "--fork", "rsrc").Binary);
+            var actual = ClassicMac.Resources.ResourceFork.Read(File.ReadAllBytes(output));
+            static string Key(ClassicMac.Resources.Resource r) =>
+                $"{r.Type.Value:X8} {r.Id} {(r.Name is { } n ? Convert.ToHexString(n.Bytes) : "-")} {(int)r.Attributes & ~2:X2} {Convert.ToHexString(r.GetData().Span)}";
+            Assert.True(expected.Resources.Select(Key).Order().SequenceEqual(actual.Resources.Select(Key).Order()),
+                $"{source}: MPW {string.Join(", ", expected.Resources.Select(Key))}; ClassicMac {string.Join(", ", actual.Resources.Select(Key))}");
+            compared++;
+        }
+
+        Assert.True(compared > 30, $"only {compared} compared");
+    }
+
     [Fact]
     public void Cat_shows_text_hex_raw_bytes_or_a_decoded_resource()
     {

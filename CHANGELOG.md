@@ -4,7 +4,9 @@
 
 - Rez source (output/rez.md): `classicmac derez` and `RezWriter` write a resource fork as MPW 3.6's DeRez does, byte
   for byte (checked against 43 of DeRez's own outputs, `-e` included), or with `--portable` in the subset MPW's and
-  Retro68's Rez compile alike, reporting what that subset cannot hold.
+  Retro68's Rez compile alike, reporting what that subset cannot hold. `classicmac rez` and `RezCompiler` compile `data`,
+  `read` and `include` statements (with `$$Read` and `$$Format`) as MPW's Rez does, its escapes, attributes and errors
+  included, checked against MPW's own output.
 - Picture recording (pict.md §3.3, §4.3): `PictureRecorder.OpenPicture`/`OpenCPicture`/`ClosePicture` record a
   `QuickDrawPort`'s drawing as version 2 opcodes as both QuickDraws do: state written lazily in CheckPic's order, the
   same-rect forms, the line and text opcodes by distance, CopyBits trimmed and packed, comments (`PicComment`), nothing

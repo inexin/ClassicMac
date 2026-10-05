@@ -141,8 +141,8 @@ In rough priority; each item names what blocks it, if anything.
    Mac-made zip; Mac OS X-made `.dmg`; NDIF version 2 and chunk type `$F0`; 68k ROM images; PEF section kinds 5, 6, 8
    and CFM-68K; THINK C code. PCE MAR is blocked (no sample; layout only in GPL source).
 7. **Owner's steps**: publish the NuGet packages, then deprecate the QuickDraw.Pict ones.
-8. **Rez**: compiling Rez source (`data` statements) into a resource fork, in progress; `derez` writes MPW DeRez's
-   output byte for byte.
+8. **Rez** (CLI only, not in the app until asked for): typed `resource` statements and the preprocessor; `rez` compiles
+   `data`, `read` and `include` as MPW does, and `derez` writes MPW DeRez's output byte for byte.
 9. **Comparisons, optional**: corpus output against resource_dasm; Rez-compiled fixtures (MPW kept out of
    the repository and CI, the forks pinned by hash).
 

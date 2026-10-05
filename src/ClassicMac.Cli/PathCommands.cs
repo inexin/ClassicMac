@@ -238,6 +238,59 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
         return strict && diagnostics.Count > 0 ? ExitCodes.Damaged : ExitCodes.Success;
     });
 
+    /// <summary>
+    /// rez (docs/cli.md §2.9): compiles a Rez source file into a resource fork written to <paramref name="outputFile"/>;
+    /// <c>read</c> and <c>include</c> name files beside the source (in its folder, or its host folder).
+    /// </summary>
+    public int Rez(string path, string outputFile, bool retro68) => With(path, (tree, entry) =>
+    {
+        if (entry.Kind != MacPathKind.File)
+        {
+            throw new InvalidOperationException($"is a {MacCommands.KindName(entry.Kind)}; rez takes a source file.");
+        }
+
+        var source = MacCommands.ReadBytes(tree, entry, MacFork.Data);
+        byte[] Fork(string name, MacFork fork)
+        {
+            if (tree.Parent(entry) is { } folder && entry.Parent is not null)
+            {
+                var sibling = tree.Children(folder).FirstOrDefault(c => c.Kind == MacPathKind.File && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
+                    ?? throw new FileNotFoundException($"no file {name} beside the source");
+                return MacCommands.ReadBytes(tree, sibling, fork);
+            }
+
+            var host = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(entry.Path)) ?? ".", name);
+            var other = MacPathTree.OpenPath(host, out var found, options, readOptions, []) ?? throw new FileNotFoundException($"no file {name} beside the source");
+            return MacCommands.ReadBytes(other, found ?? other.Root, fork);
+        }
+
+        var diagnostics = new List<Diagnostic>();
+        var compiled = ClassicMac.Resources.Rez.RezCompiler.Compile(source, new ClassicMac.Resources.Rez.RezCompileOptions
+        {
+            Retro68Escapes = retro68,
+            ReadFile = name => Fork(name, MacFork.Data),
+            ReadResourceFork = name => ClassicMac.Resources.ResourceFork.Read(Fork(name, MacFork.Resource), readOptions),
+        }, diagnostics);
+        foreach (var d in diagnostics)
+        {
+            error.WriteLine($"{Display(tree, entry.Path)}: {d.Message} ({d.Code})");
+        }
+
+        if (compiled is null)
+        {
+            error.WriteLine($"{Display(tree, entry.Path)}: since there were errors, no resource fork was written.");
+            return ExitCodes.Damaged;
+        }
+
+        File.WriteAllBytes(outputFile, compiled.ToArray());
+        if (!quiet)
+        {
+            output.WriteLine($"{compiled.Resources.Count} {(compiled.Resources.Count == 1 ? "resource" : "resources")} to {outputFile}");
+        }
+
+        return strict && diagnostics.Any(d => d.Severity != DiagnosticSeverity.Info) ? ExitCodes.Damaged : ExitCodes.Success;
+    });
+
     public int Cat(string path, bool hex, bool raw, MacFork fork, long maxBytes, bool json) => With(path, (tree, entry) =>
     {
         if (entry.Kind is MacPathKind.Folder or MacPathKind.ResourceType)

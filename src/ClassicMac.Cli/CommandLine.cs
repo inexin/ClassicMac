@@ -126,6 +126,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         root.Subcommands.Add(StatCommand());
         root.Subcommands.Add(CatCommand());
         root.Subcommands.Add(DerezCommand());
+        root.Subcommands.Add(RezCommand());
         root.Subcommands.Add(FindCommand());
         root.Subcommands.Add(GetCommand());
         root.Subcommands.Add(CheckCommand());
@@ -490,6 +491,19 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
             Dialect = result.GetValue(portable) ? ClassicMac.Resources.Rez.RezDialect.Portable : ClassicMac.Resources.Rez.RezDialect.Mpw,
             RawNames = result.GetValue(rawNames),
         }, result.GetValue(outputFile)?.FullName));
+        return command;
+    }
+
+    private Command RezCommand()
+    {
+        var path = MacPathArgument();
+        var outputFile = new Option<FileInfo>("--output", "-o") { Description = "The resource fork to write (raw, as a .rsrc file)", Required = true };
+        var retro68 = new Option<bool>("--retro68") { Description = "Retro68's escapes: \\n is $0A and \\r $0D (MPW's is the other way round)" };
+        var command = new Command("rez", "Compile Rez source (data, read and include statements) into a resource fork, as MPW's Rez does")
+        {
+            path, outputFile, retro68,
+        };
+        command.SetAction(result => Paths(result).Rez(result.GetRequiredValue(path), result.GetRequiredValue(outputFile).FullName, result.GetValue(retro68)));
         return command;
     }
 

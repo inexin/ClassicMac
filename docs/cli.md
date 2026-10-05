@@ -268,6 +268,14 @@ standard output or `-o`'s file; `-e` prints names' and types' control bytes as t
 error what it cannot hold (an empty name, attribute bits $80, $02 or $01, a type that is not four printable
 characters); with `--strict` such a report exits 1.
 
+### 2.9 rez
+
+`classicmac rez <path> -o <file> [--retro68]` compiles Rez source ([rez.md §2](formats/output/rez.md#2-reading)):
+`data`, `read` and `include` statements, `$$Read` and `$$Format`, with MPW's escapes (`--retro68`: Retro68's `\n` and
+`\r`). The files `read` and `include` name are found beside the source, in its folder or its host folder; `-o`'s file
+gets the resource fork itself (a `.rsrc`). Diagnostics go to standard error with their line; any error writes nothing
+and exits 1.
+
 ## 3. Write commands
 
 Each write command changes one thing on a Mac path, through the library's `InputEditSession`
