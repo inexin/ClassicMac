@@ -25,7 +25,7 @@ Contents
 
 ## 1. Layout
 
-The file is a RIFF container of one chunk [Doc: RFC 9649 §2]:
+The file is a RIFF container of one chunk [Author: RFC 9649 §2]:
 
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
@@ -38,7 +38,7 @@ The file is a RIFF container of one chunk [Doc: RFC 9649 §2]:
 
 ### 1.1 The VP8L bit stream
 
-Bits are read least significant first [Doc: RFC 9649 §3]:
+Bits are read least significant first [Author: RFC 9649 §3]:
 
 | Bits | Field | Notes |
 | --- | --- | --- |
@@ -58,7 +58,7 @@ None: ClassicMac does not read WebP.
 
 ### 3.1 Transforms
 
-[Doc: RFC 9649 §4], the choices [ClassicMac]:
+[Author: RFC 9649 §4], the choices [ClassicMac]:
 
 1. **Subtract green** (type 2): red and blue each less green, modulo 256.
 2. **Predictor** (type 0), size bits 4 (16 × 16 blocks): for each block the mode (0–13) whose residuals are smallest
@@ -69,7 +69,7 @@ None: ClassicMac does not read WebP.
 
 ### 3.2 Entropy-coded images
 
-The predictor's sub-image and the main image are each written as [Doc: RFC 9649 §5]: the colour cache flag (and its
+The predictor's sub-image and the main image are each written as [Author: RFC 9649 §5]: the colour cache flag (and its
 size in bits), for the main image the meta prefix code flag (0: one group of codes), the five prefix codes (green with
 the 24 length codes and the cache's, red, blue, alpha, the 40 distance codes), then the pixels as tokens:
 
@@ -85,7 +85,7 @@ Every pixel decoded goes into the cache, as the decoder puts it there. [ClassicM
 
 Each alphabet's Huffman code lengths come from its symbol counts, at most 15 bits: when longer, built again with every
 count raised to a minimum that doubles (as libwebp does) [ClassicMac]. Codes are canonical, by length then symbol, and
-written bit-reversed [Doc: RFC 9649 §3.7.2]. A code of one or two symbols under 256 is written simple; an unused
+written bit-reversed [Author: RFC 9649 §3.7.2]. A code of one or two symbols under 256 is written simple; an unused
 alphabet as a simple code of the one symbol 0; any other as its code lengths, run-length coded (16 repeats the previous
 non-zero length 3–6 times, 17 and 18 runs of zeros) through a code-length code of at most 7 bits, written in its fixed
 order and then every symbol's length. A code with one symbol takes no bits per symbol.
