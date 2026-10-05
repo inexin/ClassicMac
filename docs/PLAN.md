@@ -1,7 +1,7 @@
 # ClassicMac — Project Plan
 
 As of 2026-10-04. This is the plan and the record of decisions; how each format is read and written is in
-[`docs/formats/`](formats/README.md), the command line in [`cli.md`](cli.md), the code rules in `CLAUDE.md`, the app's
+[`docs/formats/`](formats/README.md), the command line in [`cli.md`](cli.md), the code rules in `CLAUDE.md` (and each project's own), the app's
 design in `design/APP-DESIGN-BRIEF.md`. Finished work is summarised here, not narrated: git history has the detail.
 
 ## Goals
