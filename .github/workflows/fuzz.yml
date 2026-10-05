@@ -1,0 +1,45 @@
+name: fuzz
+
+# libFuzzer on each reader through SharpFuzz (tools/Fuzz, docs/PLAN.md "Fuzzing"): nightly and on request, a few
+# minutes per target. A crash fails the target's job and keeps the input as an artifact; reproduce it with
+#   dotnet run --project tools/Fuzz -- replay <target> <crash file>
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Seconds per target
+        default: '300'
+
+jobs:
+  fuzz:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [container, resource-fork, resource, code, pef, pict, first-aid]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet tool install --global SharpFuzz.CommandLine
+      - run: dotnet publish tools/Fuzz -c Release -o fuzz
+      # Seeds come from the uninstrumented build; then ClassicMac's assemblies are instrumented in place.
+      - run: dotnet fuzz/Fuzz.dll seeds seeds .
+      - run: for dll in fuzz/ClassicMac.*.dll; do sharpfuzz "$dll"; done
+      - run: gh release download --repo Metalnem/libfuzzer-dotnet --pattern libfuzzer-dotnet-ubuntu --output libfuzzer-dotnet && chmod +x libfuzzer-dotnet
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: >
+          mkdir -p corpus crashes &&
+          ./libfuzzer-dotnet --target_path=fuzz/Fuzz --target_arg=${{ matrix.target }}
+          -max_total_time=${{ inputs.seconds || '300' }} -timeout=30 -rss_limit_mb=4096 -max_len=1048576
+          -artifact_prefix=crashes/ corpus seeds/${{ matrix.target }}
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crashes-${{ matrix.target }}
+          path: crashes
+          if-no-files-found: ignore

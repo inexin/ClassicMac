@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ClassicMac.Cli\ClassicMac.Cli.csproj" />
+    <ProjectReference Include="..\..\tools\Fuzz\Fuzz.csproj" />
   </ItemGroup>
 
 </Project>

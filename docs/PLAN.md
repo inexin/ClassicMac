@@ -74,7 +74,8 @@ flowchart LR
   APSL code is reference only. No Apple code or files in the repository.
 - **Hostile input**: every size and offset checked, by what is present rather than what a header declares; limits
   on nesting, expansion, decompressed size and pixels; cycles detected; only `InvalidDataException` and
-  `EndOfStreamException` escape, and nothing runs long (the mutation tests).
+  `EndOfStreamException` escape (and the exceptions an API documents, such as `PictReader`'s
+  `NotSupportedException`), and nothing runs long (the mutation tests, and the nightly fuzzing of `tools/Fuzz`).
 - **Configuration**: no tunable value hard-coded; immutable options records (`ContainerReadOptions`, `ReadOptions`,
   `DecodeOptions`, `ExportOptions`, `HostWriteOptions`, `PackOptions`) with a static `Default`, mapped by the CLI and
   the app.
@@ -129,12 +130,15 @@ In rough priority; each item names what blocks it, if anything.
    counts, the alternate header, a fragmented wrapped disk) pass it too. HFSX has been tried only on built volumes, and
    the in-place extents-tree edits and multi-partition writes await a live check.
 2. **Writing, still to do**: segmented NDIF images; new NDIF images from a disk.
-3. **Fuzzing**: SharpFuzz with libFuzzer per reader in CI. The seeded mutation tests (`tests/Shared/Mutations.cs`)
-   cover the containers, resource maps, `dcmp`, every decoder's fixtures, NDIF's two forks and First Aid on HFS and
-   HFS Plus; `CLASSICMAC_MUTANTS` runs them deeper.
+3. **Fuzzing**: `tools/Fuzz` runs libFuzzer through SharpFuzz nightly (`.github/workflows/fuzz.yml`, five minutes a
+   target) on seven targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
+   code, PEF, PICT on both QuickDraws, and First Aid. A reader fault the unwrapper or a decoder reports
+   (`*-fault`) counts as a crash. Seeds are the repository's test files and what is inside them; crashes are kept
+   as artifacts and replayed with `Fuzz replay`. Still to do: crashes found so far turned into tests, a corpus kept
+   between runs, more seeds (HFS Plus, PEF with sections). The seeded mutation tests (`tests/Shared/Mutations.cs`)
+   stay in the suite; `CLASSICMAC_MUTANTS` runs them deeper.
 4. **Decoders, later**: text encodings from HFS Plus's hints and a System file's region, names written in other
-   encodings, a "make loadable" option
-   for exported fonts, lossless WebP; QuickDraw's ScrollRect, OpenRgn/OpenPoly and OpenPicture.
+   encodings, a "make loadable" option for exported fonts, lossless WebP.
 5. **App**: editing the hex view's text column; packaging (macOS bundle icon, Linux icons and `.desktop` file).
 6. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
    encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types; Word 98 and fast-saved Word 6 documents; a

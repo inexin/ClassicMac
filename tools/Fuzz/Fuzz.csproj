@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpFuzz" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ClassicMac.Files\ClassicMac.Files.csproj" />
+    <ProjectReference Include="..\..\src\ClassicMac.Resources.Decoders\ClassicMac.Resources.Decoders.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClassicMac.Cli.Tests" />
+  </ItemGroup>
+
+</Project>
