@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Export;
+using ClassicMac.Resources.Decoders.Images;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders;
 using ClassicMac.Resources.Export;
@@ -44,6 +45,8 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
         ScreenDepth = appView.ScreenDepth,
         QuickDraw = appServices.ReadOptions.ResourceManager,
         TextEncoding = appView.TextEncoding,
+        ImageEncoder = appView.WebPImages ? WebPEncoder.Instance : PngEncoder.Instance,
+        LoadableFonts = appView.LoadableFonts,
     };
 
     private bool CanSaveResource() => !IsExporting && appSelection.Selected is ResourceNode;

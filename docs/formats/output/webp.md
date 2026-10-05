@@ -102,7 +102,8 @@ ClassicMac writes only the lossless form, with the subtract-green and predictor 
 ## 5. ClassicMac
 
 - `WebPEncoder.Instance` is an `IImageEncoder` (`Name` `webp`, `Extension` `.webp`) for `DecodeOptions.ImageEncoder`,
-  PNG being the default. The CLI's `extract` and `convert` take `--image-format png|webp`. [ClassicMac]
+  PNG being the default. The CLI's `extract` and `convert` take `--image-format png|webp`; the app's exports follow
+  Export ▸ Images as WebP (kept between sessions; previews are drawn as before). [ClassicMac]
 - A side over 16,384 pixels, which VP8L cannot hold, is refused (`ArgumentOutOfRangeException`). [ClassicMac]
 
 ## 6. Diagnostics
@@ -114,13 +115,14 @@ None: the encoder throws on a size it cannot hold.
 - `tests/ClassicMac.Graphics.Tests/WebPEncoderTests.cs`: noise, gradients, flat areas, transparency, repeated
   patterns (smaller than the PNG), and sides of 1 and odd sizes, each decoded by ImageSharp and by libwebp (SkiaSharp)
   back to the same pixels; the sizes refused.
-- `tests/ClassicMac.Cli.Tests/ExtractTests.cs`, `Image_format_webp_writes_lossless_WebP`.
+- `tests/ClassicMac.Cli.Tests/ExtractTests.cs`, `Image_format_webp_writes_lossless_WebP`; the app's
+  `ExportFormatTests` (the menu choice kept, Extract All writing WebP).
 - Mac OS 9's Geneva suitcase's bitmap strikes: 36,046 bytes as WebP, 46,031 as ClassicMac's PNG.
 
 ## 8. Not covered
 
 - The colour-transform and colour-indexing (palette) transforms, meta prefix codes, and a cache size chosen per image
-  beyond the three tried; the app offering the format.
+  beyond the three tried.
 - Reading WebP.
 
 ## 9. References

@@ -116,7 +116,8 @@ lacks none of these, or is not TrueType, is left as it is.
 - The export (`font.outline`, decoder version 1): `.ttf`, the data unchanged (`.sfnt` when it is not TrueType); `.json`
   with `version`, `trueType`, `familyName`, `subfamilyName`, `fullName`, `tables[]` (`tag`, `offset`, `length`).
   [ClassicMac]
-- With `DecodeOptions.LoadableFonts` (off by default; the CLI's `extract --loadable-fonts`) a TrueType font's `.ttf` is
+- With `DecodeOptions.LoadableFonts` (off by default; the CLI's `extract --loadable-fonts`, the app's Export ▸ Loadable
+  Fonts) a TrueType font's `.ttf` is
   made loadable (§3.1, `LoadableFont.Make`), and the JSON gains `loadable[]`, what was added (`version`,
   `cmap (3,1)`, `name (Windows)`, `OS/2`, `post`). The JSON's tables are the font's own. [ClassicMac]
 
@@ -145,7 +146,7 @@ lacks none of these, or is not TrueType, is left as it is.
   ([quickdraw.md §2.22](../graphics/quickdraw.md#222-drawing-text)).
 - Checking table checksums when reading.
 - Making PostScript Type 1 (`'typ1'`) or bitmap-only (`bhed`) sfnts loadable; double-byte Mac `cmap` subtables (format
-  2) as the source of a Windows one; the app's exports offering the option.
+  2) as the source of a Windows one.
 
 ## 9. References
 

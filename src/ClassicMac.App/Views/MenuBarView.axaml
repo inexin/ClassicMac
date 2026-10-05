@@ -96,6 +96,8 @@
       <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding ExportActions.UnpackBasiliskCommand}" />
       <Separator />
       <MenuItem Header="_Drag Files Out as MacBinary" ToggleType="CheckBox" IsChecked="{Binding DragOut.DragOutAsMacBinary, Mode=TwoWay}" />
+      <MenuItem Header="Images as _WebP" ToggleType="CheckBox" IsChecked="{Binding WebPImages, Mode=TwoWay}" />
+      <MenuItem Header="_Loadable Fonts" ToggleType="CheckBox" IsChecked="{Binding LoadableFonts, Mode=TwoWay}" />
     </MenuItem>
     <!-- Filled by the window: Minimize, Zoom, then one item per open input. -->
     <MenuItem x:Name="WindowMenu" Header="_Window" />

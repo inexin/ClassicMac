@@ -113,6 +113,12 @@ public interface IAppView
     /// <summary>The Mac encoding names and text are read in (View ▸ Text Encoding).</summary>
     MacTextEncoding TextEncoding { get; set; }
 
+    /// <summary>Whether exports write images as lossless WebP rather than PNG (Export ▸ Images as WebP).</summary>
+    bool WebPImages { get; }
+
+    /// <summary>Whether exports write TrueType fonts made loadable (Export ▸ Loadable Fonts).</summary>
+    bool LoadableFonts { get; }
+
     /// <summary>The image preview's items at the zoom.</summary>
     IReadOnlyList<ImageItem> Images { get; set; }
 

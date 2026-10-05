@@ -23,8 +23,12 @@ public enum AppTheme
 /// <param name="RecentFiles">The files opened last, newest first (the empty state's Recent list).</param>
 /// <param name="ShowDetails">Whether the tree shows its rows' details column (type · creator, sizes).</param>
 /// <param name="TypeCreatorDatabase">The type and creator database the user chose (View ▸ Type/Creator Database…), or null.</param>
+/// <param name="TextEncoding">The encoding names and text are read in (View ▸ Text Encoding), by its IANA name.</param>
+/// <param name="ImageFormat">How exports write images (Export ▸ Images as WebP): <c>png</c> or <c>webp</c>.</param>
+/// <param name="LoadableFonts">Whether exports write TrueType fonts made loadable (Export ▸ Loadable Fonts).</param>
 public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = true, AppTheme Theme = AppTheme.System,
-    IReadOnlyList<string>? RecentFiles = null, bool ShowDetails = false, string? TypeCreatorDatabase = null, string TextEncoding = "macintosh")
+    IReadOnlyList<string>? RecentFiles = null, bool ShowDetails = false, string? TypeCreatorDatabase = null, string TextEncoding = "macintosh",
+    string ImageFormat = "png", bool LoadableFonts = false)
 {
     /// <summary>The files opened last, newest first; empty when none.</summary>
     public IReadOnlyList<string> RecentFiles { get; init; } = RecentFiles ?? [];
@@ -33,6 +37,7 @@ public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = t
     public bool Equals(AppSettings? other) =>
         other is not null && GroupNoName == other.GroupNoName && HideInvisible == other.HideInvisible && Theme == other.Theme
         && ShowDetails == other.ShowDetails && TypeCreatorDatabase == other.TypeCreatorDatabase && TextEncoding == other.TextEncoding
+        && ImageFormat == other.ImageFormat && LoadableFonts == other.LoadableFonts
         && RecentFiles.SequenceEqual(other.RecentFiles);
 
     public override int GetHashCode()
@@ -44,6 +49,8 @@ public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = t
         hash.Add(ShowDetails);
         hash.Add(TypeCreatorDatabase);
         hash.Add(TextEncoding);
+        hash.Add(ImageFormat);
+        hash.Add(LoadableFonts);
         foreach (var path in RecentFiles)
         {
             hash.Add(path);

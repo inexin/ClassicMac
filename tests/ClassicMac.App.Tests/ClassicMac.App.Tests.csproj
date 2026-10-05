@@ -25,6 +25,7 @@
     <Compile Include="..\ClassicMac.Resources.Decoders.Tests\XlsxBuilder.cs" Link="Builders\XlsxBuilder.cs" />
     <Compile Include="..\ClassicMac.Files.Tests\AliasBuilder.cs" Link="Builders\AliasBuilder.cs" />
     <Compile Include="..\ClassicMac.Files.Tests\AliasFixtures.cs" Link="Builders\AliasFixtures.cs" />
+    <Compile Include="..\ClassicMac.Graphics.Tests\Fonts\TrueTypeBuilder.cs" Link="Builders\TrueTypeBuilder.cs" />
   </ItemGroup>
 
   <ItemGroup>

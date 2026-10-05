@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The app's Export menu has Images as WebP and Loadable Fonts: its exports write images as lossless WebP and TrueType
+  fonts made loadable, both off by default and kept between sessions.
+
 - Lossless WebP (output/webp.md): `WebPEncoder` writes VP8L (RFC 9649) with the subtract-green and predictor transforms,
   LZ77 backward references and a colour cache, for `DecodeOptions.ImageEncoder`; the CLI's `extract` and `convert`
   take `--image-format webp`. ImageSharp and libwebp read every test image back pixel for pixel; a Mac font's bitmap

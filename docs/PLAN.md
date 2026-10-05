@@ -138,16 +138,15 @@ In rough priority; each item names what blocks it, if anything.
    cache between runs. Crashes are kept as artifacts and replayed with `Fuzz replay`; those found so far are tests.
    Still to do: targets for the other writers (HFS edits, StuffIt and archive writers, PICT recording). The seeded
    mutation tests (`tests/Shared/Mutations.cs`) stay in the suite; `CLASSICMAC_MUTANTS` runs them deeper.
-3. **Decoders, later**: the app's exports offering loadable fonts and WebP images.
-4. **App**: packaging (macOS bundle icon, Linux icons and `.desktop` file).
-5. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
+3. **App**: packaging (macOS bundle icon, Linux icons and `.desktop` file).
+4. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
    encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types; Word 98 and fast-saved Word 6 documents; a
    Mac-made zip; Mac OS X-made `.dmg`; NDIF version 2 and chunk type `$F0`; 68k ROM images; PEF section kinds 5, 6, 8
    and CFM-68K; THINK C code. PCE MAR is blocked (no sample; layout only in GPL source).
-6. **Owner's steps**: publish the NuGet packages, then deprecate the QuickDraw.Pict ones.
-7. **Rez** (CLI only, not in the app until asked for): typed `resource` statements and the preprocessor; `rez` compiles
+5. **Owner's steps**: publish the NuGet packages, then deprecate the QuickDraw.Pict ones.
+6. **Rez** (CLI only, not in the app until asked for): typed `resource` statements and the preprocessor; `rez` compiles
    `data`, `read` and `include` as MPW does, and `derez` writes MPW DeRez's output byte for byte.
-8. **Comparisons, optional**: corpus output against resource_dasm; Rez-compiled fixtures (MPW kept out of
+7. **Comparisons, optional**: corpus output against resource_dasm; Rez-compiled fixtures (MPW kept out of
    the repository and CI, the forks pinned by hash).
 
 ## Ideas

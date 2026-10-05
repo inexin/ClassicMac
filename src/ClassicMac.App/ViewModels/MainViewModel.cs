@@ -227,6 +227,8 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
         TreeDisplay.LaidOut += TreeSearch.ReapplySearch;
         EmptyState.InitRecentFiles(saved.RecentFiles);
         textEncoding = MacEncodings.TryParse(saved.TextEncoding, out var encoding) ? encoding : MacTextEncoding.Roman;
+        webPImages = saved.ImageFormat == "webp";
+        loadableFonts = saved.LoadableFonts;
         TypeCreatorActions.InitTypeCreatorDatabase(saved.TypeCreatorDatabase);
     }
 
@@ -239,6 +241,8 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
             ShowDetails = TreeDisplay.ShowDetails,
             RecentFiles = EmptyState.RecentFiles.Select(r => r.Path).ToList(),
             TextEncoding = MacEncodings.Name(TextEncoding),
+            ImageFormat = WebPImages ? "webp" : "png",
+            LoadableFonts = LoadableFonts,
         });
 
     /// <summary>Which files the tree hides or groups.</summary>
@@ -586,6 +590,24 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
         // An alias previews its original (with a strip above); one whose original is not found shows a card instead.
         PreviewTask = MakePreviewAsync(AliasActions.SelectedAlias is { } alias ? alias.Target : value);
     }
+
+    /// <summary>
+    /// Whether exports write images as lossless WebP (output/webp.md) rather than PNG (Export ▸ Images as WebP), kept
+    /// between sessions. Previews are unchanged.
+    /// </summary>
+    [ObservableProperty]
+    private bool webPImages;
+
+    partial void OnWebPImagesChanged(bool value) => SaveSettings();
+
+    /// <summary>
+    /// Whether exports write TrueType fonts made loadable by modern systems (outline-fonts.md §3.1; Export ▸ Loadable
+    /// Fonts), kept between sessions.
+    /// </summary>
+    [ObservableProperty]
+    private bool loadableFonts;
+
+    partial void OnLoadableFontsChanged(bool value) => SaveSettings();
 
     /// <summary>The Mac encoding names and text are read in (View ▸ Text Encoding; text-encodings.md §5), kept between sessions.</summary>
     [ObservableProperty]
