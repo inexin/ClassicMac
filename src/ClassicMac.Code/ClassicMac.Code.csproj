@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <PackageId>ClassicMac.Code</PackageId>
-    <Description>Readers for classic Mac OS executable code: PowerPC PEF containers and code fragment resources (cfrg), with the loader's imports, exports and relocations.</Description>
+    <Description>Readers for classic Mac OS executable code: PowerPC PEF containers and code fragment resources (cfrg) with the loader's imports, exports and relocations; 68k applications (CODE segments, jump table, data initialisers) and code resources; 68k and PowerPC disassemblers producing annotated listings.</Description>
     <PackageTags>macintosh;classic-mac;pef;cfrg;powerpc;code-fragment</PackageTags>
   </PropertyGroup>
 

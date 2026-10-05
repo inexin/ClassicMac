@@ -6,7 +6,7 @@
     <ToolCommandName>classicmac</ToolCommandName>
     <AssemblyName>classicmac</AssemblyName>
     <PackageId>ClassicMac.Cli</PackageId>
-    <Description>Command-line tool that lists and extracts the resources of classic Mac OS files, whatever they are wrapped in, into modern files with a manifest.</Description>
+    <Description>Command-line tool for classic Mac OS files, whatever they are wrapped in: list, unpack, extract resources into modern files with a manifest, convert documents, disassemble code, rebuild resource forks, browse and edit disk images by Mac path, check and repair HFS volumes; also an MCP server and a DOS-like shell.</Description>
     <PackageTags>macintosh;classic-mac;resource-fork;rsrc;cli;dotnet-tool</PackageTags>
   </PropertyGroup>
 

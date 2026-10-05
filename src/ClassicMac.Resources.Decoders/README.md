@@ -11,7 +11,7 @@ exporter, the CLI and the app. Each decodes exactly what the Mac showed or playe
 | Fonts | `NFNT`, `FONT`, `FOND`, `sfnt` | PNG strikes, JSON metrics, TrueType (made loadable on request) |
 | Interface | `DLOG`, `ALRT`, `DITL`, `MENU`, `WIND`, `CNTL` and others, drawn in the Platinum appearance | PNG previews, JSON |
 | Finder | Finder windows and icons, `BNDL`/`FREF`, aliases, kinds (with a type/creator database) | PNG, JSON |
-| Documents | DOCMaker, SimpleText, Word 4/5/6/98, help pages | HTML folders |
+| Documents | DOCMaker, SimpleText, Word 4/5/6/98; help pages for previews | HTML folders |
 | Code | `CODE`, code resources, PEF fragments | 68k and PowerPC listings (`.s`), `code.json` |
 | Templates | `TMPL`s in the file, and ClassicMac's own for common types | Typed fields for editors |
 

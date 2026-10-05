@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <PackageId>ClassicMac.Files</PackageId>
-    <Description>Classic Mac OS files as the Mac saw them (name, Finder info, dates, data and resource forks) and the containers that carry them: AppleSingle, AppleDouble, MacBinary, BinHex, StuffIt, zip, tar and Basilisk II shared folders.</Description>
+    <Description>Classic Mac OS files as the Mac saw them (name, Finder info, dates, data and resource forks) and every container that carries them, through any nesting: AppleSingle, AppleDouble, MacBinary, BinHex, Basilisk II folders; StuffIt, Compact Pro, DiskDoubler, PackIt, LHA, zip and tar archives; Disk Copy, NDIF, DART and UDIF images, partition maps and CDs; HFS, HFS Plus, MFS, ISO 9660 and FAT file systems. Writes the wrappers and HFS volumes, and checks and repairs HFS and HFS Plus volumes (First Aid).</Description>
     <PackageTags>macintosh;classic-mac;finder-info;macbinary;binhex;stuffit;zip;tar;appledouble;applesingle</PackageTags>
   </PropertyGroup>
 

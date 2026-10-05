@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <PackageId>ClassicMac.Resources</PackageId>
-    <Description>Dependency-free reader and writer for classic Mac OS resource forks, with the System's compressed-resource decompressors (dcmp 0-3).</Description>
+    <Description>Dependency-free reader and writer for classic Mac OS resource forks, as the Resource Manager reads and compacts them: the System's compressed-resource decompressors (dcmp 0-3), edits with undo, export to files with a JSON manifest and back, and Rez and DeRez.</Description>
     <PackageTags>macintosh;classic-mac;resource-fork;rsrc;dcmp</PackageTags>
   </PropertyGroup>
 
