@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using ClassicMac.Core;
@@ -54,6 +55,8 @@ public sealed class InputEditSession
     private readonly List<EditedVolume> volumes = [];
     private bool resized;
     private readonly MacFile? ndif;
+    // A segmented NDIF image's parts, in part order, with their host paths (part 1 the input); null otherwise.
+    private readonly IReadOnlyList<(string Path, MacFile File)>? ndifParts;
     private readonly HostFile host;
     private MacFile? single;
 
@@ -126,6 +129,19 @@ public sealed class InputEditSession
                 singleFormat = chosen;
                 volumes.Add(new EditedVolume(kind, null, null, ""));
                 Kind = kind;
+                return;
+            }
+
+            // A segmented image (ndif.md §3.4): part 1 is the input, and every other part is found beside it, in the same
+            // layout; the image is made again in as many parts.
+            if (format is { } segmentedFormat && image == root && SegmentedParts(path, host, options) is { } parts
+                && image.Children is [var whole] && VolumeKind(whole.File.DataFork) is { } wholeKind)
+            {
+                ndif = image.File;
+                ndifParts = parts;
+                singleFormat = segmentedFormat;
+                volumes.Add(new EditedVolume(wholeKind, null, null, ""));
+                Kind = wholeKind;
                 return;
             }
 
@@ -238,7 +254,8 @@ public sealed class InputEditSession
     {
         if (ndif is not null)
         {
-            return NdifReader.Instance.Read(ndif, new ContainerContext(options)).Single().DataFork;
+            var parts = ndifParts?.Skip(1).Select(p => p.File).ToList();
+            return NdifReader.Instance.Read(ndif, new ContainerContext(options, siblings: parts is null ? null : () => parts)).Single().DataFork;
         }
 
         // The host file as read (on disk, or in memory for a session over changes not saved yet).
@@ -729,8 +746,23 @@ public sealed class InputEditSession
 
         if (ndif is not null)
         {
-            var image = Rewritten();
-            return ForkSaver.SaveAs(full, singleFormat, image, ResourceForkOf(image));
+            var images = Rewritten();
+            if (images is [var image])
+            {
+                return ForkSaver.SaveAs(full, singleFormat, image, ResourceForkOf(image));
+            }
+
+            // Part 1 at the destination, the others beside it under its name with their part numbers.
+            var directory = System.IO.Path.GetDirectoryName(full)!;
+            var names = PartNames(System.IO.Path.GetFileName(full), images.Count);
+            var written = new List<string>();
+            for (var n = 0; n < images.Count; n++)
+            {
+                var part = images[n] with { Name = new MacString([.. names[n].Select(c => MacRoman.TryGetByte(c, out var b) ? b : (byte)'?')]) };
+                written.AddRange(ForkSaver.SaveAs(System.IO.Path.Combine(directory, names[n]), singleFormat, part, ResourceForkOf(part)));
+            }
+
+            return written;
         }
 
         WriteVolume(full);
@@ -907,12 +939,62 @@ public sealed class InputEditSession
         WriteVolume(Path);
     }
 
-    // The NDIF image made again around the edited disk (its forks' edits made too).
-    // The changed sectors name the chunks to store again, so the old disk is not decoded to compare them.
-    private MacFile Rewritten()
+    // The NDIF image made again around the edited disk (its forks' edits made too): one file, or a segmented image's
+    // parts in part order. The changed sectors name the chunks to store again, so the old disk is not decoded to compare
+    // them.
+    private IReadOnlyList<MacFile> Rewritten()
     {
         var edited = ForkSaver.ApplyHfsForks(Overlay(volumes[0]), Replacements(volumes[0]));
-        return NdifWriter.Rewrite(ndif!, edited.ToArray(), edited.Sectors.ToHashSet());
+        return ndifParts is null
+            ? [NdifWriter.Rewrite(ndif!, edited.ToArray(), edited.Sectors.ToHashSet())]
+            : NdifWriter.RewriteSegmented([.. ndifParts.Select(p => p.File)], edited.ToArray(), edited.Sectors.ToHashSet());
+    }
+
+    // A segmented image's parts beside part 1 (path): files in its folder in the same layout, typed 'dseg', whose
+    // 'bcm#' 128 has its ID and count, each number once (ndif.md §2.6); a backup (.orig) is not a part [ClassicMac]. Null
+    // when part 1 is not segmented or a part is missing.
+    private static IReadOnlyList<(string Path, MacFile File)>? SegmentedParts(string path, HostFile host, ContainerReadOptions options)
+    {
+        var full = System.IO.Path.GetFullPath(path);
+        var directory = System.IO.Path.GetDirectoryName(full)!;
+        var candidates = new List<(string Path, MacFile File)> { (full, host.File) };
+        foreach (var file in Directory.EnumerateFiles(directory).Order(StringComparer.Ordinal))
+        {
+            var name = System.IO.Path.GetFileName(file);
+            if (string.Equals(file, full, StringComparison.OrdinalIgnoreCase) || name.StartsWith("._", StringComparison.Ordinal)
+                || name.EndsWith(".orig", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var read = HostFiles.Read(file, options);
+            if (read.Layout == host.Layout && read.File.FinderInfo.Type == FourCC.FromString("dseg"))
+            {
+                candidates.Add((file, read.File));
+            }
+        }
+
+        // Only the files of this image: its ID and count.
+        if (NdifCreation.PartRecord(host.File) is not { } first)
+        {
+            return null;
+        }
+
+        var mine = candidates.Where(c => NdifCreation.PartRecord(c.File) is { } record
+            && record.AsSpan(2, 18).SequenceEqual(first.AsSpan(2, 18))).ToList();
+        var ordered = NdifCreation.Ordered([.. mine.Select(c => c.File)]);
+        return ordered is null || !ReferenceEquals(ordered[0], host.File) ? null
+            : [.. ordered.Select(f => mine.First(c => ReferenceEquals(c.File, f)))];
+    }
+
+    // The host names of a segmented image's parts saved as `first`: its name with part 1's " 1ofM" (as wide as M)
+    // replaced by each part's number, or, without that ending, the name with " NofM" added [ClassicMac].
+    private static string[] PartNames(string first, int count)
+    {
+        var width = count.ToString(CultureInfo.InvariantCulture).Length;
+        string Suffix(int n) => string.Create(CultureInfo.InvariantCulture, $" {n.ToString(CultureInfo.InvariantCulture).PadLeft(width, '0')}of{count}");
+        var stem = first.EndsWith(Suffix(1), StringComparison.Ordinal) ? first[..^Suffix(1).Length] : null;
+        return [.. Enumerable.Range(1, count).Select(n => n == 1 ? first : (stem ?? first) + Suffix(n))];
     }
 
     private static ResourceFork ResourceForkOf(MacFile file) => ResourceFork.Read(file.ResourceFork.ToArray());
@@ -925,8 +1007,16 @@ public sealed class InputEditSession
         var temporary = System.IO.Path.Combine(folder, $".classicmac-{Guid.NewGuid():N}");
         try
         {
-            var image = Rewritten();
-            var written = ForkSaver.SaveAs(System.IO.Path.Combine(temporary, System.IO.Path.GetFileName(Path)), singleFormat, image, ResourceForkOf(image));
+            // Each file (a segmented image's every part) written under its own name, then moved over its original.
+            var images = Rewritten();
+            var paths = ndifParts?.Select(p => p.Path).ToList() ?? [Path];
+            var written = new List<string>();
+            for (var n = 0; n < images.Count; n++)
+            {
+                written.AddRange(ForkSaver.SaveAs(System.IO.Path.Combine(temporary, System.IO.Path.GetFileName(paths[n])), singleFormat, images[n],
+                    ResourceForkOf(images[n])));
+            }
+
             foreach (var file in written)
             {
                 var target = System.IO.Path.Combine(folder, System.IO.Path.GetRelativePath(temporary, file));
@@ -963,7 +1053,7 @@ public sealed class InputEditSession
 
         if (ndif is not null)
         {
-            return host.File == ndif ? host with { File = Rewritten() } : null;
+            return host.File == ndif && ndifParts is null ? host with { File = Rewritten()[0] } : null;
         }
 
         var whole = host.File.DataFork;

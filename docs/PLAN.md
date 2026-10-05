@@ -129,25 +129,24 @@ In rough priority; each item names what blocks it, if anything.
    Digital Corpora journaled Mac OS X image checks out; HFS Plus repairs on Mac OS 9-made volumes (valences, header
    counts, the alternate header, a fragmented wrapped disk) pass it too. HFSX has been tried only on built volumes, and
    the in-place extents-tree edits and multi-partition writes await a live check.
-2. **Writing, still to do**: edits written back into a segmented NDIF image's parts.
-3. **Fuzzing**: `tools/Fuzz` runs libFuzzer through SharpFuzz nightly (`.github/workflows/fuzz.yml`, five minutes a
+2. **Fuzzing**: `tools/Fuzz` runs libFuzzer through SharpFuzz nightly (`.github/workflows/fuzz.yml`, five minutes a
    target) on seven targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
    code, PEF, PICT on both QuickDraws, and First Aid. A reader fault the unwrapper or a decoder reports
    (`*-fault`) counts as a crash. Seeds are the repository's test files and what is inside them; crashes are kept
    as artifacts and replayed with `Fuzz replay`. Still to do: crashes found so far turned into tests, a corpus kept
    between runs, more seeds (HFS Plus, PEF with sections). The seeded mutation tests (`tests/Shared/Mutations.cs`)
    stay in the suite; `CLASSICMAC_MUTANTS` runs them deeper.
-4. **Decoders, later**: text encodings from HFS Plus's hints and a System file's region, names written in other
+3. **Decoders, later**: text encodings from HFS Plus's hints and a System file's region, names written in other
    encodings, a "make loadable" option for exported fonts, lossless WebP.
-5. **App**: packaging (macOS bundle icon, Linux icons and `.desktop` file).
-6. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
+4. **App**: packaging (macOS bundle icon, Linux icons and `.desktop` file).
+5. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
    encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types; Word 98 and fast-saved Word 6 documents; a
    Mac-made zip; Mac OS X-made `.dmg`; NDIF version 2 and chunk type `$F0`; 68k ROM images; PEF section kinds 5, 6, 8
    and CFM-68K; THINK C code. PCE MAR is blocked (no sample; layout only in GPL source).
-7. **Owner's steps**: publish the NuGet packages, then deprecate the QuickDraw.Pict ones.
-8. **Rez** (CLI only, not in the app until asked for): typed `resource` statements and the preprocessor; `rez` compiles
+6. **Owner's steps**: publish the NuGet packages, then deprecate the QuickDraw.Pict ones.
+7. **Rez** (CLI only, not in the app until asked for): typed `resource` statements and the preprocessor; `rez` compiles
    `data`, `read` and `include` as MPW does, and `derez` writes MPW DeRez's output byte for byte.
-9. **Comparisons, optional**: corpus output against resource_dasm; Rez-compiled fixtures (MPW kept out of
+8. **Comparisons, optional**: corpus output against resource_dasm; Rez-compiled fixtures (MPW kept out of
    the repository and CI, the forks pinned by hash).
 
 ## Ideas

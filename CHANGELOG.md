@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Segmented NDIF images are writable (disk-images/ndif.md §3.4): edited through part 1, the image is made again and
+  cut into as many parts, each keeping its name, Finder info and the image ID; saved in place every part is written
+  over itself (`.orig` kept), saved as a new file the parts are written beside it. `NdifWriter.RewriteSegmented` does
+  it for parts in memory.
+
 - New NDIF (Disk Copy 6) images (disk-images/ndif.md §3.2, §3.3): `NdifWriter.Create` lays a disk out as Disk Copy
   6.3.3 does (read/write, read-only, or compressed with ADC or KenCode in chunks of a chosen size; on HFS, free space
   past the last used block left out), byte for byte the data fork and map Disk Copy writes for the same volume;

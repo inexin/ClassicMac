@@ -228,6 +228,18 @@ public static class NdifWriter
     public static IReadOnlyList<MacFile> Split(MacFile image, int parts, string baseName, DateTime? created = null) =>
         NdifCreation.Split(image, parts, baseName, created);
 
+    /// <summary>
+    /// A segmented image's <paramref name="parts"/> (in any order) made again around <paramref name="disk"/> (§3.4): the
+    /// parts joined, the image rewritten as <see cref="Rewrite"/> does, and cut again into as many parts, each keeping
+    /// its name, Finder info, other resources and the image ID. Returned in part order.
+    /// </summary>
+    /// <exception cref="InvalidDataException">
+    /// The files are not every part of one segmented image, the image is not one ClassicMac rewrites, or the disk is
+    /// not its size.
+    /// </exception>
+    public static IReadOnlyList<MacFile> RewriteSegmented(IReadOnlyList<MacFile> parts, ReadOnlyMemory<byte> disk, IReadOnlySet<long>? changedSectors = null) =>
+        NdifCreation.RewriteSegmented(parts, disk, changedSectors);
+
     private static void Entry(BigEndianWriter entries, uint word, long offset, long stored)
     {
         entries.WriteUInt32(word);

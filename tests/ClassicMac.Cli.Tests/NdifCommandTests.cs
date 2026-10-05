@@ -122,4 +122,21 @@ public sealed class NdifCommandTests : IDisposable
         Assert.Contains("--overwrite", error, StringComparison.Ordinal);
         Assert.Equal(ExitCodes.Success, Run("ndif", disk, image, "--overwrite").Code);
     }
+    // The write commands edit a segmented image through part 1 and write every part (ndif.md §3.4).
+    [Fact]
+    public void A_segmented_image_is_edited_through_its_first_part()
+    {
+        var disk = Volume();
+        Assert.Equal(ExitCodes.Success, Run("ndif", disk, Path.Combine(folder, "Seg.img"), "--segments", "3").Code);
+        var output = Path.Combine(folder, "out", "Edited 1of3");
+        Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+
+        var (code, _, error) = Run("mkdir", Path.Combine(folder, "Seg 1of3") + ":Docs", "-o", output);
+
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.True(File.Exists(Path.Combine(folder, "out", "Edited 3of3")));
+        var (listed, list, _) = Run("ls", output);
+        Assert.Equal(ExitCodes.Success, listed);
+        Assert.Contains("Docs", list, StringComparison.Ordinal);
+    }
 }

@@ -221,26 +221,15 @@ internal static class NdifCreation
         ArgumentNullException.ThrowIfNull(baseName);
         ArgumentOutOfRangeException.ThrowIfLessThan(parts, 2);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(parts, MaxParts);
-        var fork = ResourceFork.Read(image.ResourceFork.ToArray());
-        var bcem = fork.Find(Bcem, 128) ?? throw new InvalidDataException("Not an NDIF image: it has no 'bcem' 128.");
-        var map = bcem.GetData().ToArray();
-        var reader = new BigEndianReader(map);
-        if (map.Length < HeaderLength || reader.ReadUInt16At(0) is < 10 or > 12)
-        {
-            throw new InvalidDataException("Only NDIF map versions 10 to 12 are split.");
-        }
-
-        if (reader.ReadUInt32At(0x54) != 0)
+        var (fork, map) = Whole(image);
+        if (new BigEndianReader(map).ReadUInt32At(0x54) != 0)
         {
             throw new InvalidDataException("The image is already segmented.");
         }
 
-        // The data fork cut raw into parts of ceil(sectors / parts) sectors, the last taking the rest (§1.6).
-        var data = image.DataFork.ToArray();
-        long partSize = ((data.Length + SectorSize - 1) / SectorSize + parts - 1) / parts * SectorSize;
-        if (partSize * (parts - 1) >= data.Length)
+        if (parts > (image.DataFork.Length + SectorSize - 1) / SectorSize)
         {
-            throw new ArgumentOutOfRangeException(nameof(parts), $"The image's {data.Length} bytes do not make {parts} parts of whole sectors.");
+            throw new ArgumentOutOfRangeException(nameof(parts), $"The image's {image.DataFork.Length} bytes do not make {parts} parts of a sector or more.");
         }
 
         // One ID for every part: the date, then random bytes (Disk Copy mixes the date, the tick count, a random number
@@ -248,9 +237,131 @@ internal static class NdifCreation
         var id = new BigEndianWriter();
         id.WriteUInt32(MacDate.FromDateTime(created ?? DateTime.Now).Seconds);
         id.WriteBytes(RandomNumberGenerator.GetBytes(12));
-        bool hasCrc = reader.ReadUInt32At(0x50) != 0;
         var width = parts.ToString(CultureInfo.InvariantCulture).Length;
+        var stem = Name(baseName).Bytes.ToArray();
         var versions = fork.Find(Vers, 1)?.GetData().ToArray();
+        var result = Cut(image, fork, map, parts, id.ToArray(), n =>
+        {
+            var suffix = string.Create(CultureInfo.InvariantCulture, $" {n.ToString(CultureInfo.InvariantCulture).PadLeft(width, '0')}of{parts}");
+            return new MacString([.. stem.AsSpan(0, Math.Min(stem.Length, MaxPartName - suffix.Length)), .. MacRoman.Encode(suffix)]);
+        }, n => n == 1 ? image.FinderInfo : image.FinderInfo with { Type = Dseg },
+            n => [new Resource(Vers, 1, VersData(string.Create(CultureInfo.InvariantCulture, $"Part {n}/{parts} of a disk image"), versions))]);
+        Check(result[0], NdifReader.Instance.Read(image, new ContainerContext()).Single().DataFork.ToArray(), result.Skip(1).ToList());
+        return result;
+    }
+
+    // A segmented image edited (§3.4): its parts joined into one image, made again around the disk (§3.1), and cut again
+    // into as many parts, each keeping its name, Finder info, other resources and the image ID.
+    public static IReadOnlyList<MacFile> RewriteSegmented(IReadOnlyList<MacFile> parts, ReadOnlyMemory<byte> disk, IReadOnlySet<long>? changedSectors)
+    {
+        ArgumentNullException.ThrowIfNull(parts);
+        var ordered = Ordered(parts) ?? throw new InvalidDataException("The files are not every part of one segmented NDIF image.");
+        var first = ordered[0];
+        var (fork, map) = Whole(first);
+        if (new BigEndianReader(map).ReadUInt32At(0x54) == 0)
+        {
+            throw new InvalidDataException("Part 1's map is not marked segmented.");
+        }
+
+        // The whole image as it was before it was cut: the parts' data back to back, part 1's resources without its
+        // 'bcm#', the map not flagged (version 12 stays).
+        var unflagged = map.ToArray();
+        new BigEndianWriter(unflagged).WriteUInt32At(0x54, 0u);
+        var resources = new ResourceFork();
+        foreach (var resource in fork.Resources.Where(r => r.Type != BcmCount))
+        {
+            resources.Add(new Resource(resource.Type, resource.Id, resource.Type == Bcem && resource.Id == 128 ? unflagged : resource.GetData().ToArray())
+            {
+                Name = resource.Name,
+                Attributes = resource.Attributes,
+            });
+        }
+
+        var whole = first with
+        {
+            DataFork = ForkData.FromBytes(ordered.SelectMany(p => p.DataFork.ToArray()).ToArray()),
+            ResourceFork = ForkData.FromBytes(resources.ToArray()),
+        };
+        var rewritten = NdifWriter.Rewrite(whole, disk, changedSectors);
+        var (newFork, newMap) = Whole(rewritten);
+        var id = PartRecord(first)!.AsSpan(4, 16).ToArray();
+        var result = Cut(rewritten, newFork, newMap, ordered.Count, id, n => ordered[n - 1].Name, n => ordered[n - 1].FinderInfo,
+            n => ResourceFork.Read(ordered[n - 1].ResourceFork.ToArray()).Resources.Where(r => r.Type != BcmCount));
+        Check(result[0], disk.ToArray(), result.Skip(1).ToList());
+        return result;
+    }
+
+    // The parts in part order by their 'bcm#' (§2.6): one ID and count, every number once, part 1 holding the map; null
+    // when the files are not that.
+    internal static IReadOnlyList<MacFile>? Ordered(IReadOnlyList<MacFile> parts)
+    {
+        var records = parts.Select(p => (Part: p, Record: PartRecord(p))).ToList();
+        if (records.Any(r => r.Record is null) || records.Count < 2)
+        {
+            return null;
+        }
+
+        var id = records[0].Record!.AsSpan(4, 16).ToArray();
+        var count = parts.Count;
+        var byNumber = new MacFile?[count + 1];
+        foreach (var (part, record) in records)
+        {
+            var reader = new BigEndianReader(record!);
+            int number = reader.ReadUInt16At(0);
+            if (reader.ReadUInt16At(2) != count || !record!.AsSpan(4, 16).SequenceEqual(id) || number < 1 || number > count || byNumber[number] is not null)
+            {
+                return null;
+            }
+
+            byNumber[number] = part;
+        }
+
+        return ResourceFork.Read(byNumber[1]!.ResourceFork.ToArray()).Find(Bcem, 128) is null ? null : [.. byNumber.Skip(1).Select(p => p!)];
+    }
+
+    // A part's 'bcm#' 128 (at least 20 bytes), or null.
+    internal static byte[]? PartRecord(MacFile part)
+    {
+        try
+        {
+            return ResourceFork.Read(part.ResourceFork.ToArray()).Find(BcmCount, 128)?.GetData().ToArray() is { Length: >= 20 } record ? record : null;
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
+    }
+
+    // An image's resources and its map, version 10 to 12.
+    private static (ResourceFork Fork, byte[] Map) Whole(MacFile image)
+    {
+        var fork = ResourceFork.Read(image.ResourceFork.ToArray());
+        var bcem = fork.Find(Bcem, 128) ?? throw new InvalidDataException("Not an NDIF image: it has no 'bcem' 128.");
+        var map = bcem.GetData().ToArray();
+        if (map.Length < HeaderLength || new BigEndianReader(map).ReadUInt16At(0) is < 10 or > 12)
+        {
+            throw new InvalidDataException("Only NDIF map versions 10 to 12 are cut into parts.");
+        }
+
+        return (fork, map);
+    }
+
+    // The image's data fork cut raw into parts of ceil(sectors / parts) sectors, the last taking the rest (§1.6). When
+    // that would leave the last part nothing (an edited image grown smaller than its parts), the data is padded with
+    // zeros to equal parts; readers address chunks by offset, so bytes past the last are not read [ClassicMac]. Every
+    // part has a 'bcm#' (number, count, ID, its own CRC28 when the image has a CRC); part 1 also the map, version 12
+    // and flagged, its resource unnamed, and the image's other resources; the others what `others` gives them.
+    private static List<MacFile> Cut(MacFile image, ResourceFork fork, byte[] map, int parts, byte[] id, Func<int, MacString> name,
+        Func<int, FinderInfo> finder, Func<int, IEnumerable<Resource>> others)
+    {
+        var data = image.DataFork.ToArray();
+        long partSize = Math.Max(1, ((data.Length + SectorSize - 1) / SectorSize + parts - 1) / parts) * SectorSize;
+        if (partSize * (parts - 1) >= data.Length)
+        {
+            Array.Resize(ref data, checked((int)(partSize * parts)));
+        }
+
+        bool hasCrc = new BigEndianReader(map).ReadUInt32At(0x50) != 0;
         var result = new List<MacFile>();
         for (var n = 1; n <= parts; n++)
         {
@@ -258,14 +369,13 @@ internal static class NdifCreation
             var record = new BigEndianWriter();
             record.WriteUInt16((ushort)n);
             record.WriteUInt16((ushort)parts);
-            record.WriteBytes(id.WrittenSpan);
+            record.WriteBytes(id);
             record.WriteUInt32(hasCrc ? NdifReader.Crc(ForkData.FromBytes(slice)) : 0u);
 
             var resources = new ResourceFork();
             resources.Add(new Resource(BcmCount, 128, record.ToArray()));
             if (n == 1)
             {
-                // Part 1 keeps the map, version 12 and flagged, its resource unnamed, and the other resources.
                 var segmented = map.ToArray();
                 var writer = new BigEndianWriter(segmented);
                 writer.WriteUInt16At(0, (ushort)12);
@@ -279,21 +389,21 @@ internal static class NdifCreation
             }
             else
             {
-                resources.Add(new Resource(Vers, 1, VersData(string.Create(CultureInfo.InvariantCulture, $"Part {n}/{parts} of a disk image"), versions)));
+                foreach (var resource in others(n))
+                {
+                    resources.Add(new Resource(resource.Type, resource.Id, resource.GetData().ToArray()) { Name = resource.Name, Attributes = resource.Attributes });
+                }
             }
 
-            var suffix = string.Create(CultureInfo.InvariantCulture, $" {n.ToString(CultureInfo.InvariantCulture).PadLeft(width, '0')}of{parts}");
-            var stem = Name(baseName).Bytes.ToArray();
             result.Add(new MacFile
             {
-                Name = new MacString([.. stem.AsSpan(0, Math.Min(stem.Length, MaxPartName - suffix.Length)), .. MacRoman.Encode(suffix)]),
-                FinderInfo = n == 1 ? image.FinderInfo : image.FinderInfo with { Type = Dseg },
+                Name = name(n),
+                FinderInfo = finder(n),
                 DataFork = ForkData.FromBytes(slice),
                 ResourceFork = ForkData.FromBytes(resources.ToArray()),
             });
         }
 
-        Check(result[0], NdifReader.Instance.Read(image, new ContainerContext()).Single().DataFork.ToArray(), result.Skip(1).ToList());
         return result;
     }
 

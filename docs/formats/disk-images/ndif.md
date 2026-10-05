@@ -327,6 +327,24 @@ An image is cut into parts as Disk Copy 6.3.3 cuts it ([§1.6](#16-segmented-ima
 names, types, data forks, `'bcem'` and `'bcm#'` numbers and CRCs]. The image ID is the date and 12 random bytes
 [ClassicMac]: Disk Copy's mixes the date, the tick count, a random number and a CRC-32, and readers only compare it.
 
+### 3.4 Editing a segmented image
+
+A segmented image is edited through part 1 [ClassicMac], following §3.1 and §3.3:
+
+1. The parts are found as Disk Copy finds them (§2.6), in part 1's folder and in its layout (AppleDouble or Basilisk
+   II); a backup (`.orig`) is not a part. With a part missing the image is read only.
+2. They are joined into the image they were cut from: their data forks back to back, part 1's resources without its
+   `'bcm#'`, the map unflagged (version 12 stays). That image is made again around the edited disk (§3.1).
+3. It is cut again into as many parts (§3.3), each keeping its name, Finder info, its other resources and the image ID;
+   each `'bcm#'` gets its part's new CRC28. When the image has grown smaller than a sector per part, its data fork is
+   padded with zeros to equal parts: chunks are found by their offsets, so the padding is never read.
+4. Saved in place, every part is written over itself, each original kept as `.orig` the first time. Saved as a new
+   file, part 1 is written where asked and the others beside it, named by its name with its " 1of*M*" ending (as
+   wide as *M*) replaced by their numbers, or, without that ending, with " *N*of*M*" added.
+
+[Verified: Disk Copy 6.3.3's own four-part image, edited and saved in place, reads back with the change; not yet
+mounted in Disk Copy after the edit.]
+
 ## 4. Variants
 
 ### 4.1 Map versions
@@ -415,8 +433,8 @@ segmented image is NDIF version 12 cut into parts ([§1.6](#16-segmented-images)
 - **Writing**: an image of a plain HFS disk, given as an AppleDouble pair, a Basilisk II entry, or in MacBinary,
   AppleSingle or BinHex, is writable: the edit session (`InputEditSession`) edits the decoded disk as a volume
   ([hfs.md §3](../file-systems/hfs.md#3-writing)) and saves the image made again (§3.1) in the input's own layout, as a new
-  file or in place (each file written kept as `.orig` the first time). Its disk is not resized. The CLI's `check` runs
-  the writer's checks on the disk.
+  file or in place (each file written kept as `.orig` the first time); a segmented image through part 1, every part
+  written (§3.4). Its disk is not resized. The CLI's `check` runs the writer's checks on the disk.
 
 - **Recognition** [ClassicMac]: a file whose resource fork (256 bytes or more) parses and holds a `'bcem'` 128 of at
   least `$58` bytes, whatever its version or file type. The data fork alone never says it is NDIF; reading a data fork
@@ -497,6 +515,10 @@ unchanged disk giving the same data and map, a changed chunk's zero runs stored 
 staying raw with no CRC, and the refusals.
 `NdifSessionTests.cs` edits images given as an AppleDouble pair (saved as a new pair and in place) and in MacBinary,
 and reads the disk of every kind of image, also one whose data fork starts with the disk's raw boot blocks and MDB.
+`NdifSegmentedTests.cs` covers §3.4: a segmented image made again in as many parts (read-only and ADC, the parts
+given in any order), parts of another image or a missing part refused, an image grown smaller than its parts padded,
+the session saving every part as new files and in place, an image missing a part read only, and, with the corpus,
+Disk Copy's own four-part image edited in place.
 `NdifCreateTests.cs` covers §3.2 and §3.3: the read-only layout, free space past the used area read as zeros, ADC and
 KenCode chunks of a chosen size, a read/write image, a disk that is not HFS, the `'vers'` text, a split into parts
 read back through its siblings, part names, and the refusals; and, with the corpus, `New_images_match_Disk_Copy_s_own`
@@ -536,8 +558,8 @@ Images made by Disk Copy in SheepShaver, read from the `CLASSICMAC_CORPUS` folde
 
 ## 8. Not covered
 
-- Rewriting version 2 or segmented images (a segmented image's parts are joined to read it, but an edit is not
-  written back into them); a new image's KenCode chunks compared with Disk Copy's own (only ADC was).
+- Rewriting version 2 images; a new image's KenCode chunks compared with Disk Copy's own (only ADC was); an edited
+  segmented image mounted in Disk Copy.
 - Checking rewritten images against Disk Copy itself (mounting one in SheepShaver with "Verify checksum" on).
 - **Version 2's real layout.** No image from Disk Image Mounter or Disk Copy 6.0.x has been seen. Disk Copy 6.1.2's
   8-byte layout ([§4.2](#42-version-2)) was verified only on hand-built images; ShrinkWrap 2.1 reads such files with the
