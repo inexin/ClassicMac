@@ -37,6 +37,7 @@ internal static class FuzzTargets
             ["pef"] = Pef,
             ["pict"] = Pict,
             ["first-aid"] = FirstAid,
+            ["ndif-write"] = NdifWrite,
         };
 
     /// <summary>Runs <paramref name="target"/> on <paramref name="input"/>, letting only a malformed-input refusal pass.</summary>
@@ -50,6 +51,22 @@ internal static class FuzzTargets
         {
         }
     }
+
+    /// <summary>
+    /// <paramref name="target"/> as a writer's target: a writer given valid input must make it, so a malformed-input
+    /// refusal (its read-back check failing) is a crash too.
+    /// </summary>
+    public static Action<ReadOnlyMemory<byte>> Strict(Action<ReadOnlyMemory<byte>> target) => input =>
+    {
+        try
+        {
+            target(input);
+        }
+        catch (Exception e) when (ExceptionFilters.IsMalformed(e))
+        {
+            throw new InvalidOperationException("A writer refused its own output: " + e.Message, e);
+        }
+    };
 
     /// <summary>
     /// Runs every file in <paramref name="paths"/> (files, or folders of them) through <paramref name="target"/> without
@@ -181,6 +198,30 @@ internal static class FuzzTargets
             }
         }
     }
+
+    // The NDIF writer (ndif.md §3): whole sectors of the input as a disk, made into an image, rewritten around the disk
+    // with its last byte changed, and (when the first byte says) split into two parts that are rewritten too. The first
+    // byte chooses the kind of image and the split, the second the chunk size: one image a run keeps the runs quick.
+    // Every step reads its result back, so any refusal is a crash.
+    private static void NdifWrite(ReadOnlyMemory<byte> input) => Strict(data =>
+    {
+        var disk = data[..(data.Length / 512 * 512)];
+        if (disk.Length == 0)
+        {
+            return;
+        }
+
+        var changed = disk.ToArray();
+        changed[^1] ^= 0xFF;
+        var formats = Enum.GetValues<NdifFormat>();
+        var options = new NdifCreateOptions { Format = formats[data.Span[0] % formats.Length], ChunkSectors = 1 + data.Span[1] % 64 };
+        var image = NdifWriter.Create(disk, "fuzz.img", options);
+        _ = NdifWriter.Rewrite(image, changed);
+        if ((data.Span[0] & 0x10) != 0 && image.DataFork.Length > 512)
+        {
+            _ = NdifWriter.RewriteSegmented(NdifWriter.Split(image, 2, "fuzz"), changed);
+        }
+    })(input);
 
     // An HFS or HFS Plus volume checked and repaired.
     private static void FirstAid(ReadOnlyMemory<byte> input)

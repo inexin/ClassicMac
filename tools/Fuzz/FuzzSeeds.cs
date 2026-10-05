@@ -1,17 +1,22 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using ClassicMac.Code.Ppc;
+using ClassicMac.Code.Tests;
 using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Hfs;
+using ClassicMac.Files.Tests;
 using ClassicMac.Resources;
+using ClassicMac.Resources.Decoders.Tests;
 
 namespace Fuzz;
 
 /// <summary>
 /// The seed corpora libFuzzer starts from, one folder per target: the repository's test files (the archives and images
 /// in <c>tests/ClassicMac.Files.Tests/TestData</c>, the pictures in <c>tests/golden/pict</c>), the forks, resources,
-/// pictures and PEF containers inside them, and small inputs made here (an HFS volume, a resource fork, 68k and PEF
-/// code). Each seed is named by its hash, so writing again adds no duplicates.
+/// pictures and PEF containers inside them, and inputs made here and by the tests' builders (HFS and HFS Plus volumes,
+/// plain and wrapped; a resource fork; 68k code; PEF containers with sections and a fat application). Each seed is
+/// named by its hash, so writing again adds no duplicates.
 /// </summary>
 internal static class FuzzSeeds
 {
@@ -58,6 +63,22 @@ internal static class FuzzSeeds
         var volume = Volume();
         Add("first-aid", volume);
         Add("container", volume);
+        Add("ndif-write", volume);
+        foreach (var plus in HfsPlus())
+        {
+            Add("first-aid", plus);
+            Add("container", plus);
+            Add("ndif-write", plus);
+        }
+
+        Add("pef", new PefBuilder()
+            .AddSection(PefSectionKind.Code, PefBuilder.Words(0x7C0802A6, 0x4E800020))
+            .AddSection(PefSectionKind.UnpackedData, PefBuilder.Words(1, 2), total: 16)
+            .Build());
+        Add("pef", CodeFixtures.Fragment());
+        var (fatFork, fatData) = CodeFixtures.FatApplication();
+        Add("code", fatFork.ToArray());
+        Add("container", fatData);
         var fork = Fork();
         Add("resource-fork", fork.ToArray());
         Add("code", fork.ToArray());
@@ -120,6 +141,22 @@ internal static class FuzzSeeds
             date, date);
         new BigEndianWriter(volume).WriteUInt32At(1024 + 6, date.Seconds);           // the MDB's drLsMod, stamped now by the writer
         return volume;
+    }
+
+    // HFS Plus volumes as the tests build them: one with a folder, a fragmented file, hard links and an attribute, and
+    // the same wrapped in an HFS volume.
+    private static IEnumerable<byte[]> HfsPlus()
+    {
+        foreach (var wrapped in new[] { false, true })
+        {
+            var builder = new HfsPlusBuilder();
+            uint docs = builder.Folder(HfsPlusBuilder.Root, "Docs");
+            builder.File(docs, "Letter", "dear sir"u8.ToArray(), new byte[300]);
+            builder.File(HfsPlusBuilder.Root, "Fragmented", new byte[4 * HfsPlusBuilder.Block], [], fragments: 4);
+            builder.HardLinks("shared"u8.ToArray(), (HfsPlusBuilder.Root, "Link"));
+            builder.Attribute(docs, "com.example.tag", "red"u8.ToArray());
+            yield return wrapped ? builder.BuildWrapped("Plus") : builder.Build("Plus");
+        }
     }
 
     // A resource fork of text, a version, and a 68k application's jump table and one segment.

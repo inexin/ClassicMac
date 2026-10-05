@@ -20,7 +20,30 @@ public sealed class FuzzTests : IDisposable
     [Fact]
     public void Every_reader_has_a_target()
     {
-        Assert.Equal(["code", "container", "first-aid", "pef", "pict", "resource", "resource-fork"], FuzzTargets.All.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(["code", "container", "first-aid", "ndif-write", "pef", "pict", "resource", "resource-fork"], FuzzTargets.All.Keys.Order(StringComparer.Ordinal));
+    }
+
+    // A writer given any disk must make it: there, even a malformed-input refusal is a crash.
+    [Fact]
+    public void A_writer_s_refusal_is_a_crash()
+    {
+        var e = Assert.Throws<InvalidOperationException>(() => FuzzTargets.Run(FuzzTargets.Strict(_ => throw new InvalidDataException("no read-back")), default));
+        Assert.IsType<InvalidDataException>(e.InnerException);
+        FuzzTargets.Run(FuzzTargets.Strict(_ => { }), default);
+    }
+
+    // The NDIF writer target takes any input as a disk: whole sectors of it, nothing when it is shorter than one.
+    [Fact]
+    public void The_NDIF_writer_target_takes_whole_sectors_of_any_input()
+    {
+        var target = FuzzTargets.All["ndif-write"];
+        var random = new Random(4);
+        foreach (var length in new[] { 0, 100, 512, 1500, 4096 })
+        {
+            var input = new byte[length];
+            random.NextBytes(input);
+            target(input);                                                               // no refusal let through
+        }
     }
 
     [Fact]
@@ -90,6 +113,22 @@ public sealed class FuzzTests : IDisposable
         }
 
         Assert.Equal(counts, FuzzSeeds.Write(folder, Repository()));                     // the same names: no duplicates
+    }
+
+    // Seeds beyond the test files: HFS Plus volumes (plain and wrapped) for First Aid and the containers, PEF containers
+    // with sections, and disks for the NDIF writer.
+    [Fact]
+    public void The_seeds_hold_HFS_Plus_volumes_and_PEF_sections()
+    {
+        FuzzSeeds.Write(folder, Repository());
+
+        static bool HfsPlus(byte[] b, int at) => b.Length > at + 2 && b[at] == (byte)'H' && b[at + 1] == (byte)'+';
+        var firstAid = Directory.GetFiles(Path.Combine(folder, "first-aid")).Select(File.ReadAllBytes).ToList();
+        Assert.Contains(firstAid, b => HfsPlus(b, 1024));
+        Assert.Contains(firstAid, b => b.Length > 1026 && b[1024] == (byte)'B' && b[1025] == (byte)'D' && b[1024 + 0x7C] == (byte)'H');   // wrapped
+        Assert.Contains(Directory.GetFiles(Path.Combine(folder, "container")).Select(File.ReadAllBytes), b => HfsPlus(b, 1024));
+        Assert.Contains(Directory.GetFiles(Path.Combine(folder, "pef")).Select(File.ReadAllBytes), b => b.Length > 0x28 && (b[0x20] << 8 | b[0x21]) > 0);
+        Assert.True(Directory.GetFiles(Path.Combine(folder, "ndif-write")).Length >= 2);
     }
 
     [Fact]

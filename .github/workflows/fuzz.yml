@@ -1,7 +1,8 @@
 name: fuzz
 
 # libFuzzer on each reader through SharpFuzz (tools/Fuzz, docs/PLAN.md "Fuzzing"): nightly and on request, a few
-# minutes per target. A crash fails the target's job and keeps the input as an artifact; reproduce it with
+# minutes per target. Each target's corpus is kept between runs (minimised, in the Actions cache), so a night starts
+# where the last left off. A crash fails the target's job and keeps the input as an artifact; reproduce it with
 #   dotnet run --project tools/Fuzz -- replay <target> <crash file>
 on:
   schedule:
@@ -17,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [container, resource-fork, resource, code, pef, pict, first-aid]
+        target: [container, resource-fork, resource, code, pef, pict, first-aid, ndif-write]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -32,11 +33,29 @@ jobs:
       - run: gh release download --repo Metalnem/libfuzzer-dotnet --pattern libfuzzer-dotnet-ubuntu --output libfuzzer-dotnet && chmod +x libfuzzer-dotnet
         env:
           GH_TOKEN: ${{ github.token }}
+      # The corpus the last run left: the newest saved for this target.
+      - uses: actions/cache/restore@v4
+        with:
+          path: corpus
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.target }}-
       - run: >
           mkdir -p corpus crashes &&
           ./libfuzzer-dotnet --target_path=fuzz/Fuzz --target_arg=${{ matrix.target }}
           -max_total_time=${{ inputs.seconds || '300' }} -timeout=30 -rss_limit_mb=4096 -max_len=1048576
           -artifact_prefix=crashes/ corpus seeds/${{ matrix.target }}
+      # Only the inputs that add coverage are kept, so the corpus does not grow without end.
+      - if: always()
+        run: >
+          mkdir -p minimised &&
+          ./libfuzzer-dotnet --target_path=fuzz/Fuzz --target_arg=${{ matrix.target }}
+          -merge=1 -timeout=30 -rss_limit_mb=4096 -max_len=1048576 minimised corpus seeds/${{ matrix.target }}
+          && rm -rf corpus && mv minimised corpus
+      - if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: corpus
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

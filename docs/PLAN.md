@@ -130,12 +130,14 @@ In rough priority; each item names what blocks it, if anything.
    counts, the alternate header, a fragmented wrapped disk) pass it too. HFSX has been tried only on built volumes, and
    the in-place extents-tree edits and multi-partition writes await a live check.
 2. **Fuzzing**: `tools/Fuzz` runs libFuzzer through SharpFuzz nightly (`.github/workflows/fuzz.yml`, five minutes a
-   target) on seven targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
-   code, PEF, PICT on both QuickDraws, and First Aid. A reader fault the unwrapper or a decoder reports
-   (`*-fault`) counts as a crash. Seeds are the repository's test files and what is inside them; crashes are kept
-   as artifacts and replayed with `Fuzz replay`. Still to do: crashes found so far turned into tests, a corpus kept
-   between runs, more seeds (HFS Plus, PEF with sections). The seeded mutation tests (`tests/Shared/Mutations.cs`)
-   stay in the suite; `CLASSICMAC_MUTANTS` runs them deeper.
+   target) on eight targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
+   code, PEF, PICT on both QuickDraws, First Aid, and the NDIF writer (any disk made into an image, rewritten and
+   split, where any refusal is a crash). A reader fault the unwrapper or a decoder reports (`*-fault`) counts as a
+   crash. Seeds are the repository's test files and what is inside them, and HFS and HFS Plus volumes (plain and
+   wrapped) and PEF containers from the tests' builders; each target's corpus is minimised and kept in the Actions
+   cache between runs. Crashes are kept as artifacts and replayed with `Fuzz replay`; those found so far are tests.
+   Still to do: targets for the other writers (HFS edits, StuffIt and archive writers, PICT recording). The seeded
+   mutation tests (`tests/Shared/Mutations.cs`) stay in the suite; `CLASSICMAC_MUTANTS` runs them deeper.
 3. **Decoders, later**: text encodings from HFS Plus's hints and a System file's region, names written in other
    encodings, a "make loadable" option for exported fonts, lossless WebP.
 4. **App**: packaging (macOS bundle icon, Linux icons and `.desktop` file).

@@ -2,6 +2,8 @@
 
   <PropertyGroup>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- tools/Fuzz links the same test builders and shows its internals here: the copies compiled here are used. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
 

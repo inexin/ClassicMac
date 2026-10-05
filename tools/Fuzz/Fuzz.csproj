@@ -18,4 +18,11 @@
     <InternalsVisibleTo Include="ClassicMac.Cli.Tests" />
   </ItemGroup>
 
+  <!-- The tests' builders make seeds the repository has no files for: HFS Plus volumes, PEF containers with sections. -->
+  <ItemGroup>
+    <Compile Include="..\..\tests\ClassicMac.Files.Tests\HfsPlusBuilder.cs" Link="Builders\HfsPlusBuilder.cs" />
+    <Compile Include="..\..\tests\ClassicMac.Code.Tests\PefBuilder.cs" Link="Builders\PefBuilder.cs" />
+    <Compile Include="..\..\tests\ClassicMac.Resources.Decoders.Tests\CodeFixtures.cs" Link="Builders\CodeFixtures.cs" />
+  </ItemGroup>
+
 </Project>
