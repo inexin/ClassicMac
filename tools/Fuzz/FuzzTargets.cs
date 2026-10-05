@@ -18,12 +18,14 @@ namespace Fuzz;
 /// </summary>
 internal static class FuzzTargets
 {
-    private static readonly ReadOptions[] Models =
-        [ReadOptions.Default, ReadOptions.Default with { ResourceManager = ResourceManagerModel.Rom68k }];
+    // Made on first use, not in a static initializer: instrumented code may run only once libFuzzer has set up its
+    // coverage map (inside Fuzzer.LibFuzzer.Run), or SharpFuzz's tracing finds no map and throws.
+    private static readonly Lazy<ReadOptions[]> Models =
+        new(() => [ReadOptions.Default, ReadOptions.Default with { ResourceManager = ResourceManagerModel.Rom68k }]);
 
     private static readonly QuickDrawVersion[] QuickDraws = [QuickDrawVersion.MacOS9, QuickDrawVersion.MacRom];
 
-    private static readonly IReadOnlyList<IResourceDecoder> Decoders = ResourceDecoders.Create();
+    private static readonly Lazy<IReadOnlyList<IResourceDecoder>> Decoders = new(() => ResourceDecoders.Create());
 
     public static IReadOnlyDictionary<string, Action<ReadOnlyMemory<byte>>> All { get; } =
         new Dictionary<string, Action<ReadOnlyMemory<byte>>>(StringComparer.Ordinal)
@@ -126,7 +128,7 @@ internal static class FuzzTargets
     // A resource fork read by both Resource Manager models, each resource's data fetched (and decompressed).
     private static void ResourceForks(ReadOnlyMemory<byte> input)
     {
-        foreach (var model in Models)
+        foreach (var model in Models.Value)
         {
             var fork = ResourceFork.Read(input, model);
             foreach (var resource in fork.Resources)
@@ -148,7 +150,7 @@ internal static class FuzzTargets
         var fork = new ResourceFork();
         fork.Add(resource);
         var diagnostics = new List<Diagnostic>();
-        foreach (var decoder in Decoders.Where(d => d.CanDecode(type)))
+        foreach (var decoder in Decoders.Value.Where(d => d.CanDecode(type)))
         {
             decoder.Decode(new DecodeInput(resource, data, fork, diagnostics: diagnostics));
         }
