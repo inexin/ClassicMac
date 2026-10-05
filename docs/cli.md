@@ -259,6 +259,15 @@ are null for input that is not a plain HFS volume, and `partitions` lists a part
 `notHfs` or `notChecked` (not given at present: every HFS, HFS Plus and HFSX volume is checked). A problem with number 0 is MountCheck's or one of the checks Disk
 First Aid lacks, printed `first aid: Problem:  <text>.`.
 
+### 2.8 derez
+
+`classicmac derez <path> [-o <file>] [--portable] [-e]` writes a file's resource fork as Rez source
+([rez.md](formats/output/rez.md)): by default as MPW's DeRez writes it, byte for byte (Mac OS Roman, CR line ends), to
+standard output or `-o`'s file; `-e` prints names' and types' control bytes as they are, as DeRez `-e` does.
+`--portable` writes source both MPW's and Retro68's Rez compile alike (ASCII, LF line ends) and reports on standard
+error what it cannot hold (an empty name, attribute bits $80, $02 or $01, a type that is not four printable
+characters); with `--strict` such a report exits 1.
+
 ## 3. Write commands
 
 Each write command changes one thing on a Mac path, through the library's `InputEditSession`

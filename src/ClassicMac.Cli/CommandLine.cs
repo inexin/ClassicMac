@@ -125,6 +125,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         root.Subcommands.Add(LsCommand());
         root.Subcommands.Add(StatCommand());
         root.Subcommands.Add(CatCommand());
+        root.Subcommands.Add(DerezCommand());
         root.Subcommands.Add(FindCommand());
         root.Subcommands.Add(GetCommand());
         root.Subcommands.Add(CheckCommand());
@@ -472,6 +473,24 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
     {
         Data,
         Rsrc,
+    }
+
+    private Command DerezCommand()
+    {
+        var path = MacPathArgument();
+        var outputFile = new Option<FileInfo>("--output", "-o") { Description = "Write the source to this file (default: standard output)" };
+        var portable = new Option<bool>("--portable") { Description = "Source both MPW's and Retro68's Rez compile alike (ASCII, LF), instead of MPW DeRez's" };
+        var rawNames = new Option<bool>("-e") { Description = "Names and types unescaped, as DeRez -e prints them (MPW only)" };
+        var command = new Command("derez", "Write a file's resource fork as Rez source, as MPW's DeRez does")
+        {
+            path, outputFile, portable, rawNames,
+        };
+        command.SetAction(result => Paths(result).Derez(result.GetRequiredValue(path), new ClassicMac.Resources.Rez.RezOptions
+        {
+            Dialect = result.GetValue(portable) ? ClassicMac.Resources.Rez.RezDialect.Portable : ClassicMac.Resources.Rez.RezDialect.Mpw,
+            RawNames = result.GetValue(rawNames),
+        }, result.GetValue(outputFile)?.FullName));
+        return command;
     }
 
     private Command CatCommand()

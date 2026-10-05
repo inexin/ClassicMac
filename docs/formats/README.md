@@ -188,6 +188,7 @@ How ClassicMac lists this code (the disassembly, its annotations and the code mo
 | [export-manifest.md](output/export-manifest.md) | What `extract` writes: folders, file names, `manifest.json` format 1.2, image outputs | `ClassicMac.Resources.Export`, `ClassicMac.Resources.Decoders.Images` |
 | [text-output.md](output/text-output.md) | The text, JSON and RTF output of the text resources | `ClassicMac.Resources.Decoders.Text` |
 | [html.md](output/html.md) | The HTML output of documents | `ClassicMac.Resources.Decoders.Documents` |
+| [rez.md](output/rez.md) | Rez source (`.r`): MPW DeRez's output byte for byte, and the subset MPW's and Retro68's Rez compile alike; the `derez` command | `ClassicMac.Resources.Rez` |
 | [disassembly.md](output/disassembly.md) | The `.s` listings and `.json` models of 68k and PowerPC code; the `disasm` command | `ClassicMac.Code.Disassembly`, `ClassicMac.Resources.Decoders.Code` |
 
 Pictures, icons, cursors and patterns are drawn by `ClassicMac.Graphics` (`.QuickDraw`, `.Pict`), which

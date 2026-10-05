@@ -206,6 +206,38 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
         }
     });
 
+    /// <summary>
+    /// derez (docs/cli.md §2.8): a file's resource fork as Rez source, MPW DeRez's or the portable subset, to standard
+    /// output or <paramref name="outputFile"/>; what the portable dialect cannot hold is reported.
+    /// </summary>
+    public int Derez(string path, ClassicMac.Resources.Rez.RezOptions options, string? outputFile) => With(path, (tree, entry) =>
+    {
+        if (entry.Kind is not (MacPathKind.File or MacPathKind.ResourceFork))
+        {
+            throw new InvalidOperationException($"is a {MacCommands.KindName(entry.Kind)}; derez takes a file.");
+        }
+
+        var fork = ClassicMac.Resources.ResourceFork.Read(MacCommands.ReadBytes(tree, entry, MacFork.Resource), readOptions);
+        var diagnostics = new List<Diagnostic>();
+        var bytes = ClassicMac.Resources.Rez.RezWriter.Write(fork, options, diagnostics);
+        foreach (var d in diagnostics)
+        {
+            error.WriteLine($"{Display(tree, entry.Path)}: {d.Message} ({d.Code})");
+        }
+
+        if (outputFile is null)
+        {
+            binary.Write(bytes);
+            binary.Flush();
+        }
+        else
+        {
+            File.WriteAllBytes(outputFile, bytes);
+        }
+
+        return strict && diagnostics.Count > 0 ? ExitCodes.Damaged : ExitCodes.Success;
+    });
+
     public int Cat(string path, bool hex, bool raw, MacFork fork, long maxBytes, bool json) => With(path, (tree, entry) =>
     {
         if (entry.Kind is MacPathKind.Folder or MacPathKind.ResourceType)

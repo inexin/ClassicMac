@@ -140,6 +140,50 @@ public sealed class PathCommandTests : IDisposable
         Assert.Contains("japanese", bad.Error);                                             // the names it takes
     }
 
+    // derez (docs/cli.md §2.8, docs/formats/output/rez.md): a resource fork as MPW DeRez writes it, or the portable subset.
+    [Fact]
+    public void Derez_writes_a_resource_fork_as_Rez_source()
+    {
+        var (code, _, _, binary) = Run("derez", P("System Folder:Finder"));
+        Assert.Equal(0, code);
+        var text = ClassicMac.Core.MacRoman.Decode(binary);
+        Assert.StartsWith("data 'STR ' (128, \"Greeting\") {\r\t$\"0248 69\"", text, StringComparison.Ordinal);
+        Assert.Contains("data 'TEXT' (128) {\r\t$\"7465 7874\"", text, StringComparison.Ordinal);
+
+        var file = Path.Combine(folder, "Finder.r");
+        Assert.Equal(0, Run("derez", P("System Folder:Finder"), "--portable", "-o", file).Code);
+        Assert.Contains("data 'STR ' (128, \"Greeting\") {\n", File.ReadAllText(file), StringComparison.Ordinal);
+    }
+
+    // With CLASSICMAC_MPW_DISK set to an HFS disk holding MPW DeRez's outputs (X.derez beside the file X.out whose
+    // resource fork it shows; crafted, crafted_e with -e): each output is byte for byte what derez writes. The disk is
+    // made with Apple's tools and is not committed.
+    [Fact]
+    public void Derez_matches_MPW_DeRez()
+    {
+        var mpw = Environment.GetEnvironmentVariable("CLASSICMAC_MPW_DISK");
+        Assert.SkipWhen(string.IsNullOrEmpty(mpw) || !File.Exists(mpw), "CLASSICMAC_MPW_DISK is not set.");
+        var listing = Json(Run("ls", mpw + ":tests", "--json").Output);
+        var names = listing.GetProperty("entries").EnumerateArray().Select(e => e.GetProperty("name").GetString()!).ToList();
+        int compared = 0;
+        foreach (var derez in names.Where(n => n.EndsWith(".derez", StringComparison.Ordinal)))
+        {
+            var stem = derez[..^".derez".Length];
+            var (source, option) = stem switch
+            {
+                "crafted" or "crafted_m" => ("crafted", null),
+                "crafted_e" => ("crafted", "-e"),
+                _ => (stem + ".out", (string?)null),
+            };
+            string[] args = option is null ? ["derez", mpw + ":tests:" + source] : ["derez", mpw + ":tests:" + source, option];
+            var expected = Run("cat", mpw + ":tests:" + derez, "--raw").Binary;
+            Assert.True(expected.SequenceEqual(Run(args).Binary), $"{derez} differs");
+            compared++;
+        }
+
+        Assert.True(compared > 0);
+    }
+
     [Fact]
     public void Cat_shows_text_hex_raw_bytes_or_a_decoded_resource()
     {
