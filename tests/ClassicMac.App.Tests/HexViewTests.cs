@@ -92,6 +92,56 @@ public sealed class HexViewTests
             Directory.Delete(folder, recursive: true);
         }
     });
+    // The Mac OS Roman column while editing: a click on a character types characters there (the cursor in it, a
+    // shadow on the byte's digits), and typed text becomes Mac OS Roman bytes.
+    [Fact]
+    public void Characters_type_in_the_Mac_OS_Roman_column() => Headless.OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("cm-hexview").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "Hex.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork(("ZZZZ", 1, null, [0x55, 0x6E, 0x74, 0x69, 0x00, 0xFF])));
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            window.Show();
+            var open = model.OpenAsync(path);
+            Pump(open);
+            Pump(open.Result!.EnsureLoadedAsync());
+            model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single().Children[0];
+            Pump(model.PreviewTask);
+            Pump(model.EditActions.EditHexCommand.ExecuteAsync(null));
+            Dispatcher.UIThread.RunJobs();
+
+            var character = Character(window, 1);
+            var at = character.TranslatePoint(new Point(4, 4), window)!.Value;
+            window.MouseDown(at, MouseButton.Left);
+            window.MouseUp(at, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal((1, true), (model.EditActions.HexEdit!.Cursor, model.EditActions.HexEdit.TextColumn));
+            Assert.Contains("cursor", Character(window, 1).Classes);
+            Assert.Equal(Token("CmHexCursor"), ((ISolidColorBrush)Character(window, 1).Background!).Color);
+            Assert.Contains("cursor-shadow", Cell(window, 1).Classes);
+            Assert.Equal(Token("CmSelectionInactive"), ((ISolidColorBrush)Cell(window, 1).Background!).Color);
+
+            window.KeyTextInput("Ab");
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal([0x55, 0x41, 0x62, 0x69, 0x00, 0xFF], model.EditActions.HexEdit.ToArray());
+            Assert.Contains("changed", Character(window, 1).Classes);
+            Assert.Contains("cursor", Character(window, 3).Classes);
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
+
+    private static Border Character(Window window, long offset) =>
+        window.Named<ListBox>("HexList")!.GetVisualDescendants().OfType<Border>()
+            .First(b => b.Classes.Contains("hex-char") && b.DataContext is HexCell c && c.Offset == offset);
+
 
     // Read only: a click selects a byte (the pair on CmSelectionInactive), the inspector reads it and names its field
     // (E8, through a TMPL), whose bytes are on CmRowHighlight; the Mac OS Roman column stays clear of the inspector.

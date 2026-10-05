@@ -40,9 +40,16 @@ public sealed record HexLine(string Offset, string Hex, string Characters, int C
 /// <param name="IsSelected">Selected in the read-only view (a click): the pair highlights in both columns.</param>
 /// <param name="IsInField">Part of the field the inspected byte belongs to (E8).</param>
 /// <param name="IsMatch">Part of the match Find found.</param>
+/// <param name="CursorInText">The cursor types in the Mac OS Roman column (the hex column shows its shadow), not the hex.</param>
 public sealed record HexCell(long Offset, string Hex, string Character, bool IsZero, bool IsChanged, bool IsCursor, bool IsGroupEnd,
-    bool IsSelected = false, bool IsInField = false, bool IsMatch = false)
+    bool IsSelected = false, bool IsInField = false, bool IsMatch = false, bool CursorInText = false)
 {
+    /// <summary>The cursor, typing hex digits here.</summary>
+    public bool IsHexCursor => IsCursor && !CursorInText;
+
+    /// <summary>The cursor, typing characters in the Mac OS Roman column.</summary>
+    public bool IsTextCursor => IsCursor && CursorInText;
+
     /// <summary>A non-printable byte, shown as a muted "·".</summary>
     public bool IsPlaceholder => Character == "·";
 }
@@ -57,6 +64,7 @@ public sealed class HexLines : IReadOnlyList<HexLine>, IList, INotifyCollectionC
     private ForkData data;
     private bool editing;
     private int cursor = -1;
+    private bool cursorInText;
     private Func<int, bool>? changed;
     private long selected = -1;
     private (long Start, long Length)? field;
@@ -86,12 +94,15 @@ public sealed class HexLines : IReadOnlyList<HexLine>, IList, INotifyCollectionC
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
     /// <summary>Shows edited bytes, with the edit cursor on byte <paramref name="cursorOffset"/> (which may be the
-    /// length, to append). There is always a line for the cursor at the end.</summary>
-    public void Reload(ForkData newData, int cursorOffset, Func<int, bool>? isChanged = null, (int Start, int Length)? meaningField = null)
+    /// length, to append), typing in the Mac OS Roman column when <paramref name="textColumn"/>. There is always a line for
+    /// the cursor at the end.</summary>
+    public void Reload(ForkData newData, int cursorOffset, Func<int, bool>? isChanged = null, (int Start, int Length)? meaningField = null,
+        bool textColumn = false)
     {
         data = newData;
         editing = true;
         cursor = cursorOffset;
+        cursorInText = textColumn;
         changed = isChanged;
         field = meaningField;
         cachedBlock = -1;
@@ -148,11 +159,11 @@ public sealed class HexLines : IReadOnlyList<HexLine>, IList, INotifyCollectionC
                     cells.Add(new HexCell(byteOffset, line[i].ToString("X2", CultureInfo.InvariantCulture), ch < ' ' || ch == '\u007F' ? "·" : ch.ToString(),
                         line[i] == 0, editing && byteOffset <= int.MaxValue && changed?.Invoke((int)byteOffset) == true, editing && byteOffset == cursor, i == 7,
                         !editing && byteOffset == selected, field is var (start, length) && byteOffset >= start && byteOffset < start + length,
-                        match is var (from, count) && byteOffset >= from && byteOffset < from + count));
+                        match is var (from, count) && byteOffset >= from && byteOffset < from + count, cursorInText));
                 }
                 else if (editing && byteOffset == cursor)
                 {
-                    cells.Add(new HexCell(byteOffset, "", "", false, false, true, i == 7));
+                    cells.Add(new HexCell(byteOffset, "", "", false, false, true, i == 7, CursorInText: cursorInText));
                 }
 
                 if (i == 8)

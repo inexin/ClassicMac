@@ -123,7 +123,8 @@
   </Style>
 
   <!-- The hex grid (boards/hex.md): mono 13, 24 high lines; byte cells 24 wide with a gap after the eighth, characters
-       9 wide; zero bytes lighter; changed bytes on CmWarningTint in SemiBold; the cursor on CmHexCursor. -->
+       9 wide; zero bytes lighter; changed bytes on CmWarningTint in SemiBold; the cursor on CmHexCursor in the column
+       that types, its shadow on CmSelectionInactive in the other. -->
   <Style Selector="Border.hex-bar">
     <Setter Property="Padding" Value="12,8" />
   </Style>
@@ -191,6 +192,9 @@
   </Style>
   <Style Selector="Border.changed > TextBlock">
     <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+  </Style>
+  <Style Selector="Border.cursor-shadow">
+    <Setter Property="Background" Value="{DynamicResource CmSelectionInactive}" />
   </Style>
   <Style Selector="Border.cursor">
     <Setter Property="Background" Value="{DynamicResource CmHexCursor}" />

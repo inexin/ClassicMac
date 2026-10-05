@@ -12,6 +12,7 @@ namespace ClassicMac.App.ViewModels;
 /// <summary>
 /// Edits a resource's bytes in the hex view, as ResEdit's hex editor does: hex digits overwrite the byte under the
 /// cursor two digits at a time (or insert, in insert mode; at the end they append), Delete and Backspace remove bytes.
+/// In the Mac OS Roman column (<see cref="TextColumn"/>) characters type their Mac OS Roman bytes the same way.
 /// </summary>
 public sealed partial class HexEditor : ObservableObject
 {
@@ -48,6 +49,20 @@ public sealed partial class HexEditor : ObservableObject
     [NotifyPropertyChangedFor(nameof(Status), nameof(ModeIndex))]
     private bool insertMode;
 
+    /// <summary>
+    /// Whether typing goes to the Mac OS Roman column (characters) rather than the hex column (digits); Tab switches.
+    /// The cursor is the same byte in both.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Status))]
+    private bool textColumn;
+
+    partial void OnTextColumnChanged(bool value)
+    {
+        half = false;
+        Reload();
+    }
+
     /// <summary>The footer's switch, in <see cref="Modes"/> order: 0 overwrite, 1 insert.</summary>
     public int ModeIndex
     {
@@ -62,7 +77,7 @@ public sealed partial class HexEditor : ObservableObject
 
     public bool IsModified => !bytes.SequenceEqual(original);
 
-    /// <summary>"0x000A = 32 · 1 byte changed · hex digits type, Insert toggles, Delete removes".</summary>
+    /// <summary>"0x000A = 32 · 1 byte changed · hex digits type, Tab for text, Insert toggles, Delete removes".</summary>
     public string Status
     {
         get
@@ -74,7 +89,8 @@ public sealed partial class HexEditor : ObservableObject
                 1 => "1 byte changed",
                 var n => string.Create(CultureInfo.InvariantCulture, $"{n:N0} bytes changed"),
             };
-            return string.Create(CultureInfo.InvariantCulture, $"0x{Cursor:X4} = {value} · {changed} · hex digits type, Insert toggles, Delete removes");
+            var typing = TextColumn ? "characters type, Tab for hex" : "hex digits type, Tab for text";
+            return string.Create(CultureInfo.InvariantCulture, $"0x{Cursor:X4} = {value} · {changed} · {typing}, Insert toggles, Delete removes");
         }
     }
 
@@ -144,6 +160,46 @@ public sealed partial class HexEditor : ObservableObject
         }
         Reload();
         RaiseEdited();
+    }
+
+    /// <summary>
+    /// Types characters as their Mac OS Roman bytes, one byte each, overwriting or inserting as digits do; false when a
+    /// character has no Mac OS Roman byte or is a control character (it types nothing; the others still type).
+    /// </summary>
+    public bool TypeText(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var all = true;
+        var typed = false;
+        foreach (var c in text)
+        {
+            if (char.IsControl(c) || !MacRoman.TryGetByte(c, out var b))
+            {
+                all = false;
+                continue;
+            }
+
+            if (InsertMode || Cursor >= bytes.Count)
+            {
+                bytes.Insert(Cursor, b);
+            }
+            else
+            {
+                bytes[Cursor] = b;
+            }
+
+            Cursor++;
+            typed = true;
+        }
+
+        half = false;
+        if (typed)
+        {
+            Reload();
+            RaiseEdited();
+        }
+
+        return all;
     }
 
     /// <summary>Raised after each change to the bytes (typing, Delete, Backspace).</summary>
@@ -219,6 +275,9 @@ public sealed partial class HexEditor : ObservableObject
             case HexKey.Insert:
                 ToggleInsert();
                 break;
+            case HexKey.Tab:
+                TextColumn = !TextColumn;
+                break;
             case HexKey.Delete:
                 Delete();
                 break;
@@ -239,7 +298,7 @@ public sealed partial class HexEditor : ObservableObject
         Inspector = HexInspection.At(data, Cursor, meaning);
         OnPropertyChanged(nameof(Inspector));
         OnPropertyChanged(nameof(ChangedCount));
-        Lines.Reload(ForkData.FromBytes(data), Cursor, IsChanged, Inspector.Meaning is { } field ? (field.Start, field.Length) : null);
+        Lines.Reload(ForkData.FromBytes(data), Cursor, IsChanged, Inspector.Meaning is { } field ? (field.Start, field.Length) : null, TextColumn);
         OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(IsModified));
         OnPropertyChanged(nameof(Length));
@@ -292,4 +351,7 @@ public enum HexKey
     Insert,
     Delete,
     Backspace,
+
+    /// <summary>Switches typing between the hex and the Mac OS Roman column.</summary>
+    Tab,
 }

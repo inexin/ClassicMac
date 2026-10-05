@@ -139,7 +139,7 @@ In rough priority; each item names what blocks it, if anything.
    stay in the suite; `CLASSICMAC_MUTANTS` runs them deeper.
 4. **Decoders, later**: text encodings from HFS Plus's hints and a System file's region, names written in other
    encodings, a "make loadable" option for exported fonts, lossless WebP.
-5. **App**: editing the hex view's text column; packaging (macOS bundle icon, Linux icons and `.desktop` file).
+5. **App**: packaging (macOS bundle icon, Linux icons and `.desktop` file).
 6. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
    encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types; Word 98 and fast-saved Word 6 documents; a
    Mac-made zip; Mac OS X-made `.dmg`; NDIF version 2 and chunk type `$F0`; 68k ROM images; PEF section kinds 5, 6, 8

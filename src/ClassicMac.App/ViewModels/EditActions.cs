@@ -484,13 +484,15 @@ public sealed partial class EditActions(IAppSelection appSelection, IAppServices
     private HexInspection? readInspection;
 
     /// <summary>
-    /// A click on a byte of the hex view: the cursor while editing; otherwise the byte is selected, its pair highlighted
-    /// and inspected, its field (E8) highlighted.
+    /// A click on a byte of the hex view: the cursor while editing, typing in the column clicked (<paramref name="text"/>:
+    /// the Mac OS Roman one); otherwise the byte is selected, its pair highlighted and inspected, its field (E8)
+    /// highlighted.
     /// </summary>
-    public void SelectHexByte(long offset)
+    public void SelectHexByte(long offset, bool text = false)
     {
         if (HexEdit is { } editor)
         {
+            editor.TextColumn = text;
             editor.MoveTo((int)Math.Min(offset, int.MaxValue));
             return;
         }

@@ -78,14 +78,14 @@ public sealed class HexEditTests : IDisposable
     {
         var editor = new HexEditor(new byte[] { 1, 2, 3, 4 });
         Assert.Equal(0, editor.ChangedCount);
-        Assert.Equal("0x0000 = 1 · no changes · hex digits type, Insert toggles, Delete removes", editor.Status);
+        Assert.Equal("0x0000 = 1 · no changes · hex digits type, Tab for text, Insert toggles, Delete removes", editor.Status);
 
         editor.TypeDigit(0);
         editor.TypeDigit(9);                 // byte 0: 1 → 9
         Assert.True(editor.IsChanged(0));
         Assert.False(editor.IsChanged(1));
         Assert.Equal(1, editor.ChangedCount);
-        Assert.Equal("0x0001 = 2 · 1 byte changed · hex digits type, Insert toggles, Delete removes", editor.Status);
+        Assert.Equal("0x0001 = 2 · 1 byte changed · hex digits type, Tab for text, Insert toggles, Delete removes", editor.Status);
 
         editor.InsertMode = true;            // inserted bytes shift the rest: all after differ
         editor.TypeDigit(0xF);
@@ -93,7 +93,7 @@ public sealed class HexEditTests : IDisposable
         Assert.Equal([9, 0xFF, 2, 3, 4], editor.ToArray());
         Assert.Equal(5, editor.ChangedCount);
         Assert.True(editor.IsChanged(4));    // past the original end
-        Assert.Equal("0x0002 = 2 · 5 bytes changed · hex digits type, Insert toggles, Delete removes", editor.Status);
+        Assert.Equal("0x0002 = 2 · 5 bytes changed · hex digits type, Tab for text, Insert toggles, Delete removes", editor.Status);
         editor.MoveTo(5);
         Assert.StartsWith("0x0005 = end · ", editor.Status);
     }
@@ -313,5 +313,99 @@ public sealed class HexEditTests : IDisposable
         model.EditActions.DiscardHexEditCommand.Execute(null);
         model.Selected = input;
         Assert.Null(model.EditActions.HexInspection);
+    }
+
+    // The Mac OS Roman column (boards/hex.md): typed characters become their Mac OS Roman bytes, overwriting, inserting
+    // or appending as digits do; a character Mac OS Roman lacks, or a control character, types nothing.
+    [Fact]
+    public void Characters_type_Mac_OS_Roman_bytes_in_the_text_column()
+    {
+        var editor = new HexEditor(new byte[] { 0x55, 0x6E, 0x74 });
+        Assert.False(editor.TextColumn);
+
+        editor.OnKey(HexKey.Tab);
+
+        Assert.True(editor.TextColumn);
+        Assert.Equal("0x0000 = 85 · no changes · characters type, Tab for hex, Insert toggles, Delete removes", editor.Status);
+        Assert.True(editor.TypeText("Hé"));
+        Assert.Equal([0x48, 0x8E, 0x74], editor.ToArray());
+        Assert.Equal(2, editor.Cursor);
+        editor.InsertMode = true;
+        Assert.True(editor.TypeText("•"));
+        Assert.Equal([0x48, 0x8E, 0xA5, 0x74], editor.ToArray());
+        editor.MoveTo(4);
+        Assert.True(editor.TypeText("!"));                                     // at the end: appended
+        Assert.Equal([0x48, 0x8E, 0xA5, 0x74, 0x21], editor.ToArray());
+
+        Assert.False(editor.TypeText("Ж\r"));                                  // no Mac OS Roman byte; a control character
+        Assert.Equal(5, editor.Length);
+        Assert.False(editor.TypeText("aЖb"));                                  // the others still type
+        Assert.Equal([.. "aЖb".Where(c => c != 'Ж').Select(c => (byte)c)], editor.ToArray()[5..]);
+        editor.OnKey(HexKey.Tab);
+        Assert.False(editor.TextColumn);
+    }
+
+    // A half-typed byte ends when the column changes; the cursor is the same byte in both columns.
+    [Fact]
+    public void Switching_columns_ends_a_half_typed_byte()
+    {
+        var editor = new HexEditor(new byte[] { 0x00, 0x00 });
+        editor.TypeDigit(4);                                                     // 0x40, waiting for the low digit
+
+        editor.TextColumn = true;
+        editor.TypeText("A");
+
+        Assert.Equal([0x41, 0x00], editor.ToArray());
+        Assert.Equal(1, editor.Cursor);
+    }
+
+    // The grid shows which column types: the cursor in it, a shadow of it in the other.
+    [Fact]
+    public void The_cursor_is_in_the_typing_column()
+    {
+        var editor = new HexEditor(new byte[] { 1, 2 });
+        var cell = editor.Lines[0].Cells[0];
+        Assert.Equal((true, false), (cell.IsHexCursor, cell.IsTextCursor));
+
+        editor.TextColumn = true;
+
+        cell = editor.Lines[0].Cells[0];
+        Assert.Equal((false, true), (cell.IsHexCursor, cell.IsTextCursor));
+        Assert.False(editor.Lines[0].Cells[1].IsTextCursor);
+    }
+
+    // In the text column letters and digits are text: the keys are left for text input; Tab and the cursor keys still
+    // go to the editor.
+    [Fact]
+    public void The_text_column_leaves_letter_keys_to_text_input()
+    {
+        var editor = new HexEditor(new byte[] { 1, 2 });
+        Assert.True(ClassicMac.App.Behaviors.HexKeys.Handle(editor, Avalonia.Input.Key.Tab, Avalonia.Input.KeyModifiers.None));
+        Assert.True(editor.TextColumn);
+
+        Assert.False(ClassicMac.App.Behaviors.HexKeys.Handle(editor, Avalonia.Input.Key.A, Avalonia.Input.KeyModifiers.None));
+        Assert.False(ClassicMac.App.Behaviors.HexKeys.Handle(editor, Avalonia.Input.Key.D4, Avalonia.Input.KeyModifiers.None));
+        Assert.Equal([1, 2], editor.ToArray());
+        Assert.True(ClassicMac.App.Behaviors.HexKeys.Handle(editor, Avalonia.Input.Key.Right, Avalonia.Input.KeyModifiers.None));
+        Assert.Equal(1, editor.Cursor);
+        Assert.True(ClassicMac.App.Behaviors.HexKeys.Handle(editor, Avalonia.Input.Key.Tab, Avalonia.Input.KeyModifiers.Shift));
+        Assert.False(editor.TextColumn);
+    }
+
+    // A click on a character puts the cursor there in the text column; on a byte's digits, in the hex column.
+    [Fact]
+    public async Task A_click_chooses_the_column()
+    {
+        var (model, input) = await Open();
+        model.Selected = Resource(input, "ZZZZ");
+        await model.PreviewTask;
+        await model.EditActions.EditHexCommand.ExecuteAsync(null);
+        var editor = model.EditActions.HexEdit!;
+
+        model.EditActions.SelectHexByte(2, text: true);
+        Assert.Equal((2, true), (editor.Cursor, editor.TextColumn));
+
+        model.EditActions.SelectHexByte(3);
+        Assert.Equal((3, false), (editor.Cursor, editor.TextColumn));
     }
 }

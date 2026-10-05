@@ -118,7 +118,7 @@
                 <DataTemplate DataType="vm:HexCell">
                   <Border Classes="hex-cell" Classes.group-end="{Binding IsGroupEnd}" Classes.zero="{Binding IsZero}"
                           Classes.in-field="{Binding IsInField}" Classes.selected="{Binding IsSelected}" Classes.match="{Binding IsMatch}"
-                          Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
+                          Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsHexCursor}" Classes.cursor-shadow="{Binding IsTextCursor}">
                     <TextBlock Text="{Binding Hex}" />
                   </Border>
                 </DataTemplate>
@@ -133,7 +133,7 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="vm:HexCell">
                   <Border Classes="hex-char" Classes.in-field="{Binding IsInField}" Classes.selected="{Binding IsSelected}" Classes.match="{Binding IsMatch}"
-                          Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
+                          Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsTextCursor}" Classes.cursor-shadow="{Binding IsHexCursor}">
                     <TextBlock Text="{Binding Character}" Classes.muted="{Binding IsPlaceholder}" />
                   </Border>
                 </DataTemplate>

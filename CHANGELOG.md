@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The app's hex editor types in the Mac OS Roman column too: a click on a character or Tab (Shift+Tab) moves typing
+  there, where characters become their Mac OS Roman bytes (overwriting, inserting or appending as digits do; one Mac
+  OS Roman lacks types nothing). The column that types shows the cursor, the other its shadow.
+
 - `PictDecodeOptions.MaxPixels` (64 Mi by default): a picture whose canvas is larger is refused with
   `InvalidDataException` before anything is allocated, where a huge frame used to overflow (found by fuzzing,
   pict.md §5). The `PICT` decoder passes `DecodeOptions.MaxImagePixels`.
