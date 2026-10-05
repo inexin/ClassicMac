@@ -165,8 +165,9 @@ No Apple code on the Mac OS 9.0 disk reads or writes MacBinary, so there is no A
   [ClassicMac]
 - A date of 0 is "not recorded". [ClassicMac]
 - The forks are slices of the input, not copies. [ClassicMac]
-- `MacBinaryWriter` writes §3. A name longer than 63 bytes is cut to 63; an empty name is written as `?`. A fork over
-  `$7FFFFF` bytes is refused (an argument error, nothing written), as the reader's limit. [ClassicMac]
+- `MacBinaryWriter` writes §3. A name longer than 63 bytes is cut to 63; an empty name is written as `?`. A name with
+  `:` or NUL, which the reader takes for another kind of file, and a fork over `$7FFFFF` bytes, as the reader's limit,
+  are refused (an argument error, nothing written). [ClassicMac]
 
 ## 6. Diagnostics
 
@@ -187,7 +188,7 @@ No file made by a MacBinary application is in the tests; the inputs are built by
   `MacBinary_III_keeps_script_and_extended_flags`, `A_secondary_header_is_skipped`,
   `Truncated_forks_keep_what_is_there` (`macbinary.fork-truncated`), `MacBinary_I_needs_the_length_its_header_gives`,
   `Data_starting_with_zeros_is_not_MacBinary_I`, `A_bad_CRC_is_not_MacBinary_II`, `Other_files_are_not_MacBinary`.
-- `tests/ClassicMac.Files.Tests/ContainerWriterTests.cs`: `MacBinary_III_reads_back` (§3 read back by §2).
+- `tests/ClassicMac.Files.Tests/ContainerWriterTests.cs`: `MacBinary_III_reads_back` (§3 read back by §2), `MacBinary_refuses_a_name_no_Mac_file_has`.
 - `tests/ClassicMac.Files.Tests/ForkSaverTests.cs`: `A_MacBinary_II_file_is_saved_as_MacBinary_III`
   ([writing.md](writing.md)).
 

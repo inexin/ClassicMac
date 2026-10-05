@@ -60,6 +60,18 @@ public class ContainerWriterTests
         AssertSame(file, MacBinaryReader.III.Read(ForkData.FromBytes(bytes), new ContainerContext())[0], dates: true, extended: true);
     }
 
+    // A name with ':' or NUL no Mac file has, and the reader takes such a header for something else (macbinary.md §5):
+    // refused rather than written unreadable (found by fuzzing).
+    [Fact]
+    public void MacBinary_refuses_a_name_no_Mac_file_has()
+    {
+        foreach (var name in new byte[][] { [(byte)'a', (byte)':'], [(byte)'a', 0] })
+        {
+            var file = Sample() with { Name = new MacString(name) };
+            Assert.Throws<ArgumentException>(() => MacBinaryWriter.ToArray(file));
+        }
+    }
+
     [Fact]
     public void BinHex_reads_back()
     {

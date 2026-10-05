@@ -88,6 +88,17 @@ internal static class FuzzSeeds
         }
 
         Add("pef", Pef());
+
+        // The writers' targets read their input as choices (FuzzReader): a few fixed patterns to start from.
+        var random = new Random(7);
+        foreach (var length in new[] { 64, 300, 2000 })
+        {
+            var choices = new byte[length];
+            random.NextBytes(choices);
+            Add("hfs-edit", choices);
+            Add("wrappers", choices);
+            Add("pict-write", choices);
+        }
         return FuzzTargets.All.Keys.ToDictionary(t => t,
             t => Directory.Exists(Path.Combine(output, t)) ? Directory.GetFiles(Path.Combine(output, t)).Length : 0, StringComparer.Ordinal);
     }

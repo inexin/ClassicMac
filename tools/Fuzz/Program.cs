@@ -6,7 +6,8 @@ using SharpFuzz;
 //   Fuzz <target>                        one target, under libfuzzer-dotnet with the ClassicMac assemblies instrumented
 //   Fuzz seeds <output> [repository]     writes the seed corpora, a folder per target
 //   Fuzz replay <target> <file|folder>…  runs inputs without libFuzzer, as a crash is reproduced
-// Targets: container, resource-fork, resource, code, pef, pict, first-aid, ndif-write (FuzzTargets).
+// Targets: container, resource-fork, resource, code, pef, pict, first-aid; the writers' ndif-write, hfs-edit, wrappers,
+// pict-write (FuzzTargets, WriterTargets).
 switch (args)
 {
     case ["seeds", var output, ..]:

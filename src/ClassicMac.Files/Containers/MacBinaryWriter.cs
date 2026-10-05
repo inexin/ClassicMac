@@ -16,8 +16,9 @@ public static class MacBinaryWriter
     private const int Block = 128;
 
     /// <summary>
-    /// Writes <paramref name="file"/>. Its name is cut to 63 bytes; forks over $7FFFFF bytes (the MacBinary limit) are
-    /// refused (an argument error, nothing written).
+    /// Writes <paramref name="file"/>. Its name is cut to 63 bytes; a name with ':' or NUL (which no Mac file has, and the
+    /// reader takes for another kind of file) and forks over $7FFFFF bytes (the MacBinary limit) are refused (an argument
+    /// error, nothing written).
     /// </summary>
     public static void Write(MacFile file, Stream output)
     {
@@ -26,6 +27,11 @@ public static class MacBinaryWriter
         if (file.DataFork.Length > 0x7FFFFF || file.ResourceFork.Length > 0x7FFFFF)
         {
             throw new ArgumentException("A fork is over MacBinary's 8 MiB limit.", nameof(file));
+        }
+
+        if (file.Name.Bytes.IndexOfAny((byte)':', (byte)0) >= 0)
+        {
+            throw new ArgumentException("A Mac name holds no ':' or NUL; MacBinary readers refuse one.", nameof(file));
         }
 
         var header = new byte[Block];

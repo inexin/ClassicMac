@@ -38,6 +38,9 @@ internal static class FuzzTargets
             ["pict"] = Pict,
             ["first-aid"] = FirstAid,
             ["ndif-write"] = NdifWrite,
+            ["hfs-edit"] = Strict(WriterTargets.HfsEdit),
+            ["wrappers"] = Strict(WriterTargets.Wrappers),
+            ["pict-write"] = Strict(WriterTargets.PictWrite),
         };
 
     /// <summary>Runs <paramref name="target"/> on <paramref name="input"/>, letting only a malformed-input refusal pass.</summary>

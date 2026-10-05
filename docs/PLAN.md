@@ -130,14 +130,18 @@ In rough priority; each item names what blocks it, if anything.
    NDIF images (mounted in Disk Copy 6.3.3). HFSX has been tried only on built volumes: it needs Mac OS X 10.3 or later
    (fsck_hfs), which the harness does not have.
 2. **Fuzzing**: `tools/Fuzz` runs libFuzzer through SharpFuzz nightly (`.github/workflows/fuzz.yml`, five minutes a
-   target) on eight targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
-   code, PEF, PICT on both QuickDraws, First Aid, and the NDIF writer (any disk made into an image, rewritten and
-   split, where any refusal is a crash). A reader fault the unwrapper or a decoder reports (`*-fault`) counts as a
+   target) on eleven targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
+   code, PEF, PICT on both QuickDraws and First Aid; and the writers, where the input chooses what is written and it
+   must read back as meant (any refusal of their own output a crash): the NDIF writer (any disk made into an image,
+   rewritten and split), HFS edits (up to 24 edits on a new volume, each followed by the writer's checks, First Aid and
+   a comparison with a model of the files and folders), the wrappers (MacBinary III, AppleSingle, BinHex, resource
+   forks, DeRez and Rez, ADC, KenCode, PackBits) and PICT (PictWriter in every pixel format, and recordings on both
+   QuickDraws drawing what the port drew). A reader fault the unwrapper or a decoder reports (`*-fault`) counts as a
    crash. Seeds are the repository's test files and what is inside them, and HFS and HFS Plus volumes (plain and
    wrapped) and PEF containers from the tests' builders; each target's corpus is minimised and kept in the Actions
    cache between runs. Crashes are kept as artifacts and replayed with `Fuzz replay`; those found so far are tests.
-   Still to do: targets for the other writers (HFS edits, StuffIt and archive writers, PICT recording). The seeded
-   mutation tests (`tests/Shared/Mutations.cs`) stay in the suite; `CLASSICMAC_MUTANTS` runs them deeper.
+   Still to do: HFS Plus repairs and the volume tools (defragment, resize) as writer targets. The seeded mutation
+   tests (`tests/Shared/Mutations.cs`) stay in the suite; `CLASSICMAC_MUTANTS` runs them deeper.
 3. **App**: packaging (macOS bundle icon, Linux icons and `.desktop` file).
 4. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
    encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types; Word 98 and fast-saved Word 6 documents; a

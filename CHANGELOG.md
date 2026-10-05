@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Fuzzing the writers: `hfs-edit` (edit sequences on a new HFS volume, checked against a model, the writer's checks and
+  First Aid after each), `wrappers` (MacBinary III, AppleSingle, BinHex, resource forks, DeRez and Rez, ADC, KenCode,
+  PackBits round trips) and `pict-write` (PictWriter in every pixel format; recordings on both QuickDraws). Fixed from
+  it: `MacBinaryWriter` refuses a name with `:` or NUL, which it used to write into a file no reader takes.
+
 - Verified live (Mac OS 9.0, Disk First Aid 8.5.5, Disk Copy 6.3.3): edits of volumes with overflow extents, writes
   to several partitions, and new and edited NDIF images. `ndif --format kencode`'s help no longer promises a smaller
   image.
