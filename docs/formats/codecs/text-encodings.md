@@ -8,7 +8,7 @@ every encoding below and, by default, Mac OS Roman.
 | | |
 | --- | --- |
 | Used by | Every text the decoders read: `TEXT`, `STR `, `STR#`, `styl` documents, menus, dialogs, aliases, Finder resources, Help pages ([help-pages.md](../resources/help-pages.md)) |
-| ClassicMac | Reads and writes; `ClassicMac.Core` (`MacEncodings`, `MacTextEncoding`) |
+| ClassicMac | Reads and writes; `ClassicMac.Core` (`MacEncodings`, `MacTextEncoding`, `MacScripts`); the CLI's `--encoding`, the app's View ▸ Text Encoding |
 | Verified against | Apple's mapping tables, every code of all 16 (§7) |
 | Sources | Apple's Mac OS mapping tables (unicode.org `VENDORS/APPLE`, version 2.x, Apple's licence); Apple's TextCommon.h and Script.h (Universal Interfaces 3.4): base encodings, script and region codes, font ranges; *Inside Macintosh: Text* |
 
@@ -104,6 +104,8 @@ None.
   `HostWriteOptions.NameEncoding` and `ExportOptions.NameEncoding` as host names (`HostNames.ToHostName(name, encoding)`:
   each character whole, a code that is no text escaped byte by byte, `%XX`); SheepShaver's layout keeps the bytes.
   Names written into a volume stay Mac OS Roman. [ClassicMac]
+- The app's View ▸ Text Encoding sets the encoding of names in the tree, of decoded text and of the host names its
+  exports write, kept between sessions; choosing another retitles the open files' names in place. [ClassicMac]
 - The decoders read text in `DecodeOptions.TextEncoding`, Mac OS Roman by default, and record its IANA name in the
   manifest. With `DecodeOptions.AutomaticEncoding` (on by default), text that says its script is read in it first: a
   styled run (`TEXT` and `styl`, SimpleText and DOCMaker documents) whose font family is in a non-Roman script's range
@@ -124,6 +126,8 @@ None.
 - `tests/ClassicMac.Core.Tests/MacScriptsTests.cs`: font family ranges, script and region pairs, regions' systems.
 - `tests/ClassicMac.Core.Tests/HostNamesTests.cs`, `Names_in_another_encoding_become_their_characters`;
   `tests/ClassicMac.Cli.Tests/UnpackTests.cs`, `Encoding_names_the_host_files_in_that_script`.
+- `tests/ClassicMac.App.Tests/TextEncodingTests.cs`: names retitled and text read again on a change, the choice kept
+  for the next session, the menu's choices.
 - `tests/ClassicMac.Resources.Decoders.Tests/TextDecoderTests.cs`: a styled run in a Japanese font, with and without
   automatic encodings; a Japanese `'vers'` read and written back.
 

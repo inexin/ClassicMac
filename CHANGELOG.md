@@ -6,7 +6,9 @@
   to encodings as Apple's headers and tables give them; styled runs in a non-Roman script's fonts read in that script,
   run by run, and `'vers'` strings in their region's encoding (read and written), unless
   `DecodeOptions.AutomaticEncoding` is off. Names stored as bytes follow `--encoding` too: listed and matched in Mac
-  paths, and as the host names `unpack` and `extract` write (`HostNames.ToHostName(name, encoding)`).
+  paths, and as the host names `unpack` and `extract` write (`HostNames.ToHostName(name, encoding)`). The app's
+  View ▸ Text Encoding chooses the encoding of names, text and export names, kept between sessions; a change retitles
+  the open tree in place.
 - Rez source (output/rez.md): `classicmac derez` and `RezWriter` write a resource fork as MPW 3.6's DeRez does, byte
   for byte (checked against 43 of DeRez's own outputs, `-e` included), or with `--portable` in the subset MPW's and
   Retro68's Rez compile alike, reporting what that subset cannot hold. `classicmac rez` and `RezCompiler` compile `data`,

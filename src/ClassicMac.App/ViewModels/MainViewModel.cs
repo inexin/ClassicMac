@@ -226,6 +226,7 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
         StatusLine.WatchSummary();
         TreeDisplay.LaidOut += TreeSearch.ReapplySearch;
         EmptyState.InitRecentFiles(saved.RecentFiles);
+        textEncoding = MacEncodings.TryParse(saved.TextEncoding, out var encoding) ? encoding : MacTextEncoding.Roman;
         TypeCreatorActions.InitTypeCreatorDatabase(saved.TypeCreatorDatabase);
     }
 
@@ -237,6 +238,7 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
             HideInvisible = TreeDisplay.HideInvisible,
             ShowDetails = TreeDisplay.ShowDetails,
             RecentFiles = EmptyState.RecentFiles.Select(r => r.Path).ToList(),
+            TextEncoding = MacEncodings.Name(TextEncoding),
         });
 
     /// <summary>Which files the tree hides or groups.</summary>
@@ -478,14 +480,14 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
         {
             var (host, root) = await Task.Run(() =>
             {
-                var context = new ContainerContext(ContainerOptions, diagnostics);
+                var context = new ContainerContext(ContainerOptions with { NameEncoding = TextEncoding }, diagnostics);
                 var hostFile = HostFiles.Read(path, ContainerOptions, diagnostics);
                 // One level: the containers inside (archives, disk images on a disk) are read when expanded.
                 var tree = ContainerUnwrapper.Default.Unwrap(hostFile.File, HostFiles.FormatName(hostFile.Layout),
                     context.For(null, HostFiles.Siblings(path, ContainerOptions, diagnostics)), levels: 1);
                 return (hostFile, tree);
             });
-            var input = new InputNode(path, host, root, ContainerOptions, ReadOptions, Report, TreeDisplay);
+            var input = new InputNode(path, host, root, ContainerOptions with { NameEncoding = TextEncoding }, ReadOptions, Report, TreeDisplay);
             Roots.Add(input);
             UpdateHiddenCount();
             EmptyState.AddRecent(path);
@@ -585,6 +587,23 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
         PreviewTask = MakePreviewAsync(AliasActions.SelectedAlias is { } alias ? alias.Target : value);
     }
 
+    /// <summary>The Mac encoding names and text are read in (View ▸ Text Encoding; text-encodings.md §5), kept between sessions.</summary>
+    [ObservableProperty]
+    private MacTextEncoding textEncoding;
+
+    // A new encoding: the open inputs' names retitled, the preview read again, the choice kept.
+    partial void OnTextEncodingChanged(MacTextEncoding value)
+    {
+        foreach (var input in Roots.OfType<InputNode>())
+        {
+            input.SetNameEncoding(value);
+        }
+
+        SaveSettings();
+        ShellActions.ViewChanged();
+        PreviewTask = MakePreviewAsync(Selected);
+    }
+
     partial void OnScreenDepthChanged(int value)
     {
         ShellActions.ViewChanged();
@@ -642,7 +661,7 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
                 return;
             }
 
-            result = await PreviewViewModel.BuildAsync(node, DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager },
+            result = await PreviewViewModel.BuildAsync(node, DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager, TextEncoding = TextEncoding },
                 ReadOptions, diagnostics, cancellation.Token,
                 node is ResourceNode { Resource.Type: var type } && type.ToString() is "DLOG" or "ALRT" or "DITL"
                     || node is FolderNode or InputNode or ContainerFileNode or NoNameGroupNode ? DialogSources.From(Roots) : null);

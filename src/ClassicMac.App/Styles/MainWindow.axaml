@@ -907,6 +907,21 @@
     <Setter Property="Padding" Value="12,8" />
   </Style>
 
+  <!-- View ▸ Text Encoding: one radio item per encoding. -->
+  <Style Selector="MenuItem.encodings > MenuItem" x:DataType="vm:TextEncodingChoice">
+    <Setter Property="Header" Value="{Binding Label}" />
+    <Setter Property="ToggleType" Value="Radio" />
+    <Setter Property="GroupName" Value="encoding" />
+    <Setter Property="Command" Value="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShellActions.SetTextEncodingCommand, FallbackValue={x:Null}}" />
+    <Setter Property="CommandParameter" Value="{Binding Encoding}" />
+    <Setter Property="IsChecked">
+      <MultiBinding Converter="{x:Static dialogs:ShellConverters.AreEqual}">
+        <Binding Path="Encoding" />
+        <Binding Path="$parent[Window].((vm:MainViewModel)DataContext).TextEncoding" FallbackValue="{x:Null}" />
+      </MultiBinding>
+    </Setter>
+  </Style>
+
   <!-- View ▸ Screen Depth: one radio item per depth. -->
   <Style Selector="MenuItem.depths > MenuItem" x:DataType="vm:ScreenDepthChoice">
     <Setter Property="Header" Value="{Binding Label}" />

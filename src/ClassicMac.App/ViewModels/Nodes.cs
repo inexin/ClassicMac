@@ -102,7 +102,29 @@ public abstract partial class NodeViewModel : ObservableObject
     };
 
     /// <summary>The title without the unsaved-edits mark.</summary>
-    public string BaseTitle { get; }
+    public string BaseTitle { get; private set; }
+
+    // A Mac name as text in the input's name encoding (View ▸ Text Encoding).
+    internal static string NameText(NodeViewModel parent, MacString name) =>
+        MacEncodings.Decode(name.Bytes, parent.Input.ContainerOptions.NameEncoding);
+
+    // The title this node takes in the input's name encoding, or null when it has no Mac name.
+    internal virtual string? TitleInEncoding() => null;
+
+    // Gives the node (and every node below it, shown or not) the titles of the input's name encoding, keeping any mark.
+    internal void Retitle()
+    {
+        if (TitleInEncoding() is { } title && title != BaseTitle)
+        {
+            Title = title + (Title.StartsWith(BaseTitle, StringComparison.Ordinal) ? Title[BaseTitle.Length..] : "");
+            BaseTitle = title;
+        }
+
+        foreach (var child in (Items ?? []).Concat(Children).Distinct())
+        {
+            child.Retitle();
+        }
+    }
 
     public NodeKind Kind { get; }
 
@@ -355,7 +377,14 @@ public sealed class InputNode : NodeViewModel
 
     internal ReadOptions Options { get; }
 
-    internal ContainerReadOptions ContainerOptions { get; }
+    internal ContainerReadOptions ContainerOptions { get; private set; }
+
+    // A new name encoding for the input's names (View ▸ Text Encoding): every node retitled; containers read later use it.
+    internal void SetNameEncoding(MacTextEncoding encoding)
+    {
+        ContainerOptions = ContainerOptions with { NameEncoding = encoding };
+        Retitle();
+    }
 
     internal Action<DiagnosticEntry> Report { get; }
 
@@ -459,7 +488,7 @@ public sealed class InputNode : NodeViewModel
 public sealed class ContainerFileNode : NodeViewModel
 {
     internal ContainerFileNode(NodeViewModel parent, ContainerNode node)
-        : base($"{node.File.Name.ToMacRoman()} ({ContentFormatOf(node)})", NodeKind.Container, parent)
+        : base($"{NameText(parent, node.File.Name)} ({ContentFormatOf(node)})", NodeKind.Container, parent)
     {
         Node = node;
         if (node.UnreadFormat is not null)
@@ -481,6 +510,8 @@ public sealed class ContainerFileNode : NodeViewModel
     public string ContentFormat => ContentFormatOf(Node);
 
     public override string Source => $"{Parent!.Source} › {Node.File.Name.ToMacRoman()}";
+
+    internal override string? TitleInEncoding() => $"{NameText(Parent!, Node.File.Name)} ({ContentFormatOf(Node)})";
 
     private static string ContentFormatOf(ContainerNode node) => node.UnreadFormat ?? node.Children[0].Format;
 
@@ -512,7 +543,14 @@ public sealed class FolderNode : NodeViewModel
 {
     public FolderNode(NodeViewModel parent, string name) : base(name, NodeKind.Folder, parent) => Items = [];
 
+    internal FolderNode(NodeViewModel parent, MacString name) : this(parent, NameText(parent, name)) => MacName = name;
+
+    // The folder's name as stored, when it came from a volume or archive.
+    internal MacString? MacName { get; }
+
     public override string Source => $"{Parent!.Source}:{Title}";
+
+    internal override string? TitleInEncoding() => MacName is { } name ? NameText(Parent!, name) : null;
 }
 
 /// <summary>A folder's files whose names are empty or only whitespace, when it has two or more (shown collapsed).</summary>
@@ -527,7 +565,7 @@ public sealed class NoNameGroupNode : NodeViewModel
 public sealed class FileNode : NodeViewModel
 {
     internal FileNode(NodeViewModel parent, ContainerNode node)
-        : base(node.File.Name.ToMacRoman(), NodeKind.File, parent)
+        : base(NameText(parent, node.File.Name), NodeKind.File, parent)
     {
         Node = node;
         AddResourcesPlaceholder(this, node.File, raw: false);
@@ -538,6 +576,8 @@ public sealed class FileNode : NodeViewModel
     public MacFile File => Node.File;
 
     public FileResources? Resources { get; internal set; }
+
+    internal override string? TitleInEncoding() => NameText(Parent!, Node.File.Name);
 
     /// <summary>The edits made to the file's resources, once any are.</summary>
     public EditState? Editing { get; internal set; }
@@ -632,8 +672,14 @@ public sealed class ResourceTypeNode : NodeViewModel
 
 /// <summary>One resource.</summary>
 public sealed class ResourceNode(NodeViewModel parent, ResourceFork fork, Resource resource)
-    : NodeViewModel(resource.Name is { } n ? $"{resource.Id} “{n.ToMacRoman()}”" : resource.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), NodeKind.Resource, parent)
+    : NodeViewModel(TitleOf(parent, resource), NodeKind.Resource, parent)
 {
+    private static string TitleOf(NodeViewModel parent, Resource resource) => resource.Name is { } n
+        ? $"{resource.Id} “{NameText(parent, n)}”"
+        : resource.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    internal override string? TitleInEncoding() => TitleOf(Parent!, Resource);
+
     public ResourceFork Fork { get; } = fork;
 
     public Resource Resource { get; } = resource;
@@ -657,7 +703,7 @@ internal static class Tree
                 key += ":" + part.ToMacRoman();
                 if (!folders.TryGetValue(key, out var folder))
                 {
-                    folders[key] = folder = new FolderNode(at, part.ToMacRoman());
+                    folders[key] = folder = new FolderNode(at, part);
                     at.Items!.Add(folder);
                 }
                 at = folder;

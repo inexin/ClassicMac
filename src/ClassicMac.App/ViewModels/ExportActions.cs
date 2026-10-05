@@ -39,7 +39,12 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
     /// <summary>The last export's task (tests wait for it).</summary>
     internal Task ExportTask { get; private set; } = Task.CompletedTask;
 
-    internal DecodeOptions CurrentDecodeOptions => DecodeOptions.Default with { ScreenDepth = appView.ScreenDepth, QuickDraw = appServices.ReadOptions.ResourceManager };
+    internal DecodeOptions CurrentDecodeOptions => DecodeOptions.Default with
+    {
+        ScreenDepth = appView.ScreenDepth,
+        QuickDraw = appServices.ReadOptions.ResourceManager,
+        TextEncoding = appView.TextEncoding,
+    };
 
     private bool CanSaveResource() => !IsExporting && appSelection.Selected is ResourceNode;
 
@@ -228,7 +233,7 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
         var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " unpacked");
         var progress = appParts.StatusLine.BeginProgress($"Unpacking {NameOf(node)}…", root.Leaves().Count());
         var diagnostics = new List<Diagnostic>();
-        var result = await Task.Run(() => Unpacker.Unpack(root, target, HostWriteOptions.Default with { Layout = layout }, diagnostics, progress));
+        var result = await Task.Run(() => Unpacker.Unpack(root, target, HostWriteOptions.Default with { Layout = layout, NameEncoding = appView.TextEncoding }, diagnostics, progress));
         foreach (var d in diagnostics)
         {
             appServices.Report(new DiagnosticEntry(d, node.Source, node));
@@ -271,6 +276,7 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
     private ExportOptions ExportOptionsFor(IReadOnlySet<FourCC>? types) =>
         ExportOptions.Default with
         {
+            NameEncoding = appView.TextEncoding,
             Decoders = ResourceDecoders.Create(CurrentDecodeOptions),
             Documents = ResourceDecoders.CreateDocumentConverters(CurrentDecodeOptions),
             Types = types,

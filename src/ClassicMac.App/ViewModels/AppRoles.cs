@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Threading.Tasks;
+using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Resources;
 
@@ -108,6 +109,9 @@ public interface IAppView
 
     /// <summary>The screen depth previews are drawn at.</summary>
     int ScreenDepth { get; set; }
+
+    /// <summary>The Mac encoding names and text are read in (View ▸ Text Encoding).</summary>
+    MacTextEncoding TextEncoding { get; set; }
 
     /// <summary>The image preview's items at the zoom.</summary>
     IReadOnlyList<ImageItem> Images { get; set; }

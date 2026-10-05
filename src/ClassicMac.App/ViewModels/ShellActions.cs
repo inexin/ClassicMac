@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using ClassicMac.Core;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -24,6 +25,12 @@ public interface IShell
 
     /// <summary>Puts plain text on the clipboard (Details ▸ Copy all).</summary>
     Task CopyTextAsync(string text);
+}
+
+/// <summary>An encoding for View ▸ Text Encoding.</summary>
+public sealed record TextEncodingChoice(MacTextEncoding Encoding, string Label)
+{
+    public override string ToString() => Label;
 }
 
 /// <summary>A screen depth for the toolbar's Depth select and View ▸ Screen Depth.</summary>
@@ -131,6 +138,22 @@ public sealed partial class ShellActions(IAppSelection appSelection, IAppService
 
     [RelayCommand]
     private void SetScreenDepth(int depth) => appView.ScreenDepth = depth;
+
+    // ---- Text encoding (View ▸ Text Encoding) ----
+
+    /// <summary>The encodings View ▸ Text Encoding offers, Mac OS Roman first.</summary>
+    public IReadOnlyList<TextEncodingChoice> TextEncodingChoices { get; } =
+    [
+        new(MacTextEncoding.Roman, "Mac OS Roman"), new(MacTextEncoding.CentralEuropean, "Central European"),
+        new(MacTextEncoding.Croatian, "Croatian"), new(MacTextEncoding.Icelandic, "Icelandic"), new(MacTextEncoding.Romanian, "Romanian"),
+        new(MacTextEncoding.Turkish, "Turkish"), new(MacTextEncoding.Greek, "Greek"), new(MacTextEncoding.Cyrillic, "Cyrillic"),
+        new(MacTextEncoding.Ukrainian, "Ukrainian"), new(MacTextEncoding.Arabic, "Arabic"), new(MacTextEncoding.Hebrew, "Hebrew"),
+        new(MacTextEncoding.Thai, "Thai"), new(MacTextEncoding.Japanese, "Japanese"), new(MacTextEncoding.ChineseTraditional, "Chinese (Traditional)"),
+        new(MacTextEncoding.ChineseSimplified, "Chinese (Simplified)"), new(MacTextEncoding.Korean, "Korean"),
+    ];
+
+    [RelayCommand]
+    private void SetTextEncoding(MacTextEncoding encoding) => appView.TextEncoding = encoding;
 
     // ---- Theme (View ▸ Theme) ----
 

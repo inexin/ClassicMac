@@ -24,7 +24,7 @@ public enum AppTheme
 /// <param name="ShowDetails">Whether the tree shows its rows' details column (type · creator, sizes).</param>
 /// <param name="TypeCreatorDatabase">The type and creator database the user chose (View ▸ Type/Creator Database…), or null.</param>
 public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = true, AppTheme Theme = AppTheme.System,
-    IReadOnlyList<string>? RecentFiles = null, bool ShowDetails = false, string? TypeCreatorDatabase = null)
+    IReadOnlyList<string>? RecentFiles = null, bool ShowDetails = false, string? TypeCreatorDatabase = null, string TextEncoding = "macintosh")
 {
     /// <summary>The files opened last, newest first; empty when none.</summary>
     public IReadOnlyList<string> RecentFiles { get; init; } = RecentFiles ?? [];
@@ -32,7 +32,7 @@ public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = t
     // The list compares by its paths, so equal settings are equal records.
     public bool Equals(AppSettings? other) =>
         other is not null && GroupNoName == other.GroupNoName && HideInvisible == other.HideInvisible && Theme == other.Theme
-        && ShowDetails == other.ShowDetails && TypeCreatorDatabase == other.TypeCreatorDatabase
+        && ShowDetails == other.ShowDetails && TypeCreatorDatabase == other.TypeCreatorDatabase && TextEncoding == other.TextEncoding
         && RecentFiles.SequenceEqual(other.RecentFiles);
 
     public override int GetHashCode()
@@ -43,6 +43,7 @@ public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = t
         hash.Add(Theme);
         hash.Add(ShowDetails);
         hash.Add(TypeCreatorDatabase);
+        hash.Add(TextEncoding);
         foreach (var path in RecentFiles)
         {
             hash.Add(path);

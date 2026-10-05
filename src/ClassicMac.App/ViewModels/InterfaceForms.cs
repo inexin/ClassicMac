@@ -342,7 +342,7 @@ public sealed partial class FormLivePreview(IAppSelection appSelection, IAppServ
                 if (form is DialogItemsForm items)
                 {
                     // The item list in the window of the dialog that uses it, redrawn from the values on each change.
-                    FormDialog = InterfacePreviews.ItemList(node.Resource, bytes, items.User, node.Fork, DecodeOptions.Default with { ScreenDepth = appView.ScreenDepth },
+                    FormDialog = InterfacePreviews.ItemList(node.Resource, bytes, items.User, node.Fork, DecodeOptions.Default with { ScreenDepth = appView.ScreenDepth, TextEncoding = appView.TextEncoding },
                         appServices.ReadOptions, [], sources ??= DialogSources.From(appSelection.Roots));
                     FormDialogNote = FormDialog is not { } drawn ? null
                         : string.Create(CultureInfo.InvariantCulture,
@@ -351,7 +351,7 @@ public sealed partial class FormLivePreview(IAppSelection appSelection, IAppServ
                 else if (form is DataForm and not MenuForm)
                 {
                     // An alert draws the selected stage's default button (E4).
-                    FormDialog = InterfacePreviews.Dialog(node.Resource, bytes, node.Fork, DecodeOptions.Default with { ScreenDepth = appView.ScreenDepth }, appServices.ReadOptions, [],
+                    FormDialog = InterfacePreviews.Dialog(node.Resource, bytes, node.Fork, DecodeOptions.Default with { ScreenDepth = appView.ScreenDepth, TextEncoding = appView.TextEncoding }, appServices.ReadOptions, [],
                         sources ??= DialogSources.From(appSelection.Roots), (form as AlertForm)?.SelectedStage?.BoldItem);
                 }
             }

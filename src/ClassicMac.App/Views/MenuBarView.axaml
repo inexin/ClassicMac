@@ -38,6 +38,7 @@
       <MenuItem Header="Zoom _Out" Command="{Binding ShellActions.ZoomOutCommand}" InputGesture="Ctrl+OemMinus" HotKey="Ctrl+OemMinus" />
       <MenuItem Header="_Actual Size" Command="{Binding ShellActions.ActualSizeCommand}" InputGesture="Ctrl+D0" HotKey="Ctrl+D0" />
       <MenuItem Header="Screen _Depth" Classes="depths" ItemsSource="{Binding ShellActions.ScreenDepthChoices}" />
+      <MenuItem Header="Text _Encoding" Classes="encodings" ItemsSource="{Binding ShellActions.TextEncodingChoices}" />
       <Separator />
       <MenuItem Header="Show _Diagnostics" ToggleType="CheckBox" IsChecked="{Binding DiagnosticsPanel.IsExpanded, Mode=TwoWay}" InputGesture="Ctrl+Shift+D" />
       <Separator />
