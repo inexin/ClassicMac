@@ -183,4 +183,21 @@ public class ExtractTests : IDisposable
         Assert.Equal(sfnt, File.ReadAllBytes(Path.Combine(folder, "plain", "sfnt", "128.ttf")));
         Assert.Equal(ClassicMac.Graphics.Fonts.LoadableFont.Make(sfnt), File.ReadAllBytes(Path.Combine(folder, "loadable", "sfnt", "128.ttf")));
     }
+    // --image-format webp: images written as lossless WebP (output/webp.md).
+    [Fact]
+    public void Image_format_webp_writes_lossless_WebP()
+    {
+        var input = Path.Combine(folder, "Icon.rsrc");
+        var icon = new byte[256];
+        icon[0] = 0xF0;
+        File.WriteAllBytes(input, Fork(("ICN#", 128, null, icon)));
+        var target = Path.Combine(folder, "webp");
+
+        Assert.Equal(ExitCodes.Success, Run("extract", input, "-o", target, "--image-format", "webp").Code);
+
+        var webp = File.ReadAllBytes(Path.Combine(target, "ICN#", "128.webp"));
+        Assert.Equal("RIFF", System.Text.Encoding.ASCII.GetString(webp, 0, 4));
+        Assert.Equal("WEBPVP8L", System.Text.Encoding.ASCII.GetString(webp, 8, 8));
+        Assert.Equal(ExitCodes.Usage, Run("extract", input, "-o", Path.Combine(folder, "gif"), "--image-format", "gif").Code);
+    }
 }

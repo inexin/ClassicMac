@@ -666,7 +666,7 @@ The options of the built-in decoders (`ClassicMac.Resources.Decoders.DecodeOptio
 | --- | --- | --- | --- |
 | `TextEncoding` | enum | Mac OS Roman | The encoding text resources are read with; recorded as `encoding` |
 | `LineEndings` | enum | LF | Line breaks in `.txt` output: LF, or as stored (CR) ([text-output.md §5](text-output.md#5-classicmac)) |
-| `ImageEncoder` | `IImageEncoder` | `PngEncoder` | How images are written: a name, an extension and `Encode(width, height, rgba)`. PNG (§1.12) is the only one built in; the manifest records the extension through the file names but not the encoder's name |
+| `ImageEncoder` | `IImageEncoder` | `PngEncoder` | How images are written: a name, an extension and `Encode(width, height, rgba)`. PNG (§1.12) and lossless WebP ([webp.md](webp.md), `WebPEncoder`) are built in; the manifest records the extension through the file names but not the encoder's name |
 | `ScreenDepth` | integer | 32 | The screen depth pictures are drawn at: 1, 2, 4, 8, 16 or 32 (§3.9) |
 | `MaxImagePixels` | integer | 67,108,864 | The pixel limit: the largest picture drawn (§3.9) |
 | `QuickDraw` | `ResourceManagerModel` | `MacOS9` | Whose QuickDraw pictures are drawn as: Mac OS 9's (`MacOS9`) or the 68k ROM's (`Rom68k`) (§3.9) |
@@ -681,7 +681,7 @@ exporter, and `Unpacker.Extract` reports a file-system exception as a failed for
 ### 5.3 The extract command
 
 ```
-classicmac extract <input> [-o <dir>] [--raw] [--keep-raw] [-t <type>]… [--overwrite] [--screen-depth <n>] [--no-documents] [--loadable-fonts]
+classicmac extract <input> [-o <dir>] [--raw] [--keep-raw] [-t <type>]… [--overwrite] [--screen-depth <n>] [--no-documents] [--loadable-fonts] [--image-format png|webp]
 ```
 
 | Option | Maps to |
@@ -693,6 +693,7 @@ classicmac extract <input> [-o <dir>] [--raw] [--keep-raw] [-t <type>]… [--ove
 | `--overwrite` | `Overwrite` |
 | `--screen-depth <n>` | `DecodeOptions.ScreenDepth`; one of 1, 2, 4, 8, 16, 32 (default 32) |
 | `--no-documents` | `Documents` empty. By default the built-in converter runs (§3.14) |
+| `--image-format png\|webp` | `DecodeOptions.ImageEncoder`: `PngEncoder` (the default) or `WebPEncoder`, lossless WebP ([webp.md](webp.md)); images take the encoder's extension |
 | `--loadable-fonts` | `DecodeOptions.LoadableFonts`: TrueType fonts written so modern systems load them ([outline-fonts.md §3.1](../resources/outline-fonts.md#31-making-a-font-loadable)) |
 | `--max-resource-size`, `--max-nesting-depth`, `--max-expanded-bytes`, `--verify`, `--strict`, `-q` | The options every command takes: limits (`ReadOptions`, `ContainerReadOptions`), exit-code strictness and quiet output |
 

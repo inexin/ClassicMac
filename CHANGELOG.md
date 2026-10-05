@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Lossless WebP (output/webp.md): `WebPEncoder` writes VP8L (RFC 9649) with the subtract-green and predictor transforms,
+  LZ77 backward references and a colour cache, for `DecodeOptions.ImageEncoder`; the CLI's `extract` and `convert`
+  take `--image-format webp`. ImageSharp and libwebp read every test image back pixel for pixel; a Mac font's bitmap
+  strikes come out about a fifth smaller than as PNG.
+
 - Loadable fonts (resources/outline-fonts.md §3.1): `LoadableFont.Make` and `DecodeOptions.LoadableFonts` (the CLI's
   `extract --loadable-fonts`) write a Mac TrueType font so Windows and other modern systems load it: version $00010000,
   a Windows Unicode `cmap`, the Windows names it lacks (the unique name GDI needs among them), `OS/2` and `post` when

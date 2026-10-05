@@ -331,20 +331,21 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
             }
         });
         var overwrite = new Option<bool>("--overwrite") { Description = "Write into output folders that already hold files" };
+        var imageFormat = ImageFormatOption();
         var loadableFonts = new Option<bool>("--loadable-fonts")
         {
             Description = "Write TrueType fonts so Windows and other modern systems load them (a Windows cmap, names, OS/2 and post added where missing)",
         };
         var command = new Command("extract", "Extract resources into a folder with a manifest")
         {
-            input, outputDir, raw, keepRaw, types, overwrite, screenDepth, noDocuments, loadableFonts,
+            input, outputDir, raw, keepRaw, types, overwrite, screenDepth, noDocuments, loadableFonts, imageFormat,
         };
         command.SetAction(result =>
         {
             var chosen = result.GetValue(types) is { Length: > 0 } list
                 ? list.Select(FourCC.FromString).ToHashSet()                  // the validator above refused any other
                 : null;
-            var decodeOptions = DecodeOptionsFrom(result, screenDepth) with { LoadableFonts = result.GetValue(loadableFonts) };
+            var decodeOptions = DecodeOptionsFrom(result, screenDepth, imageFormat) with { LoadableFonts = result.GetValue(loadableFonts) };
             var decode = !result.GetValue(raw);
             return new ExtractCommand(output, error).Run(
                 result.GetRequiredValue(input), result.GetValue(outputDir),
@@ -375,15 +376,16 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         };
         var screenDepth = ScreenDepthOption();
         var overwrite = new Option<bool>("--overwrite") { Description = "Write into an output folder that already holds files" };
+        var imageFormat = ImageFormatOption();
         var command = new Command("convert", "Convert the DOCMaker and SimpleText documents inside the input to HTML folders")
         {
-            input, outputDir, overwrite, screenDepth,
+            input, outputDir, overwrite, screenDepth, imageFormat,
         };
         command.SetAction(result => new ConvertCommand(output, error).Run(
             result.GetRequiredValue(input), result.GetValue(outputDir),
-            ClassicMac.Resources.Decoders.ResourceDecoders.CreateDocumentConverters(DecodeOptionsFrom(result, screenDepth)), ReadOptionsFrom(result),
+            ClassicMac.Resources.Decoders.ResourceDecoders.CreateDocumentConverters(DecodeOptionsFrom(result, screenDepth, imageFormat)), ReadOptionsFrom(result),
             ContainerOptionsFrom(result), result.GetValue(overwrite), result.GetValue(strict), result.GetValue(quiet),
-            ClassicMac.Resources.Decoders.ResourceDecoders.CreateDocumentConvertersFor(DecodeOptionsFrom(result, screenDepth))));
+            ClassicMac.Resources.Decoders.ResourceDecoders.CreateDocumentConvertersFor(DecodeOptionsFrom(result, screenDepth, imageFormat))));
         return command;
     }
 
@@ -679,8 +681,22 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         return screenDepth;
     }
 
-    private ClassicMac.Resources.Decoders.DecodeOptions DecodeOptionsFrom(ParseResult result, Option<int> screenDepth) => ClassicMac.Resources.Decoders.DecodeOptions.Default with
+    private static Option<string> ImageFormatOption()
     {
+        var format = new Option<string>("--image-format")
+        {
+            Description = "How images are written: png (the default) or webp (lossless WebP, usually smaller)",
+            DefaultValueFactory = _ => "png",
+        };
+        format.AcceptOnlyFromAmong("png", "webp");
+        return format;
+    }
+
+    private ClassicMac.Resources.Decoders.DecodeOptions DecodeOptionsFrom(ParseResult result, Option<int> screenDepth, Option<string>? imageFormat = null) => ClassicMac.Resources.Decoders.DecodeOptions.Default with
+    {
+        ImageEncoder = imageFormat is not null && result.GetValue(imageFormat) == "webp"
+            ? ClassicMac.Resources.Decoders.Images.WebPEncoder.Instance
+            : ClassicMac.Resources.Decoders.Images.PngEncoder.Instance,
         ScreenDepth = result.GetValue(screenDepth),
         QuickDraw = ReadOptionsFrom(result).ResourceManager,
         TextEncoding = result.GetValue(encoding),
