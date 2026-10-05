@@ -100,6 +100,10 @@ None.
 - Writing takes the longest text at each place that maps to a code (codes of one byte before codes of two); a
   character the encoding does not hold is refused. [ClassicMac]
 - `MacScripts` gives §2.1's rules: `Encoding(script, region)`, `ScriptOfFontFamily`, `EncodingOfRegion`. [ClassicMac]
+- Names stored as bytes are read in `ContainerReadOptions.NameEncoding` in Mac paths (listing and matching), and in
+  `HostWriteOptions.NameEncoding` and `ExportOptions.NameEncoding` as host names (`HostNames.ToHostName(name, encoding)`:
+  each character whole, a code that is no text escaped byte by byte, `%XX`); SheepShaver's layout keeps the bytes.
+  Names written into a volume stay Mac OS Roman. [ClassicMac]
 - The decoders read text in `DecodeOptions.TextEncoding`, Mac OS Roman by default, and record its IANA name in the
   manifest. With `DecodeOptions.AutomaticEncoding` (on by default), text that says its script is read in it first: a
   styled run (`TEXT` and `styl`, SimpleText and DOCMaker documents) whose font family is in a non-Roman script's range
@@ -118,14 +122,16 @@ None.
   code of every table is checked: all 16 match.
 - `tests/ClassicMac.Cli.Tests/PathCommandTests.cs`, `Encoding_reads_text_in_another_Mac_script`.
 - `tests/ClassicMac.Core.Tests/MacScriptsTests.cs`: font family ranges, script and region pairs, regions' systems.
+- `tests/ClassicMac.Core.Tests/HostNamesTests.cs`, `Names_in_another_encoding_become_their_characters`;
+  `tests/ClassicMac.Cli.Tests/UnpackTests.cs`, `Encoding_names_the_host_files_in_that_script`.
 - `tests/ClassicMac.Resources.Decoders.Tests/TextDecoderTests.cs`: a styled run in a Japanese font, with and without
   automatic encodings; a Japanese `'vers'` read and written back.
 
 ## 8. Not covered
 
 - Codes .NET's code pages define that Apple's tables do not are left as .NET reads them.
-- Names (`MacString`) in other encodings; HFS Plus's text encoding hints and a System file's region as the encoding of
-  a volume's files.
+- Writing names in other encodings into a volume; the folders `convert` and `disasm` name; HFS Plus's text encoding
+  hints and a System file's region as the encoding of a volume's files.
 - Symbol, Dingbats, the Indic scripts, Farsi, Celtic, Gaelic and Inuit.
 
 ## 9. References

@@ -65,6 +65,57 @@ public static class HostNames
     }
 
     /// <summary>
+    /// The host name for a Mac name in <paramref name="encoding"/> (text-encodings.md §5): as
+    /// <see cref="ToHostName(MacString, int)"/>, each character whole, a code that is no text escaped byte by byte.
+    /// </summary>
+    public static string ToHostName(MacString name, MacTextEncoding encoding, int maxLength = 255)
+    {
+        if (encoding == MacTextEncoding.Roman)
+        {
+            return ToHostName(name, maxLength);
+        }
+
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxLength, 8);
+        var bytes = name.Bytes;
+        if (bytes.Length == 0)
+        {
+            return "%00";
+        }
+
+        var codes = MacEncodings.Codes(bytes, encoding);
+        var parts = new List<string>(codes.Count);
+        for (var i = 0; i < codes.Count; i++)
+        {
+            var (text, start, length) = codes[i];
+            char c = text[0];
+            var last = i == codes.Count - 1;
+            bool escape = text.Length == 1 && (c < 0x20 || c == 0x7F || c == '\uFFFD' || Escaped.Contains(c) || (last && c is ' ' or '.'));
+            if (!escape)
+            {
+                parts.Add(text);
+                continue;
+            }
+
+            var escaped = new StringBuilder();
+            for (var b = start; b < start + length; b++)
+            {
+                escaped.Append(Escape(bytes[b]));
+            }
+
+            parts.Add(escaped.ToString());
+        }
+
+        var stemParts = ReservedStem(parts);
+        if (stemParts > 0)
+        {
+            var (_, start, _) = codes[stemParts - 1];
+            parts[stemParts - 1] = Escape(bytes[start]);
+        }
+
+        return Fit(parts, maxLength);
+    }
+
+    /// <summary>
     /// The host name SheepShaver (on Windows) gives a Mac name in its shared folder, so the emulator reads it back:
     /// each Mac Roman byte as the Windows-1252 character with the same value (it does no Unicode conversion), and
     /// <c>% ? * " &lt; &gt; |</c>, control characters and bytes 1252 lacks as <c>%XX</c>. What its folders cannot hold

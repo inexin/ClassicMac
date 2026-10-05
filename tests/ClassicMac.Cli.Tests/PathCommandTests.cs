@@ -135,6 +135,14 @@ public sealed class PathCommandTests : IDisposable
         Assert.NotEqual("日本語\n", Run("cat", path + ":Note").Output);                        // Mac OS Roman by default
         Assert.Contains("Note", Run("find", path + ":", "--contains", "本語", "--encoding", "japanese").Output);
 
+        // Names too: a file named 日本 in Mac OS Japanese is listed and found by that name.
+        var named = new HfsBuilder();
+        named.File(HfsBuilder.Root, ClassicMac.Core.MacRoman.Decode([0x93, 0xFA, 0x96, 0x7B]), "hi"u8.ToArray(), []);
+        var namedPath = Path.Combine(folder, "named.img");
+        File.WriteAllBytes(namedPath, named.Build("Disk"));
+        Assert.Contains("日本", Run("ls", namedPath + ":", "--encoding", "japanese").Output);
+        Assert.Equal("hi\n", Run("cat", namedPath + ":日本", "--encoding", "japanese").Output);
+
         var bad = Run("cat", path + ":Note", "--encoding", "ebcdic");
         Assert.Equal(ExitCodes.Usage, bad.Code);
         Assert.Contains("japanese", bad.Error);                                             // the names it takes

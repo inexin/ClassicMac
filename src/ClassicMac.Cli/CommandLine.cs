@@ -103,6 +103,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         MaxNestingDepth = result.GetValue(maxNestingDepth),
         MaxExpandedBytesPerInput = result.GetValue(maxExpandedBytes),
         VerifyChecksums = result.GetValue(verify),
+        NameEncoding = result.GetValue(encoding),
     };
 
     internal RootCommand BuildRoot()
@@ -292,6 +293,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
             result.GetRequiredValue(input), result.GetValue(outputDir),
             HostWriteOptions.Default with
             {
+                NameEncoding = result.GetValue(encoding),
                 Layout = result.GetValue(layout) == UnpackLayout.Basilisk ? HostLayout.BasiliskII : HostLayout.AppleDouble,
                 Overwrite = result.GetValue(overwrite),
             },
@@ -344,6 +346,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
                 result.GetRequiredValue(input), result.GetValue(outputDir),
                 ClassicMac.Resources.Export.ExportOptions.Default with
                 {
+                    NameEncoding = result.GetValue(encoding),
                     KeepRaw = result.GetValue(keepRaw),
                     Decoders = decode ? ClassicMac.Resources.Decoders.ResourceDecoders.Create(decodeOptions) : [],
                     Documents = decode && !result.GetValue(noDocuments) ? ClassicMac.Resources.Decoders.ResourceDecoders.CreateDocumentConverters(decodeOptions) : [],

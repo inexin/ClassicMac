@@ -12,6 +12,12 @@ public sealed record HostWriteOptions
     public static HostWriteOptions Default { get; } = new();
 
     /// <summary>
+    /// The encoding of Mac names as host names (text-encodings.md §5), for every layout but SheepShaver's, which keeps
+    /// the bytes. Default Mac OS Roman.
+    /// </summary>
+    public ClassicMac.Core.MacTextEncoding NameEncoding { get; init; }
+
+    /// <summary>
     /// How the resource fork and Finder info are stored: <see cref="HostLayout.AppleDouble"/> (the default: a
     /// <c>._</c> file beside the data) or <see cref="HostLayout.BasiliskII"/> (<c>.rsrc/</c> and <c>.finf/</c>).
     /// </summary>

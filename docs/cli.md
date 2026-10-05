@@ -67,7 +67,9 @@ code page. The limit options of every command (`--max-resource-size`, `--max-nes
 `chinese-traditional`, `chinese-simplified`, `korean`, `arabic`, `hebrew`, `greek`, `cyrillic`, `ukrainian`, `thai`,
 `central-european`, `croatian`, `romanian`, `icelandic` or `turkish`, or an IANA name such as `x-mac-japanese`
 ([text-encodings.md](formats/codecs/text-encodings.md)). It applies to `cat`'s text and decoded resources,
-`find --contains`, and the text `extract` and `convert` decode; names are still shown as Mac OS Roman.
+`find --contains`, the text `extract` and `convert` decode, and names stored as bytes (HFS, MFS, most archives): as
+paths are listed and matched, and as host file names `unpack` and `extract` write. Text that says its own script (a
+styled run's font, a `'vers'` region) is read in it whatever `--encoding` says.
 
 `ls`, `cat` and `get` take `--follow`: an alias file (the Finder's isAlias flag) stands for its original, resolved on
 the volume holding it ([aliases.md §2](formats/resources/aliases.md#2-reading)), through aliases of aliases (at most

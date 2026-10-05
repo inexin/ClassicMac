@@ -125,4 +125,19 @@ public class UnpackTests : IDisposable
         }
         TestContext.Current.SendDiagnosticMessage($"{checkedImages} images unpacked and read back.");
     }
+
+    [Fact]
+    public void Encoding_names_the_host_files_in_that_script()
+    {
+        var disk = new ClassicMac.Files.Tests.HfsBuilder();
+        disk.File(ClassicMac.Files.Tests.HfsBuilder.Root, ClassicMac.Core.MacRoman.Decode([0x93, 0xFA, 0x96, 0x7B]), "hi"u8.ToArray(), []);
+        var path = Path.Combine(folder, "japanese.img");
+        File.WriteAllBytes(path, disk.Build("Disk"));
+        var target = Path.Combine(folder, "out");
+
+        var (code, _, error) = Run("unpack", path, "-o", target, "--encoding", "japanese");
+
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.True(File.Exists(Path.Combine(target, "日本")));
+    }
 }

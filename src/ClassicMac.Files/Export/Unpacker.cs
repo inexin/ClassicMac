@@ -49,7 +49,7 @@ public static class Unpacker
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(directory);
         options ??= HostWriteOptions.Default;
-        var layout = new OutputLayout(name => HostFiles.ToHostName(name, options.Layout));
+        var layout = new OutputLayout(name => HostFiles.ToHostName(name, options.Layout, options.NameEncoding));
         var failed = new List<string>();
         int files = 0;
         long bytes = 0;
@@ -58,7 +58,7 @@ public static class Unpacker
             var file = leaf.File;
             var target = Path.Combine([directory, .. folder]);
             var relative = string.Join('/', folder).Length + (folder.Count > 0 ? 1 : 0);
-            var host = HostFiles.ToHostName(file.Name, options.Layout, Math.Max(8, options.MaxPathLength - relative - CompanionRoom));
+            var host = HostFiles.ToHostName(file.Name, options.Layout, options.NameEncoding, Math.Max(8, options.MaxPathLength - relative - CompanionRoom));
             if (options.Layout == HostLayout.BasiliskII && HostFiles.ToMacName(host, basilisk: true, new ContainerContext()) != file.Name)
             {
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "unpack.name-changed",
@@ -97,7 +97,7 @@ public static class Unpacker
         ArgumentNullException.ThrowIfNull(forks);
         ArgumentNullException.ThrowIfNull(directory);
         options ??= ExportOptions.Default;
-        var layout = new OutputLayout(name => HostNames.ToHostName(name));
+        var layout = new OutputLayout(name => HostNames.ToHostName(name, options.NameEncoding));
         var folders = new Dictionary<ContainerNode, List<string>>(ReferenceEqualityComparer.Instance);
         foreach (var (leaf, folder) in layout.Place(root))
         {
@@ -113,7 +113,7 @@ public static class Unpacker
             if (forks.Count > 1)
             {
                 var folder = folders.GetValueOrDefault(entry.Node) ?? [];
-                parts = [.. folder, layout.Unique(folder, HostNames.ToHostName(file.Name), out _)];
+                parts = [.. folder, layout.Unique(folder, HostNames.ToHostName(file.Name, options.NameEncoding), out _)];
             }
             var target = Path.Combine([directory, .. parts]);
             var relative = string.Join('/', parts).Length + (parts.Count > 0 ? 1 : 0);

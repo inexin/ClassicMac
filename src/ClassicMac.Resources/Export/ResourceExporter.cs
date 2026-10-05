@@ -98,7 +98,7 @@ public static class ResourceExporter
             var folder = HostNames.TypeFolder(resource.Type, folded.Contains(resource.Type));
             var longest = outputs.Max(o => o.Extension.Length);
             var budget = Math.Max(8, options.MaxPathLength - folder.Length - 1 - longest);
-            var stem = HostNames.ToHostName(FileStem(resource), budget);
+            var stem = HostNames.ToHostName(FileStem(resource), options.NameEncoding, budget);
             if (!taken.TryGetValue(folder, out var names))
             {
                 taken[folder] = names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

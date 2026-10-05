@@ -38,6 +38,12 @@ public sealed record ContainerReadOptions
     /// </summary>
     public bool VerifyChecksums { get; init; }
 
+    /// <summary>
+    /// The encoding of names stored as bytes (HFS, MFS and archives without Unicode names) where they are shown or matched
+    /// as text, as in Mac paths (docs/formats/codecs/text-encodings.md §5). Default Mac OS Roman.
+    /// </summary>
+    public ClassicMac.Core.MacTextEncoding NameEncoding { get; init; }
+
     /// <summary>The MacRoman password used by encrypted archive formats that accept a password; null by default.</summary>
     public string? ArchivePassword { get; init; }
 }

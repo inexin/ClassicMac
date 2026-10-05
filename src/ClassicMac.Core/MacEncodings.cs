@@ -145,6 +145,38 @@ public static class MacEncodings
         return text.ToString();
     }
 
+    // The codes of the bytes, each with its text (U+FFFD when it is no text) and where its bytes are.
+    internal static List<(string Text, int Start, int Length)> Codes(ReadOnlySpan<byte> bytes, MacTextEncoding encoding)
+    {
+        var codes = new List<(string, int, int)>(bytes.Length);
+        if (encoding == MacTextEncoding.Roman)
+        {
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                codes.Add((MacRoman.ToChar(bytes[i]).ToString(), i, 1));
+            }
+
+            return codes;
+        }
+
+        var table = TableFor(encoding);
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            byte b = bytes[i];
+            if (table.Lead[b] && i + 1 < bytes.Length && table.Double.TryGetValue(b << 8 | bytes[i + 1], out var pair))
+            {
+                codes.Add((pair, i, 2));
+                i++;
+            }
+            else
+            {
+                codes.Add((table.Lead[b] ? "\uFFFD" : table.Single[b] ?? "\uFFFD", i, 1));
+            }
+        }
+
+        return codes;
+    }
+
     /// <summary>The bytes of <paramref name="text"/> in the encoding.</summary>
     /// <exception cref="ArgumentException">A character the encoding cannot hold.</exception>
     public static byte[] Encode(string text, MacTextEncoding encoding)

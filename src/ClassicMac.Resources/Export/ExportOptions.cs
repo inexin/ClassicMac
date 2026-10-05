@@ -12,6 +12,9 @@ public sealed record ExportOptions
     /// <summary>The defaults.</summary>
     public static ExportOptions Default { get; } = new();
 
+    /// <summary>The encoding of Mac names (files' and resources') as host names (text-encodings.md §5). Default Mac OS Roman.</summary>
+    public ClassicMac.Core.MacTextEncoding NameEncoding { get; init; }
+
     /// <summary>The longest a written path may be, counted from the export folder. Default 200.</summary>
     public int MaxPathLength { get; init; } = 200;
 

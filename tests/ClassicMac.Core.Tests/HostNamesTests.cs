@@ -20,6 +20,16 @@ public class HostNamesTests
         Assert.Equal(host, HostNames.ToHostName(new MacString(MacRoman.Encode(mac))));
     }
 
+    // In another encoding (text-encodings.md §5): each character whole, a code that is no text escaped byte by byte.
+    [Fact]
+    public void Names_in_another_encoding_become_their_characters()
+    {
+        Assert.Equal("日本.txt", HostNames.ToHostName(new MacString([0x93, 0xFA, 0x96, 0x7B, .. ".txt"u8]), MacTextEncoding.Japanese));
+        Assert.Equal("a%3Ab", HostNames.ToHostName(new MacString("a:b"u8), MacTextEncoding.Japanese));
+        Assert.Equal("x%82", HostNames.ToHostName(new MacString([(byte)'x', 0x82]), MacTextEncoding.Japanese));          // a lead byte alone
+        Assert.Equal("CO%4E", HostNames.ToHostName(new MacString("CON"u8), MacTextEncoding.Greek));
+    }
+
     [Fact]
     public void Long_names_are_cut_before_the_extension()
     {

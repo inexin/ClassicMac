@@ -168,7 +168,7 @@ public static class HostFiles
             throw new ArgumentException($"Files cannot be written as {options.Layout}.", nameof(options));
         }
 
-        var name = hostName ?? ToHostName(file.Name, options.Layout);
+        var name = hostName ?? ToHostName(file.Name, options.Layout, options.NameEncoding);
 
         var data = Path.Combine(directory, name);
         var paths = new List<string> { data };
@@ -235,6 +235,10 @@ public static class HostFiles
     /// </summary>
     public static string ToHostName(MacString name, HostLayout layout, int maxLength = 255) =>
         layout == HostLayout.BasiliskII ? HostNames.ToBasiliskName(name, maxLength) : HostNames.ToHostName(name, maxLength);
+
+    /// <summary>As <see cref="ToHostName(MacString, HostLayout, int)"/>, the portable name in <paramref name="encoding"/>.</summary>
+    public static string ToHostName(MacString name, HostLayout layout, MacTextEncoding encoding, int maxLength = 255) =>
+        layout == HostLayout.BasiliskII ? HostNames.ToBasiliskName(name, maxLength) : HostNames.ToHostName(name, encoding, maxLength);
 
     /// <summary>The name a layout is shown under in a container chain.</summary>
     public static string FormatName(HostLayout layout) => layout switch

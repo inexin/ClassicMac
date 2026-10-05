@@ -383,8 +383,8 @@ public sealed class MacPathTree : IDisposable
 
         IReadOnlyList<MacString> target = entry.Kind == MacPathKind.Folder ? entry.FolderPath! : [.. entry.File!.FolderPath, entry.File.Name];
         bool Within(IReadOnlyList<MacString> path) => path.Count >= target.Count &&
-            target.Select((name, i) => MacPaths.NamesEqual(name.ToMacRoman(), path[i].ToMacRoman())).All(same => same);
-        string Join(IEnumerable<MacString> path) => string.Join(":", path.Select(name => name.ToMacRoman()));
+            target.Select((name, i) => MacPaths.NamesEqual(Text(name), Text(path[i]))).All(same => same);
+        string Join(IEnumerable<MacString> path) => string.Join(":", path.Select(Text));
 
         var found = new List<(string, string)>();
         foreach (var file in ContentsOf(holder).Children.Select(node => node.File))
@@ -419,7 +419,7 @@ public sealed class MacPathTree : IDisposable
         foreach (var name in names)
         {
             if (Children(at).FirstOrDefault(c => c.Kind is MacPathKind.Folder or MacPathKind.File or MacPathKind.Container
-                && MacPaths.NamesEqual(c.Name, name.ToMacRoman())) is not { } next)
+                && MacPaths.NamesEqual(c.Name, Text(name))) is not { } next)
             {
                 return null;
             }
@@ -581,7 +581,7 @@ public sealed class MacPathTree : IDisposable
             }
             else if (folders.Add(path[folder.Count]))
             {
-                var name = child.File.UnicodeFolderPath is { } unicode && unicode.Count == path.Count ? unicode[folder.Count] : path[folder.Count].ToMacRoman();
+                var name = child.File.UnicodeFolderPath is { } unicode && unicode.Count == path.Count ? unicode[folder.Count] : Text(path[folder.Count]);
                 entries.Add(FolderEntry(parent, holder, name, [.. folder, path[folder.Count]]));
             }
         }
@@ -590,7 +590,7 @@ public sealed class MacPathTree : IDisposable
         foreach (var record in FoldersOf(holder).Where(f => !f.IsRoot && f.FolderPath.SequenceEqual(folder) && !folders.Contains(f.Name)))
         {
             folders.Add(record.Name);
-            entries.Add(FolderEntry(parent, holder, record.Name.ToMacRoman(), record.Path));
+            entries.Add(FolderEntry(parent, holder, Text(record.Name), record.Path));
         }
 
         return entries;
@@ -696,5 +696,8 @@ public sealed class MacPathTree : IDisposable
     private static string? ContentFormat(ContainerNode node) => node.UnreadFormat ?? (node.Children.Count > 0 ? node.Children[0].Format : null)
         ?? (node.Volume is { } volume ? volume.Format == "MFS" ? MfsReader.Instance.FormatName : HfsReader.Instance.FormatName : null);
 
-    private static string NameOf(MacFile file) => file.UnicodeName ?? file.Name.ToMacRoman();
+    private string NameOf(MacFile file) => file.UnicodeName ?? Text(file.Name);
+
+    // A name stored as bytes, as text in the options' name encoding.
+    private string Text(MacString name) => MacEncodings.Decode(name.Bytes, context.Options.NameEncoding);
 }

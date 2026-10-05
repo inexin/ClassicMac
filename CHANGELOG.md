@@ -5,7 +5,8 @@
 - Automatic text encodings (codecs/text-encodings.md §2.1, §5): `MacScripts` maps scripts, regions and font family IDs
   to encodings as Apple's headers and tables give them; styled runs in a non-Roman script's fonts read in that script,
   run by run, and `'vers'` strings in their region's encoding (read and written), unless
-  `DecodeOptions.AutomaticEncoding` is off.
+  `DecodeOptions.AutomaticEncoding` is off. Names stored as bytes follow `--encoding` too: listed and matched in Mac
+  paths, and as the host names `unpack` and `extract` write (`HostNames.ToHostName(name, encoding)`).
 - Rez source (output/rez.md): `classicmac derez` and `RezWriter` write a resource fork as MPW 3.6's DeRez does, byte
   for byte (checked against 43 of DeRez's own outputs, `-e` included), or with `--portable` in the subset MPW's and
   Retro68's Rez compile alike, reporting what that subset cannot hold. `classicmac rez` and `RezCompiler` compile `data`,
