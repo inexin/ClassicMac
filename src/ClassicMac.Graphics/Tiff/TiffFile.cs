@@ -10,8 +10,9 @@ namespace ClassicMac.Graphics;
 /// <summary>
 /// TIFF images (file type <c>TIFF</c>; <c>.tif</c>, <c>.tiff</c>; docs/formats/graphics/tiff.md): the first image of
 /// the file, in either byte order, in strips or tiles, chunky or planar; uncompressed, PackBits, LZW (TIFF 6.0's and
-/// TIFF 5.0's), Deflate, ThunderScan and CCITT fax (modified Huffman, Group 3, Group 4), with the horizontal
-/// predictor; bilevel, grey, palette, RGB (with an alpha extra sample) and CMYK pixels of 1 to 32 bits per sample.
+/// 5.0's), Deflate, ThunderScan, CCITT fax (modified Huffman, Group 3, Group 4), JPEG (through the caller's decoder) and
+/// SGILog; bilevel, grey, palette, RGB with alpha, CMYK, YCbCr, CIE L*a*b*, LogL and LogLuv pixels; integer samples of
+/// 1 to 32 bits, signed or not, and floating-point ones of 16, 32 and 64.
 /// </summary>
 public static class TiffFile
 {
@@ -24,10 +25,11 @@ public static class TiffFile
         JpegDcTables = 520, JpegAcTables = 521;
 
     private const ushort None = 1, Lzw = 5, Deflate = 8, AdobeDeflate = 32946, PackBitsCompression = 32773, ThunderScan = 32809,
-        CcittRle = 2, CcittGroup3 = 3, CcittGroup4 = 4, CcittRlew = 32771, OldJpeg = 6, Jpeg = 7;
+        CcittRle = 2, CcittGroup3 = 3, CcittGroup4 = 4, CcittRlew = 32771, OldJpeg = 6, Jpeg = 7, SgiLogRle = 34676,
+        SgiLog24 = 34677;
 
     private const ushort WhiteIsZero = 0, BlackIsZero = 1, Rgb = 2, Palette = 3, Separated = 5, YCbCr = 6, CieLab = 8,
-        IccLab = 9;
+        IccLab = 9, LogL = 32844, LogLuv = 32845;
 
     /// <summary>The most pixels an image may have (width × height). Default 64 Mi.</summary>
     public const long MaxPixels = 64L * 1024 * 1024;
@@ -156,6 +158,25 @@ public static class TiffFile
 
             (image.Width, image.Height) = ((int)width, (int)height);
             image.Compression = One(CompressionTag, None);
+            image.Photometric = Required(PhotometricTag, "PhotometricInterpretation");
+            if (image.Photometric is LogL or LogLuv)
+            {
+                if (image.Compression == SgiLog24)
+                {
+                    throw new NotSupportedException("The image is LogLuv24 (compression 34677), whose colour table is not read; LogL and LogLuv32 are.");
+                }
+
+                if (image.Compression != SgiLogRle)
+                {
+                    throw new NotSupportedException($"A {(image.Photometric == LogL ? "LogL" : "LogLuv")} image compressed with {CompressionName(image.Compression)} is not read (only SGILog, 34676).");
+                }
+
+                image.Samples = 1;
+                image.Planar = false;
+                AddStrips(image, tags, 1);
+                return image;
+            }
+
             if (image.Compression is not (None or Lzw or Deflate or AdobeDeflate or PackBitsCompression or ThunderScan
                 or CcittRle or CcittGroup3 or CcittGroup4 or CcittRlew or OldJpeg or Jpeg))
             {
@@ -177,7 +198,6 @@ public static class TiffFile
                 throw new NotSupportedException($"Samples of {string.Join("/", bits)} bits ({image.Samples} per pixel{(image.Float ? ", floating point" : "")}) are not read.");
             }
 
-            image.Photometric = Required(PhotometricTag, "PhotometricInterpretation");
             image.ColorSamples = image.Photometric switch
             {
                 WhiteIsZero or BlackIsZero or Palette => 1,
@@ -305,22 +325,75 @@ public static class TiffFile
             }
             else
             {
-                var rowsPerStrip = (int)Math.Min(One(RowsPerStrip, uint.MaxValue), (uint)image.Height);
-                var strips = (image.Height + rowsPerStrip - 1) / rowsPerStrip;
-                var offsets = Values(tags, StripOffsets, "StripOffsets", (long)strips * planes);
-                var counts = Values(tags, StripByteCounts, "StripByteCounts", (long)strips * planes);
-                for (var p = 0; p < planes; p++)
+                AddStrips(image, tags, planes);
+            }
+
+            return image;
+        }
+
+        private static void AddStrips(Image image, Dictionary<ushort, uint[]> tags, int planes)
+        {
+            var rowsPerStrip = (int)Math.Min(tags.TryGetValue(RowsPerStrip, out var r) ? r[0] : uint.MaxValue, (uint)image.Height);
+            if (rowsPerStrip == 0)
+            {
+                throw new InvalidDataException("RowsPerStrip is 0.");
+            }
+
+            var strips = (image.Height + rowsPerStrip - 1) / rowsPerStrip;
+            var offsets = Values(tags, StripOffsets, "StripOffsets", (long)strips * planes);
+            var counts = Values(tags, StripByteCounts, "StripByteCounts", (long)strips * planes);
+            for (var p = 0; p < planes; p++)
+            {
+                for (var s = 0; s < strips; s++)
                 {
-                    for (var s = 0; s < strips; s++)
+                    var first = s * rowsPerStrip;
+                    image.Units.Add((offsets[p * strips + s], counts[p * strips + s], 0, first, image.Width,
+                        Math.Min(rowsPerStrip, image.Height - first), p));
+                }
+            }
+        }
+
+        // An SGILog image (§2.10): each strip's rows decoded to XYZ, then the whole image tone-mapped.
+        private RgbaBitmap DecodeLog(TiffData file, ICollection<Diagnostic> diagnostics)
+        {
+            var count = (long)Width * Height;
+            var (x, y, z) = (new double[count], new double[count], new double[count]);
+            var planes = Photometric == LogL ? 2 : 4;
+            var row = new uint[Width];
+            var shortUnits = 0;
+            foreach (var unit in Units)
+            {
+                var data = file.Slice(unit.Offset, Math.Min(unit.Count, Math.Max(0, file.Length - unit.Offset)));
+                var at = 0;
+                for (var r = 0; r < unit.Height; r++)
+                {
+                    if (!SgiLog.DecodeRow(data, ref at, row, planes))
                     {
-                        var first = s * rowsPerStrip;
-                        image.Units.Add((offsets[p * strips + s], counts[p * strips + s], 0, first, image.Width,
-                            Math.Min(rowsPerStrip, image.Height - first), p));
+                        shortUnits++;
+                        break;
+                    }
+
+                    var line = (long)(unit.Y + r) * Width;
+                    for (var c = 0; c < Width; c++)
+                    {
+                        if (Photometric == LogL)
+                        {
+                            var luminance = Math.Max(0, SgiLog.Luminance(row[c]));
+                            // Grey: XYZ of the equal-energy white at that luminance.
+                            (x[line + c], y[line + c], z[line + c]) = (luminance, luminance, luminance);
+                        }
+                        else
+                        {
+                            (x[line + c], y[line + c], z[line + c]) = SgiLog.Xyz(row[c]);
+                        }
                     }
                 }
             }
 
-            return image;
+            var bitmap = new RgbaBitmap(Width, Height);
+            SgiLog.ToneMap(bitmap, x, y, z);
+            Report(diagnostics, shortUnits);
+            return bitmap;
         }
 
         private static uint[] Values(Dictionary<ushort, uint[]> tags, ushort tag, string name, long needed)
@@ -331,6 +404,11 @@ public static class TiffFile
 
         public RgbaBitmap Decode(TiffData file, ICollection<Diagnostic> diagnostics)
         {
+            if (Photometric is LogL or LogLuv)
+            {
+                return DecodeLog(file, diagnostics);
+            }
+
             var bitmap = new RgbaBitmap(Width, Height);
             Array.Fill(bitmap.Pixels, (byte)255);
             var unitSamples = Planar ? 1 : Samples;
@@ -1123,7 +1201,6 @@ public static class TiffFile
         4 => "transparency mask",
         6 => "YCbCr",
         8 => "CIE L*a*b*",
-        32844 or 32845 => "LogL/LogLuv",
         _ => "unknown",
     };
 

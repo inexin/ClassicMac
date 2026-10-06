@@ -61,8 +61,9 @@ port.CopyBits(PixMap.FromBitMap(icon, 4, new MacRect(0, 0, 32, 32)), new MacRect
   `yuv2`, `YVU9`, `tga ` and `PNTG` are decoded by the core; others go to an `IPictImageCodec`. A decoded image skips
   the picture's "QuickTime is required" fallback.
 - **TIFF images**: `TiffFile` decodes the first image of a TIFF file (either byte order; strips or tiles, chunky
-  or planar; uncompressed, PackBits, LZW, Deflate and the Mac's ThunderScan; bilevel, grey, palette, RGB with alpha
-  and CMYK, 1 to 32 bits) ([tiff.md](https://github.com/inexin/ClassicMac/blob/main/docs/formats/graphics/tiff.md)).
+  or planar; uncompressed, PackBits, LZW, Deflate, the Mac's ThunderScan, CCITT fax, JPEG through a decoder you pass
+  in, and SGILog; bilevel, grey, palette, RGB with alpha, CMYK, YCbCr, L\*a\*b\* and LogLuv; integer and
+  floating-point samples) ([tiff.md](https://github.com/inexin/ClassicMac/blob/main/docs/formats/graphics/tiff.md)).
 - **QuickTime image files and MacPaint documents**: `QuickTimeImageFile` decodes standalone QTIF files (with their
   resolution and ICC profile) and `MacPaintFile` decodes MacPaint (PNTG) documents, MacBinary-wrapped or not. The
   ImageSharp plugin registers both formats for loading.

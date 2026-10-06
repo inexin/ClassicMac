@@ -9,7 +9,7 @@ QuickTime imported it. Mac programs wrote it big-endian (`MM`). ClassicMac reads
 | --- | --- |
 | Identified by | File type `TIFF`; extensions `.tif`, `.tiff`; `II` and 42 little-endian, or `MM` and 42 big-endian, at the start |
 | ClassicMac | Reads; `ClassicMac.Graphics.TiffFile`; the app's preview |
-| Verified against | libtiff's sample images (libtiff-pics): every image both read decodes as ImageSharp's reader decodes it, within 1 level per channel |
+| Verified against | libtiff's sample images (libtiff-pics): 61 of the 62 read; every one ImageSharp also reads decodes as it does, within 1 level per channel, except one ImageSharp gets wrong (§7) |
 | Sources | Adobe Developers Association, *TIFF Revision 6.0* (1992); Adobe, *TIFF Technical Note 2* (Deflate); libtiff, as behaviour |
 
 Contents
@@ -53,8 +53,8 @@ A count (2 bytes), that many 12-byte entries sorted by tag, then the next IFD's 
 | 256 | ImageWidth | (required) | Pixels per row [Author] |
 | 257 | ImageLength | (required) | Rows [Author] |
 | 258 | BitsPerSample | 1 | One value per sample [Author] |
-| 259 | Compression | 1 | 1 none, 2 CCITT modified Huffman, 3 CCITT Group 3, 4 CCITT Group 4, 5 LZW, 6 old-style JPEG, 7 JPEG, 8 and 32946 Deflate, 32771 word-aligned modified Huffman, 32773 PackBits, 32809 ThunderScan [Author] |
-| 262 | PhotometricInterpretation | (required) | 0 WhiteIsZero, 1 BlackIsZero, 2 RGB, 3 palette, 5 separated (CMYK), 6 YCbCr, 8 CIE L\*a\*b\*, 9 ICC L\*a\*b\* [Author] |
+| 259 | Compression | 1 | 1 none, 2 CCITT modified Huffman, 3 CCITT Group 3, 4 CCITT Group 4, 5 LZW, 6 old-style JPEG, 7 JPEG, 8 and 32946 Deflate, 32771 word-aligned modified Huffman, 32773 PackBits, 32809 ThunderScan, 34676 SGILog [Author] |
+| 262 | PhotometricInterpretation | (required) | 0 WhiteIsZero, 1 BlackIsZero, 2 RGB, 3 palette, 5 separated (CMYK), 6 YCbCr, 8 CIE L\*a\*b\*, 9 ICC L\*a\*b\*, 32844 LogL, 32845 LogLuv [Author; Author: LogLuv] |
 | 266 | FillOrder | 1 | 1 most significant bit first; 2 least significant first [Author] |
 | 273 | StripOffsets | (required for strips) | One per strip, per plane when planar [Author] |
 | 277 | SamplesPerPixel | 1 | [Author] |
@@ -177,6 +177,18 @@ Technical Note 3].
   restart interval, SOF0 with the unit's size, the components 1 to n (Y with YCbCrSubSampling, the others 1 × 1), SOS
   over every component with its own tables, the data, EOI [Reference: libtiff].
 
+### 2.10 SGILog
+
+Greg Ward's LogLuv encoding of real-world luminance, with SGILog compression (34676) [Author: LogLuv]:
+
+1. Each row is its pixels' values a byte plane at a time, most significant first: two planes for LogL, four for
+   LogLuv32. A plane is run-length coded: a control byte of 128 or more is a run of the next byte, control − 126
+   times; less is that many literal bytes [Reference: libtiff].
+2. **LogL16**: a sign bit and 15 bits Le; Y = 2^((Le + 0.5) / 256 − 64), 0 for Le 0 [Author: LogLuv].
+3. **LogLuv32**: LogL16 in the high 16 bits, then 8-bit ue and ve: u′ = (ue + 0.5) / 410, v′ = (ve + 0.5) / 410, the
+   CIE 1976 chromaticity; x = 9u′ / (6u′ − 16v′ + 12), y = 4v′ / (6u′ − 16v′ + 12), X = x / y × Y,
+   Z = (1 − x − y) / y × Y [Author: LogLuv].
+
 ## 3. Writing
 
 None.
@@ -203,6 +215,9 @@ None.
 - JPEG is decoded by the caller's decoder (`TiffDecodeOptions.JpegDecoder`): ClassicMac.Graphics has none of its own,
   and the app passes the platform's (SkiaSharp). The decoder turns YCbCr into RGB; each strip or tile is placed
   and cut to the image, and one that does not decode counts as short. [ClassicMac]
+- SGILog images are tone-mapped for display: Reinhard's global operator at the key 0.18 over the image's
+  log-average luminance, colour from XYZ by libtiff's matrix for its primaries and equal-energy white
+  [Reference: libtiff], then the sRGB curve. [ClassicMac]
 - CMYK becomes RGB without colour management, as libtiff's RGBA interface converts it: R = (255 − C) × (255 − K) / 255,
   likewise G and B. [Reference: libtiff]
 - Associated alpha is divided out, rounded; RGB and grey take alpha, palette and CMYK do not. [ClassicMac]
@@ -231,6 +246,8 @@ None.
 - `tests/ClassicMac.Graphics.Tests/TiffJpegTests.cs`: the streams given to the decoder (JPEGTables joined, a strip on
   its own, an interchange stream, tables rebuilt byte for byte), placement and cutting, a strip that does not
   decode, no decoder.
+- `tests/ClassicMac.Graphics.Tests/TiffLogLuvTests.cs`: LogL runs and literals, tone mapping, LogLuv32 white and red,
+  LogLuv24 refused, a short row.
 - `tests/ClassicMac.Graphics.Tests/TiffFaxTests.cs`: modified Huffman, word-aligned rows, makeup and extended codes,
   Group 3 one- and two-dimensional, fill bits before EOLs, Group 4 vertical and pass modes, FillOrder 2, BlackIsZero,
   damaged data.
@@ -244,15 +261,18 @@ None.
   `dscf0013.tif` (a camera's YCbCr) and the 16-bit and planar CMYK images, which ImageSharp does not read, were
   checked by eye. With ImageSharp's JPEG decoder passed in, `quad-jpeg.tif` (compression 7 with JPEGTables) and
   `smallliz.tif` (old style, an interchange stream) match exactly; `zackthecat.tif` (old style, tables rebuilt, a
-  tile), which ImageSharp does not read, was checked by eye.
+  tile), which ImageSharp does not read, was checked by eye, as were `off_l16.tif` and `off_luv32.tif` (SGILog).
+  Of the 62 images only `off_luv24.tif` (LogLuv24) is not read.
   `quad-lzw.tif` (TIFF 5.0 LZW) and `text.tif` (ThunderScan, a scanned Mac printout), which ImageSharp does not read,
   were checked by eye; `text.tif`'s last strip holds 36 of its 39 rows.
 
 ## 8. Not covered
 
-- Compression: SGILog (34676, 34677), NeXT (32766) and others; CCITT's uncompressed mode (T.4 extensions); old-style
+- LogLuv24 (compression 34677): its chromaticity is an index into a table of the visible gamut that ClassicMac does
+  not have.
+- Compression: NeXT (32766) and others; CCITT's uncompressed mode (T.4 extensions); old-style
   JPEG other than baseline (JPEGProc 14, lossless).
-- Photometric interpretations: ITU L\*a\*b\* (10), LogL and LogLuv; CMYK ink sets other than 1; subsampled YCbCr
+- Photometric interpretations: ITU L\*a\*b\* (10); CMYK ink sets other than 1; subsampled YCbCr
   that is planar, not 8-bit or with a predictor.
 - 24-bit floating-point samples.
 - More than one image; colour management (ICC profiles); writing TIFF.
@@ -260,10 +280,13 @@ None.
 ## 9. References
 
 - Adobe Developers Association, *TIFF Revision 6.0, Final*, 3 June 1992.
+- Gregory Ward Larson, *The LogLuv Encoding for Full Gamut, High Dynamic Range Images*, Journal of Graphics Tools
+  3(1), 1998.
+- Erik Reinhard et al., *Photographic Tone Reproduction for Digital Images*, SIGGRAPH 2002: the global operator.
 - Adobe, *TIFF Technical Note 2*, 17 March 2002: Deflate compression.
 - Adobe, *TIFF Technical Note 2*, 17 March 2002: JPEG compression (7).
 - ITU-T Recommendation T.81 (JPEG): the markers of §2.9.
 - ITU-T Recommendation T.4 (Group 3 facsimile) and T.6 (Group 4 facsimile).
 - libtiff (BSD-style licence): `tif_lzw.c` (the code-width rule of §2.2 and TIFF 5.0's LZW), `tif_thunder.c` (§2.4),
-  `tif_getimage.c` (CMYK), `tif_ojpeg.c` (old-style JPEG's tables), `tif_dirread.c` (the tile and strip tags), as behaviour only.
+  `tif_getimage.c` (CMYK), `tif_ojpeg.c` (old-style JPEG's tables), `tif_luv.c` (SGILog's run-length code and colour matrix), `tif_dirread.c` (the tile and strip tags), as behaviour only.
 - libtiff-pics, the libtiff test images (<https://gitlab.com/libtiff/libtiff-pics>).

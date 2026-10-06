@@ -25,7 +25,9 @@ First release of ClassicMac: libraries, a command line and a desktop app for cla
 
 **Decoding**
 - QuickDraw, drawing exactly what a Mac draws (Mac OS 9 or the 68k ROM, 1–32 bit screens): PICT read and written,
-  QuickTime images and their codecs, MacPaint, TIFF; ImageSharp and SkiaSharp adapters.
+  QuickTime images and their codecs, MacPaint, TIFF (strips and tiles; LZW, PackBits, Deflate,
+  ThunderScan, CCITT fax, JPEG, SGILog; bilevel to CMYK, YCbCr, L*a*b*, LogLuv; integer and floating-point samples);
+  ImageSharp and SkiaSharp adapters.
 - Icons, cursors, patterns and colour tables; sounds (MACE, IMA4, µ-law, AIFF) to WAV; text and styled text to UTF-8
   and RTF; bitmap and TrueType fonts (made loadable on request); dialogs, menus, windows and Finder windows drawn as
   the Mac drew them; DOCMaker, SimpleText and Word documents and help pages to HTML; PDFs written out as `.pdf`; PNG or lossless WebP images.
