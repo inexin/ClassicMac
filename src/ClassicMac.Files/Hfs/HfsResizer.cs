@@ -52,11 +52,15 @@ internal static class HfsResizer
         long oldStart = mdb.ReadUInt16At(0x1C);
         long sectors = size / BlockSize;
 
-        // The new block count, with the bitmap grown into the allocation area when its sectors cannot cover it.
-        long start = oldStart, count;
+        // The new block count, with the bitmap grown into the allocation area when its sectors cannot cover it. Disk First
+        // Aid sizes the bitmap from the whole volume, B = ⌈(V ÷ k) ÷ 4096⌉ sectors for V = sectors − 2 and k sectors a
+        // block, and wants the allocation area after them and at most (V − 3 − B) ÷ k blocks (hfs.md §3.2, §5.6 #8, #10).
+        long volumeSectors = sectors - 2;
+        long firstAidBitmap = (volumeSectors / factor + 4095) >> 12;
+        long start = Math.Max(oldStart, bitmapStart + firstAidBitmap), count;
         while (true)
         {
-            count = (sectors - start - 2) / factor;
+            count = Math.Min((sectors - start - 2) / factor, (volumeSectors - 3 - firstAidBitmap) / factor);
             if ((start - bitmapStart) * 4096 >= count)
             {
                 break;

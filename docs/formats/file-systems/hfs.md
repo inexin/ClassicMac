@@ -557,7 +557,12 @@ Finder's Initialize uses the default path (the live volumes above).
 A volume grows within its allocation block size; allocation block numbers are counted from `drAlBlSt`, so no extent,
 catalog record or B-tree changes [Doc: Inside Macintosh: Files]. For the new size of N' logical blocks:
 
-1. `drNmAlBlks` becomes ⌊(N' − `drAlBlSt` − 2) ÷ (`drAlBlkSiz` ÷ 512)⌋, which must stay at most 65,535.
+1. `drNmAlBlks` becomes ⌊(N' − `drAlBlSt` − 2) ÷ k⌋ (k = `drAlBlkSiz` ÷ 512), which must stay at most 65,535. Disk
+   First Aid sizes the bitmap from the whole volume, B = ⌈⌊V ÷ k⌋ ÷ 4096⌉ sectors for V = N' − 2, and reports #8 or
+   #10 unless the allocation area starts at least B sectors after `drVBMSt` and the count is at most
+   ⌊(V − 3 − B) ÷ k⌋ (§5.6), so the count is capped there and `drAlBlSt` starts at least B sectors after `drVBMSt`.
+   [ClassicMac; found by fuzzing: a 400 KB volume grown to 4,102 sectors would otherwise take 4,096 blocks with one
+   bitmap sector]
 2. When the sectors from `drVBMSt` to `drAlBlSt` hold fewer bits than that, the allocation area moves up by whole
    sectors and `drAlBlSt` with it, until they hold enough; the new bitmap bits are 0 (free).
 3. `drFreeBks` goes up by the blocks added; `drLsMod` and `drWrCnt` change as for any write (§3).

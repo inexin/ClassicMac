@@ -47,6 +47,21 @@ public sealed class HfsResizeTests
         }
     }
 
+    // Found by fuzzing (hfs-edit): Disk First Aid sizes the bitmap from the whole volume, so a 400 KB volume grown to
+    // 4,102 sectors needs 2 bitmap sectors and at most 4,095 blocks, though 4,096 would fit its one sector.
+    [Theory]
+    [InlineData(2_100_224)]
+    [InlineData(2_099_712)]
+    [InlineData(2_101_248)]
+    [InlineData(4_198_400)]
+    public void A_grown_volume_has_the_bitmap_and_block_count_First_Aid_expects(long size)
+    {
+        var image = HfsWriter.Resize(ForkData.FromBytes(Volume(409_600)), size);
+        var report = HfsFirstAid.Verify(ForkData.FromBytes(image));
+        Assert.True(report.Verdict == FirstAidVerdict.AppearsOk,
+            string.Join("; ", report.Problems.Select(p => $"{p.Number} {p.Message} {p.Arg2} {p.Arg3}")));
+    }
+
     private static void AssertSameFiles(byte[] before, byte[] after)
     {
         var old = Files(before);
