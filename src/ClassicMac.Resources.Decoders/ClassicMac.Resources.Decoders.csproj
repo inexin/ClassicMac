@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Packed inside the ClassicMac package (src/ClassicMac), not on its own. -->
+    <!-- Packed inside the ClassicMac.Formats package (src/ClassicMac.Formats), not on its own. -->
     <IsPackable>false</IsPackable>
     <!-- Its symbols travel inside the DLL: a package that carries other projects' assemblies has no symbol package. -->
     <DebugType>embedded</DebugType>

@@ -93,7 +93,7 @@ Standing decisions, with their dates; superseded ones are dropped.
 - **Name and repository**: ClassicMac, `inexin/ClassicMac`; QuickDraw.Pict moved in with its history (2026-09-29) as
   `ClassicMac.Graphics`, its old packages to be deprecated when the new ones are published.
 - **Own core**: written here, not on ResourceForkReader/HfsReader (read-only); they are cross-checks.
-- **Packages** (2026-10-06): five, plus the CLI as a .NET tool: `ClassicMac` (carrying the Resources, Files, Code and
+- **Packages** (2026-10-06): five, plus the CLI as a .NET tool: `ClassicMac.Formats` (carrying the Resources, Files, Code and
   Resources.Decoders assemblies, which stay separate projects with their own layers), `ClassicMac.Core`,
   `ClassicMac.Graphics` (usable on its own, as QuickDraw.Pict was) and one integration package per host library
   (`.ImageSharp`, `.SkiaSharp`). Assemblies are named after the Apple technology, a namespace per area.

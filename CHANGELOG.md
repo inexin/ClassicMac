@@ -42,7 +42,7 @@ First release of ClassicMac: libraries, a command line and a desktop app for cla
   import; Save As in every wrapper; the Volume menu with First Aid, Defragment and Resize.
 
 **Releases**
-- Self-contained downloads for Windows, macOS and Linux, and NuGet packages, built from a version tag: `ClassicMac`
+- Self-contained downloads for Windows, macOS and Linux, and NuGet packages, built from a version tag: `ClassicMac.Formats`
   (resource forks, containers, file systems, decoders, code), `ClassicMac.Core`, `ClassicMac.Graphics` and its
   ImageSharp and SkiaSharp adapters, and the `ClassicMac.Cli` tool.
 

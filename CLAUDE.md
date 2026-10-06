@@ -34,7 +34,7 @@ Each of these has its own `CLAUDE.md`; read it before working there.
 | `tools/Fuzz/CLAUDE.md` | The fuzz targets |
 | `docs/formats/CLAUDE.md` | Writing the format specs |
 
-Each project also has a `README.md` (its NuGet page for packages; `src/ClassicMac` is the package that carries Resources,
+Each project also has a `README.md` (its NuGet page for packages; `src/ClassicMac.Formats` is the package that carries Resources,
 Files, Code and Resources.Decoders); update it when what the project offers changes.
 
 ## Reading and writing binary data (ClassicMac.Core)

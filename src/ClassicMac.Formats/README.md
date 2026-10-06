@@ -1,10 +1,10 @@
-# ClassicMac
+# ClassicMac.Formats
 
 Classic Mac OS files in .NET: reach the resource fork whatever it is wrapped in, convert resources and documents to
 modern formats, edit them and write them back. No dependencies beyond ClassicMac.Core and ClassicMac.Graphics.
 
 ```
-dotnet add package ClassicMac
+dotnet add package ClassicMac.Formats
 ```
 
 The package carries four assemblies, each documented on its own:
