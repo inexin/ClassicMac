@@ -61,7 +61,7 @@ internal static class FilePictures
             var untyped = file.FinderInfo.Type == default || type == "????";
             if ((type == "TIFF" || extension is "tif" or "tiff" || untyped) && TiffFile.IsTiffFile(file.DataFork.ReadPrefix(4)))
             {
-                return Encode(TiffFile.Decode(file.DataFork.ToArray()), "TIFF");
+                return Encode(TiffFile.Decode(file.DataFork.ToArray(), null, TiffJpeg), "TIFF");
             }
 
             if (!CommonTypes.Contains(type) && !(extension is not null && CommonExtensions.Contains(extension)) && !untyped)
@@ -107,6 +107,16 @@ internal static class FilePictures
         return dot > 0 && dot < name.Length - 1 ? name[(dot + 1)..].ToLowerInvariant() : null;
     }
 
+    // JPEG-compressed TIFF images, by the platform's JPEG decoder.
+    private static readonly TiffDecodeOptions TiffJpeg = new()
+    {
+        JpegDecoder = jpeg =>
+        {
+            using var bitmap = SKBitmap.Decode(jpeg);
+            return bitmap is null ? null : SkiaImageCodec.ToRgba(bitmap);
+        },
+    };
+
     private static Picture Encode(RgbaBitmap bitmap, string format) =>
         new(PngEncoder.Instance.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels), bitmap.Width, bitmap.Height, format);
 
@@ -127,7 +137,7 @@ internal static class FilePictures
             return bitmap is null ? null : ToRgba(bitmap);
         }
 
-        private static RgbaBitmap ToRgba(SKBitmap bitmap)
+        public static RgbaBitmap ToRgba(SKBitmap bitmap)
         {
             var result = new RgbaBitmap(bitmap.Width, bitmap.Height);
             var info = new SKImageInfo(bitmap.Width, bitmap.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);

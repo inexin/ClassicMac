@@ -53,7 +53,7 @@ A count (2 bytes), that many 12-byte entries sorted by tag, then the next IFD's 
 | 256 | ImageWidth | (required) | Pixels per row [Author] |
 | 257 | ImageLength | (required) | Rows [Author] |
 | 258 | BitsPerSample | 1 | One value per sample [Author] |
-| 259 | Compression | 1 | 1 none, 2 CCITT modified Huffman, 3 CCITT Group 3, 4 CCITT Group 4, 5 LZW, 8 and 32946 Deflate, 32771 word-aligned modified Huffman, 32773 PackBits, 32809 ThunderScan [Author] |
+| 259 | Compression | 1 | 1 none, 2 CCITT modified Huffman, 3 CCITT Group 3, 4 CCITT Group 4, 5 LZW, 6 old-style JPEG, 7 JPEG, 8 and 32946 Deflate, 32771 word-aligned modified Huffman, 32773 PackBits, 32809 ThunderScan [Author] |
 | 262 | PhotometricInterpretation | (required) | 0 WhiteIsZero, 1 BlackIsZero, 2 RGB, 3 palette, 5 separated (CMYK), 6 YCbCr, 8 CIE L\*a\*b\*, 9 ICC L\*a\*b\* [Author] |
 | 266 | FillOrder | 1 | 1 most significant bit first; 2 least significant first [Author] |
 | 273 | StripOffsets | (required for strips) | One per strip, per plane when planar [Author] |
@@ -69,6 +69,11 @@ A count (2 bytes), that many 12-byte entries sorted by tag, then the next IFD's 
 | 332 | InkSet | 1 | 1 CMYK [Author] |
 | 338 | ExtraSamples | | 0 unspecified, 1 associated alpha (premultiplied), 2 unassociated alpha [Author] |
 | 339 | SampleFormat | 1 | 1 unsigned, 2 signed integer, 3 IEEE floating point [Author] |
+| 347 | JPEGTables | | The JPEG tables (DQT, DHT) every strip or tile of a compression 7 image shares, as an abbreviated JPEG stream [Author: TIFF Technical Note 2] |
+| 512 | JPEGProc | | Old-style JPEG: 1 baseline [Author] |
+| 513, 514 | JPEGInterchangeFormat, JPEGInterchangeFormatLength | | Old-style JPEG: where a whole JPEG stream of the image lies [Author] |
+| 515 | JPEGRestartInterval | 0 | Old-style JPEG: the restart interval [Author] |
+| 519, 520, 521 | JPEGQTables, JPEGDCTables, JPEGACTables | | Old-style JPEG: per component, the offset of 64 quantisation values, or of 16 code counts and their values [Author] |
 | 529 | YCbCrCoefficients | 299/1000, 587/1000, 114/1000 | LumaRed, LumaGreen, LumaBlue (RATIONALs) [Author] |
 | 530 | YCbCrSubSampling | 2, 2 | Horizontal and vertical: 1, 2 or 4 each [Author] |
 | 532 | ReferenceBlackWhite | 0, 255, 128, 255, 128, 255 | Footroom and headroom of Y, Cb, Cr (RATIONALs) [Author] |
@@ -161,6 +166,17 @@ predictor (3) splits each row's samples into byte planes, most significant byte 
 difference from the one a pixel (as many bytes as there are samples) before it [Author: Adobe Photoshop TIFF
 Technical Note 3].
 
+### 2.9 JPEG
+
+- **Compression 7** (TIFF Technical Note 2): each strip or tile is a JPEG stream; when JPEGTables is present the strip
+  leaves its tables out, and a whole stream is JPEGTables without its EOI followed by the strip without its SOI
+  [Author: TIFF Technical Note 2].
+- **Compression 6** (TIFF 6.0 §22, old style): when JPEGInterchangeFormat is present it points at a whole JPEG stream
+  of the image [Author]. Otherwise each strip or tile is entropy-coded data alone; a stream is rebuilt from the table
+  tags: SOI, a DQT per component (table c for component c), the DHTs (DC tables, then AC), a DRI when there is a
+  restart interval, SOF0 with the unit's size, the components 1 to n (Y with YCbCrSubSampling, the others 1 × 1), SOS
+  over every component with its own tables, the data, EOI [Reference: libtiff].
+
 ## 3. Writing
 
 None.
@@ -184,6 +200,9 @@ None.
   satellite or scientific image has no white). [ClassicMac]
 - YCbCr is converted with the image's coefficients and reference black and white, without filtering the
   subsampled chroma; CIE L\*a\*b\* becomes sRGB through XYZ with the D65 white. [ClassicMac]
+- JPEG is decoded by the caller's decoder (`TiffDecodeOptions.JpegDecoder`): ClassicMac.Graphics has none of its own,
+  and the app passes the platform's (SkiaSharp). The decoder turns YCbCr into RGB; each strip or tile is placed
+  and cut to the image, and one that does not decode counts as short. [ClassicMac]
 - CMYK becomes RGB without colour management, as libtiff's RGBA interface converts it: R = (255 − C) × (255 − K) / 255,
   likewise G and B. [Reference: libtiff]
 - Associated alpha is divided out, rounded; RGB and grey take alpha, palette and CMYK do not. [ClassicMac]
@@ -209,6 +228,9 @@ None.
 - `tests/ClassicMac.Graphics.Tests/TiffColorTests.cs`: YCbCr with and without subsampling, its coefficients and
   reference black and white; CIELab and ICCLab; signed samples; 16-, 32- and 64-bit floats, in and outside 0–1;
   the floating-point predictor.
+- `tests/ClassicMac.Graphics.Tests/TiffJpegTests.cs`: the streams given to the decoder (JPEGTables joined, a strip on
+  its own, an interchange stream, tables rebuilt byte for byte), placement and cutting, a strip that does not
+  decode, no decoder.
 - `tests/ClassicMac.Graphics.Tests/TiffFaxTests.cs`: modified Huffman, word-aligned rows, makeup and extended codes,
   Group 3 one- and two-dimensional, fill bits before EOLs, Group 4 vertical and pass modes, FillOrder 2, BlackIsZero,
   damaged data.
@@ -220,13 +242,16 @@ None.
   `g3test.tif` (Group 3 two- and one-dimensional), and `ycbcr-cat.tif` (subsampled YCbCr), all match within 1 level.
   `caspian.tif` (64-bit floats with Deflate), which ImageSharp draws as stripes, shows the satellite image;
   `dscf0013.tif` (a camera's YCbCr) and the 16-bit and planar CMYK images, which ImageSharp does not read, were
-  checked by eye.
+  checked by eye. With ImageSharp's JPEG decoder passed in, `quad-jpeg.tif` (compression 7 with JPEGTables) and
+  `smallliz.tif` (old style, an interchange stream) match exactly; `zackthecat.tif` (old style, tables rebuilt, a
+  tile), which ImageSharp does not read, was checked by eye.
   `quad-lzw.tif` (TIFF 5.0 LZW) and `text.tif` (ThunderScan, a scanned Mac printout), which ImageSharp does not read,
   were checked by eye; `text.tif`'s last strip holds 36 of its 39 rows.
 
 ## 8. Not covered
 
-- Compression: JPEG (6, 7), SGILog (34676, 34677), NeXT (32766) and others; CCITT's uncompressed mode (T.4 extensions).
+- Compression: SGILog (34676, 34677), NeXT (32766) and others; CCITT's uncompressed mode (T.4 extensions); old-style
+  JPEG other than baseline (JPEGProc 14, lossless).
 - Photometric interpretations: ITU L\*a\*b\* (10), LogL and LogLuv; CMYK ink sets other than 1; subsampled YCbCr
   that is planar, not 8-bit or with a predictor.
 - 24-bit floating-point samples.
@@ -236,7 +261,9 @@ None.
 
 - Adobe Developers Association, *TIFF Revision 6.0, Final*, 3 June 1992.
 - Adobe, *TIFF Technical Note 2*, 17 March 2002: Deflate compression.
+- Adobe, *TIFF Technical Note 2*, 17 March 2002: JPEG compression (7).
+- ITU-T Recommendation T.81 (JPEG): the markers of §2.9.
 - ITU-T Recommendation T.4 (Group 3 facsimile) and T.6 (Group 4 facsimile).
 - libtiff (BSD-style licence): `tif_lzw.c` (the code-width rule of §2.2 and TIFF 5.0's LZW), `tif_thunder.c` (§2.4),
-  `tif_getimage.c` (CMYK), `tif_dirread.c` (the tile and strip tags), as behaviour only.
+  `tif_getimage.c` (CMYK), `tif_ojpeg.c` (old-style JPEG's tables), `tif_dirread.c` (the tile and strip tags), as behaviour only.
 - libtiff-pics, the libtiff test images (<https://gitlab.com/libtiff/libtiff-pics>).

@@ -19,10 +19,12 @@ public static class TiffFile
         StripOffsets = 273, SamplesPerPixel = 277, RowsPerStrip = 278, StripByteCounts = 279, PlanarConfiguration = 284,
         PredictorTag = 317, ColorMap = 320, TileWidth = 322, TileLength = 323, TileOffsets = 324, TileByteCounts = 325,
         InkSet = 332, ExtraSamples = 338, SampleFormat = 339, FillOrder = 266, T4Options = 292,
-        YCbCrCoefficients = 529, YCbCrSubSampling = 530, ReferenceBlackWhite = 532;
+        YCbCrCoefficients = 529, YCbCrSubSampling = 530, ReferenceBlackWhite = 532, JpegTables = 347,
+        JpegInterchangeFormat = 513, JpegInterchangeFormatLength = 514, JpegRestartInterval = 515, JpegQTables = 519,
+        JpegDcTables = 520, JpegAcTables = 521;
 
     private const ushort None = 1, Lzw = 5, Deflate = 8, AdobeDeflate = 32946, PackBitsCompression = 32773, ThunderScan = 32809,
-        CcittRle = 2, CcittGroup3 = 3, CcittGroup4 = 4, CcittRlew = 32771;
+        CcittRle = 2, CcittGroup3 = 3, CcittGroup4 = 4, CcittRlew = 32771, OldJpeg = 6, Jpeg = 7;
 
     private const ushort WhiteIsZero = 0, BlackIsZero = 1, Rgb = 2, Palette = 3, Separated = 5, YCbCr = 6, CieLab = 8,
         IccLab = 9;
@@ -35,10 +37,13 @@ public static class TiffFile
         start.Length >= 4 && (start[0] == 'I' && start[1] == 'I' && start[2] == 42 && start[3] == 0
             || start[0] == 'M' && start[1] == 'M' && start[2] == 0 && start[3] == 42);
 
-    /// <summary>Decodes the file's first image to RGBA. Damage that leaves the image readable goes to <paramref name="diagnostics"/>.</summary>
+    /// <summary>
+    /// Decodes the file's first image to RGBA. Damage that leaves the image readable goes to
+    /// <paramref name="diagnostics"/>; JPEG-compressed images need <see cref="TiffDecodeOptions.JpegDecoder"/>.
+    /// </summary>
     /// <exception cref="InvalidDataException">The file is not a TIFF file, or its structures are damaged.</exception>
     /// <exception cref="NotSupportedException">The image is compressed or laid out in a way not read here (the message says which).</exception>
-    public static RgbaBitmap Decode(ReadOnlyMemory<byte> data, ICollection<Diagnostic>? diagnostics = null)
+    public static RgbaBitmap Decode(ReadOnlyMemory<byte> data, ICollection<Diagnostic>? diagnostics = null, TiffDecodeOptions? options = null)
     {
         if (!IsTiffFile(data.Span))
         {
@@ -53,7 +58,7 @@ public static class TiffFile
         }
 
         var rationals = new Dictionary<ushort, double[]>();
-        var image = Image.Read(file, ReadIfd(file, ifd, rationals), rationals);
+        var image = Image.Read(file, ReadIfd(file, ifd, rationals), rationals, options ?? TiffDecodeOptions.Default);
         return image.Decode(file, diagnostics ?? []);
     }
 
@@ -127,10 +132,15 @@ public static class TiffFile
 
         public bool Float => Format == 3;
 
+        public Func<byte[], RgbaBitmap?>? JpegDecoder;
+        public byte[]? Tables;                              // JPEGTables, for compression 7
+        public (long Offset, long Length)? Interchange;     // an old-style JPEG's whole stream
+        public byte[]? OldTables;                           // an old-style JPEG's rebuilt tables (DQT, DHT, and DRI)
+
         // The units the pixels are stored in (strips or tiles): where each lies in the file and in the image.
         public readonly List<(long Offset, long Count, int X, int Y, int Width, int Height, int Plane)> Units = [];
 
-        public static Image Read(TiffData file, Dictionary<ushort, uint[]> tags, Dictionary<ushort, double[]> rationals)
+        public static Image Read(TiffData file, Dictionary<ushort, uint[]> tags, Dictionary<ushort, double[]> rationals, TiffDecodeOptions options)
         {
             uint One(ushort tag, uint fallback) => tags.TryGetValue(tag, out var v) ? v[0] : fallback;
             uint Required(ushort tag, string name) =>
@@ -147,7 +157,7 @@ public static class TiffFile
             (image.Width, image.Height) = ((int)width, (int)height);
             image.Compression = One(CompressionTag, None);
             if (image.Compression is not (None or Lzw or Deflate or AdobeDeflate or PackBitsCompression or ThunderScan
-                or CcittRle or CcittGroup3 or CcittGroup4 or CcittRlew))
+                or CcittRle or CcittGroup3 or CcittGroup4 or CcittRlew or OldJpeg or Jpeg))
             {
                 throw new NotSupportedException($"The image is compressed with {CompressionName(image.Compression)}, which is not read.");
             }
@@ -192,6 +202,29 @@ public static class TiffFile
                 throw new NotSupportedException($"CCITT compression of {image.Samples} samples of {image.Depth} bits is not read (only bilevel).");
             }
 
+            if (image.Compression is OldJpeg or Jpeg)
+            {
+                image.JpegDecoder = options.JpegDecoder ?? throw new NotSupportedException(
+                    "The image is compressed with JPEG, which needs a JPEG decoder (TiffDecodeOptions.JpegDecoder).");
+                if (tags.TryGetValue(JpegTables, out var tables))
+                {
+                    image.Tables = [.. Array.ConvertAll(tables, v => (byte)v)];
+                }
+
+                if (image.Compression == OldJpeg)
+                {
+                    if (tags.TryGetValue(JpegInterchangeFormat, out var at) && tags.TryGetValue(JpegInterchangeFormatLength, out var length)
+                        && at[0] < file.Length && length[0] > 0)
+                    {
+                        image.Interchange = (at[0], Math.Min(length[0], file.Length - at[0]));
+                    }
+                    else
+                    {
+                        image.OldTables = OldJpegTables(file, tags, image.Samples);
+                    }
+                }
+            }
+
             image.FaxOptions = One(T4Options, 0);
             image.Reversed = One(FillOrder, 1) == 2;
             image.Predictor = One(PredictorTag, 1);
@@ -223,7 +256,9 @@ public static class TiffFile
                     throw new InvalidDataException($"YCbCr subsampling {image.SubH} × {image.SubV}.");
                 }
 
-                if ((image.SubH, image.SubV) != (1, 1) && (image.Depth != 8 || One(PlanarConfiguration, 1) == 2 || image.Predictor != 1 || image.Samples != 3))
+                // JPEG streams carry their own subsampling; others come in data units of 8-bit samples (§2.6).
+                if ((image.SubH, image.SubV) != (1, 1) && image.Compression is not (OldJpeg or Jpeg)
+                    && (image.Depth != 8 || One(PlanarConfiguration, 1) == 2 || image.Predictor != 1 || image.Samples != 3))
                 {
                     throw new NotSupportedException("Subsampled YCbCr other than 8-bit, chunky and without a predictor is not read.");
                 }
@@ -311,6 +346,21 @@ public static class TiffFile
             }
 
             int shortUnits = 0;
+            if (Interchange is { } whole)
+            {
+                if (JpegDecoder!(file.Slice(whole.Offset, whole.Length).ToArray()) is { } decoded)
+                {
+                    Place(bitmap, decoded, 0, 0, Width, Height);
+                }
+                else
+                {
+                    shortUnits++;
+                }
+
+                Report(diagnostics, shortUnits);
+                return bitmap;
+            }
+
             var pixel = new double[Samples];
             foreach (var unit in Units)
             {
@@ -333,6 +383,20 @@ public static class TiffFile
                     }
 
                     packed = reversed;
+                }
+
+                if (Compression is Jpeg or OldJpeg)
+                {
+                    if (JpegDecoder!(JpegStream(packed, unit.Width, unit.Height)) is { } decoded)
+                    {
+                        Place(bitmap, decoded, unit.X, unit.Y, unit.Width, unit.Height);
+                    }
+                    else
+                    {
+                        shortUnits++;
+                    }
+
+                    continue;
                 }
 
                 var buffer = new byte[expected];
@@ -443,13 +507,128 @@ public static class TiffFile
                 }
             }
 
+            Report(diagnostics, shortUnits);
+            return bitmap;
+        }
+
+        private void Report(ICollection<Diagnostic> diagnostics, int shortUnits)
+        {
             if (shortUnits > 0)
             {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "tiff.short-strip",
-                    $"{shortUnits} of the image's {Units.Count} strips or tiles give fewer bytes than their rows; what they lack is left white."));
+                    $"{shortUnits} of the image's {Units.Count} strips or tiles give fewer bytes than their rows, or do not decode; what they lack is left white."));
+            }
+        }
+
+        // A JPEG stream for a strip or tile (tiff.md §2.9): new style, the JPEGTables without their EOI and then the
+        // unit without its SOI; old style, the tables rebuilt from the table tags, a frame and a scan header, the
+        // unit's entropy-coded data and EOI.
+        private byte[] JpegStream(ReadOnlySpan<byte> unit, int unitWidth, int unitHeight)
+        {
+            if (Compression == Jpeg)
+            {
+                if (Tables is not { Length: >= 4 } tables || unit.Length < 2)
+                {
+                    return unit.ToArray();
+                }
+
+                return [.. tables.AsSpan(0, tables.Length - 2), .. unit[2..]];
             }
 
-            return bitmap;
+            var stream = new List<byte>(OldTables!.Length + unit.Length + 64) { 0xFF, 0xD8 };
+            stream.AddRange(OldTables);
+            var components = Samples;
+            // SOF0: baseline, 8-bit, the unit's size; Y takes the subsampling, the others 1 × 1; component i uses table i.
+            stream.AddRange([0xFF, 0xC0, 0, (byte)(8 + 3 * components), 8, (byte)(unitHeight >> 8), (byte)unitHeight,
+                (byte)(unitWidth >> 8), (byte)unitWidth, (byte)components]);
+            for (var c = 0; c < components; c++)
+            {
+                var sampling = c == 0 && Photometric == YCbCr ? (byte)(SubH << 4 | SubV) : (byte)0x11;
+                stream.AddRange([(byte)(c + 1), sampling, (byte)c]);
+            }
+
+            // SOS: every component, its DC and AC tables, the whole spectrum.
+            stream.AddRange([0xFF, 0xDA, 0, (byte)(6 + 2 * components), (byte)components]);
+            for (var c = 0; c < components; c++)
+            {
+                stream.AddRange([(byte)(c + 1), (byte)(c << 4 | c)]);
+            }
+
+            stream.AddRange([0, 63, 0]);
+            stream.AddRange(unit.ToArray());
+            stream.AddRange([0xFF, 0xD9]);
+            return [.. stream];
+        }
+
+        // A decoded strip or tile drawn at its place, cut to its unit and the image.
+        private void Place(RgbaBitmap bitmap, RgbaBitmap decoded, int x0, int y0, int unitWidth, int unitHeight)
+        {
+            var width = Math.Min(Math.Min(decoded.Width, unitWidth), Width - x0);
+            var height = Math.Min(Math.Min(decoded.Height, unitHeight), Height - y0);
+            for (var y = 0; y < height; y++)
+            {
+                decoded.Pixels.AsSpan(y * decoded.Width * 4, width * 4).CopyTo(bitmap.Pixels.AsSpan(((y0 + y) * Width + x0) * 4));
+            }
+        }
+
+        // An old-style JPEG's tables (TIFF 6.0 §22): JPEGQTables, JPEGDCTables and JPEGACTables give one offset per
+        // component, to 64 quantisation values or to 16 code counts and their values; JPEGRestartInterval a DRI.
+        private static byte[] OldJpegTables(TiffData file, Dictionary<ushort, uint[]> tags, int components)
+        {
+            uint[] Offsets(ushort tag, string name) =>
+                tags.TryGetValue(tag, out var v) && v.Length >= components ? v
+                    : throw new NotSupportedException($"An old-style JPEG image without JPEGInterchangeFormat needs {name} for each component.");
+
+            var q = Offsets(JpegQTables, "JPEGQTables");
+            var dc = Offsets(JpegDcTables, "JPEGDCTables");
+            var ac = Offsets(JpegAcTables, "JPEGACTables");
+            var tables = new List<byte>();
+            for (var c = 0; c < components; c++)
+            {
+                if (q[c] + 64L > file.Length)
+                {
+                    throw new InvalidDataException($"JPEGQTables[{c}] lies outside the file.");
+                }
+
+                tables.AddRange([0xFF, 0xDB, 0, 67, (byte)c]);
+                tables.AddRange(file.Slice(q[c], 64).ToArray());
+            }
+
+            void Huffman(uint[] offsets, int tableClass)
+            {
+                for (var c = 0; c < components; c++)
+                {
+                    if (offsets[c] + 16L > file.Length)
+                    {
+                        throw new InvalidDataException("A JPEG Huffman table lies outside the file.");
+                    }
+
+                    var counts = file.Slice(offsets[c], 16);
+                    var values = 0;
+                    foreach (var n in counts)
+                    {
+                        values += n;
+                    }
+
+                    if (offsets[c] + 16L + values > file.Length)
+                    {
+                        throw new InvalidDataException("A JPEG Huffman table lies outside the file.");
+                    }
+
+                    var length = 2 + 1 + 16 + values;
+                    tables.AddRange([0xFF, 0xC4, (byte)(length >> 8), (byte)length, (byte)(tableClass << 4 | c)]);
+                    tables.AddRange(file.Slice(offsets[c], 16 + values).ToArray());
+                }
+            }
+
+            Huffman(dc, 0);
+            Huffman(ac, 1);
+            if (tags.TryGetValue(JpegRestartInterval, out var restart) && restart[0] is > 0 and <= 65535)
+            {
+                tables.AddRange([0xFF, 0xDD, 0, 4, (byte)(restart[0] >> 8), (byte)restart[0]]);
+            }
+
+            return [.. tables];
         }
 
         // A sample's bits as a number: unsigned, signed (two's complement) or IEEE floating point.
@@ -934,7 +1113,6 @@ public static class TiffFile
 
     private static string CompressionName(uint compression) => compression switch
     {
-        6 or 7 => "JPEG",
         32766 => "NeXT",
         34676 or 34677 => "SGILog",
         _ => $"scheme {compression}",

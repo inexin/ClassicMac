@@ -79,6 +79,24 @@ public class FilePreviewTests : IDisposable
         return [.. "MM"u8, 0, 42, 0, 0, 0, 8, .. ifd, .. bits, 255, 0, 0, 0, 0, 255];
     }
 
+    // A JPEG-compressed TIFF (compression 7, YCbCr): one strip holding a whole JPEG stream.
+    private static byte[] JpegTiff()
+    {
+        var jpeg = Encoded(SKEncodedImageFormat.Jpeg, 4, 3);
+        byte[] Entry(ushort tag, ushort type, uint value) =>
+            [(byte)(tag >> 8), (byte)tag, 0, (byte)type, 0, 0, 0, 1, .. type == 3 ? new byte[] { (byte)(value >> 8), (byte)value, 0, 0 }
+                : [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value]];
+        const uint data = 8 + 2 + 8 * 12 + 4;
+        byte[] ifd =
+        [
+            0, 8,
+            .. Entry(256, 4, 4), .. Entry(257, 4, 3), .. Entry(259, 3, 7), .. Entry(262, 3, 6), .. Entry(273, 4, data),
+            .. Entry(277, 3, 3), .. Entry(278, 4, 3), .. Entry(279, 4, (uint)jpeg.Length),
+            0, 0, 0, 0,
+        ];
+        return [.. "MM"u8, 0, 42, 0, 0, 0, 8, .. ifd, .. jpeg];
+    }
+
     // The files the tests read, each on a disk of its own.
     private static readonly Dictionary<string, (byte[] Data, string Type, string Creator)> Files = new()
     {
@@ -89,6 +107,7 @@ public class FilePreviewTests : IDisposable
         ["Still"] = (QuickTimeImage(), "qtif", "ogle"),
         ["Scan"] = (Tiff(), "TIFF", "8BIM"),
         ["scan.tif"] = (Tiff(), NoCode, NoCode),
+        ["Photo.tif"] = (JpegTiff(), "TIFF", "8BIM"),
         ["readme.txt"] = (Encoding.UTF8.GetBytes("Café au lait\n"), NoCode, NoCode),
         ["notes.txt"] = ([(byte)'C', (byte)'a', (byte)'f', 0x8E], "????", "????"),
     };
@@ -116,6 +135,7 @@ public class FilePreviewTests : IDisposable
     [InlineData("Still", 2, 1, "QuickTime image")]
     [InlineData("Scan", 2, 1, "TIFF")]
     [InlineData("scan.tif", 2, 1, "TIFF")]
+    [InlineData("Photo.tif", 4, 3, "TIFF")]
     public async Task A_picture_file_previews_as_its_image(string name, int width, int height, string format)
     {
         var preview = await Preview(name);

@@ -64,13 +64,16 @@ public class TiffTests
                 U16(tag);
                 U16(type);
                 U32((uint)(type == Rational ? values.Length / 2 : values.Length));
-                var size = type == Short ? 2 : 4;
+                var size = type switch { Short => 2, 1 or 7 => 1, _ => 4 };
                 var body = new List<byte>();
                 foreach (var v in values)
                 {
-                    body.AddRange(size == 2
-                        ? bigEndian ? [(byte)(v >> 8), (byte)v] : [(byte)v, (byte)(v >> 8)]
-                        : bigEndian ? [(byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v] : [(byte)v, (byte)(v >> 8), (byte)(v >> 16), (byte)(v >> 24)]);
+                    body.AddRange(size switch
+                    {
+                        1 => [(byte)v],
+                        2 => bigEndian ? [(byte)(v >> 8), (byte)v] : [(byte)v, (byte)(v >> 8)],
+                        _ => bigEndian ? [(byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v] : [(byte)v, (byte)(v >> 8), (byte)(v >> 16), (byte)(v >> 24)],
+                    });
                 }
 
                 if (body.Count <= 4)
