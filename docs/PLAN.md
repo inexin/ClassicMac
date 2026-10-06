@@ -142,7 +142,9 @@ In rough priority; each item names what blocks it, if anything.
    cache between runs. Crashes are kept as artifacts and replayed with `Fuzz replay`; those found so far are tests.
    Still to do: HFS Plus repairs and the volume tools (defragment, resize) as writer targets. The seeded mutation
    tests (`tests/Shared/Mutations.cs`) stay in the suite; `CLASSICMAC_MUTANTS` runs them deeper.
-3. **App**: packaging (macOS bundle icon, Linux icons and `.desktop` file).
+3. **App**: releases are built by `release.yml` on a version tag ([releasing.md](releasing.md)): self-contained
+   archives for Windows, macOS (`.app` with its icon) and Linux (icons, `.desktop`, `install.sh`). Still to do: signing
+   (Apple Developer ID and notarization, a Windows code-signing certificate) and installers (`.dmg`, `.msi`).
 4. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
    encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types; Word 98 and fast-saved Word 6 documents; a
    Mac-made zip; Mac OS X-made `.dmg`; NDIF version 2 and chunk type `$F0`; 68k ROM images; PEF section kinds 5, 6, 8

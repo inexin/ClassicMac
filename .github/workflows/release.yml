@@ -1,0 +1,73 @@
+name: release
+
+# Pushing a tag v<version> (v0.1.0, v0.2.0-beta.1) builds the desktop app and the command line for Windows, macOS and
+# Linux, self-contained, and publishes them as a GitHub release with that version's CHANGELOG section as its notes
+# (docs/releasing.md). A version with a hyphen is a pre-release. The NuGet packages are attached too, and pushed to
+# nuget.org only when the repository has a NUGET_API_KEY secret.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { rid: win-x64, os: windows-latest }
+          - { rid: osx-arm64, os: macos-latest }
+          - { rid: osx-x64, os: macos-latest }
+          - { rid: linux-x64, os: ubuntu-latest }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: tools/Release/package.sh ${{ matrix.rid }} "${GITHUB_REF_NAME#v}" dist
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.rid }}
+          path: dist/*
+
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet pack ClassicMac.slnx -c Release -p:Version="${GITHUB_REF_NAME#v}" -o packages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: packages/*
+
+  release:
+    needs: [build, packages]
+    runs-on: ubuntu-latest
+    env:
+      # Pushed to nuget.org only when the repository has this secret.
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          tools/Release/notes.sh "$version" > notes.md
+          prerelease=""
+          if [[ "$version" == *-* ]]; then prerelease="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" dist/* --title "ClassicMac $version" --notes-file notes.md --verify-tag $prerelease
+      - name: Push the NuGet packages
+        if: env.NUGET_API_KEY != ''
+        run: dotnet nuget push "dist/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate

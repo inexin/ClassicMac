@@ -50,6 +50,11 @@ dotnet test
   `CLASSICMAC_HFSPLUS_REFERENCE_IMAGE` point at them.
 - Fuzzing: [tools/Fuzz/README.md](tools/Fuzz/README.md).
 
+## Releases
+
+Downloads are on the [Releases](https://github.com/inexin/ClassicMac/releases) page. A release is made by pushing a
+version tag: [docs/releasing.md](docs/releasing.md).
+
 ## Documentation
 
 - [docs/formats](docs/formats/README.md): every format read or written, specified well enough to implement without the

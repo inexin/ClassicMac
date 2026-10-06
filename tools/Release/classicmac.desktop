@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ClassicMac
+Comment=Browse, convert and edit classic Mac OS files, disk images and resource forks
+Exec=ClassicMac %f
+Icon=classicmac
+Terminal=false
+Categories=Utility;FileTools;

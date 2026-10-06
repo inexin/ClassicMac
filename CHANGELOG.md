@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Releases: pushing a version tag builds self-contained downloads of the app and the command line for Windows,
+  macOS (`ClassicMac.app` with its icon) and Linux (icons, `.desktop`, `install.sh`) and publishes them on GitHub
+  (docs/releasing.md).
+
 - Fixed: on a disk with one HFS partition (as Drive Setup leaves it), the disk's top level is the volume's for writes
   too (`mkdir disk.img:New` was refused), and the volume answers to its own name as well as its partition's
   (`disk.img:Macintosh HD:File` when the partition is "untitled").
