@@ -115,7 +115,7 @@ public sealed class HelpPagePreview : IWebPreview
 public sealed partial class HelpPreview(IAppSelection appSelection, IAppView appView) : ObservableObject
 {
     /// <summary>The switch's segments, in <see cref="HelpModeIndex"/> order: Rendered, then Source (a help page's HTML) or Text (a document's).</summary>
-    public IReadOnlyList<string> WebModes => ["Rendered", appView.Preview.IsDocument ? "Text" : "Source"];
+    public IReadOnlyList<string> WebModes => ["Rendered", appView.Preview.IsDocument ? "Text" : appView.Preview.IsPdf ? "Info" : "Source"];
 
     /// <summary>The address the web view loads: the help page, or the document's page shown.</summary>
     public string? WebUri => appView.Preview.Web?.DataUri;

@@ -335,7 +335,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         var screenDepth = ScreenDepthOption();
         var noDocuments = new Option<bool>("--no-documents")
         {
-            Description = "Do not convert documents (DOCMaker, SimpleText and Word to HTML, AIFF sounds to WAV; in document/)",
+            Description = "Do not convert documents (DOCMaker, SimpleText and Word to HTML, AIFF sounds to WAV, PDFs as they are; in document/)",
         };
         var types = new Option<string[]>("--type", "-t")
         {
@@ -399,7 +399,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         var screenDepth = ScreenDepthOption();
         var overwrite = new Option<bool>("--overwrite") { Description = "Write into an output folder that already holds files" };
         var imageFormat = ImageFormatOption();
-        var command = new Command("convert", "Convert the documents inside the input: DOCMaker, SimpleText and Word to HTML folders, AIFF sounds to WAV")
+        var command = new Command("convert", "Convert the documents inside the input: DOCMaker, SimpleText and Word to HTML folders, AIFF sounds to WAV, PDFs written out as .pdf")
         {
             input, outputDir, overwrite, screenDepth, imageFormat,
         };

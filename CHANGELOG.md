@@ -28,7 +28,7 @@ First release of ClassicMac: libraries, a command line and a desktop app for cla
   QuickTime images and their codecs, MacPaint; ImageSharp and SkiaSharp adapters.
 - Icons, cursors, patterns and colour tables; sounds (MACE, IMA4, µ-law, AIFF) to WAV; text and styled text to UTF-8
   and RTF; bitmap and TrueType fonts (made loadable on request); dialogs, menus, windows and Finder windows drawn as
-  the Mac drew them; DOCMaker, SimpleText and Word documents and help pages to HTML; PNG or lossless WebP images.
+  the Mac drew them; DOCMaker, SimpleText and Word documents and help pages to HTML; PDFs written out as `.pdf`; PNG or lossless WebP images.
 - Code: PEF and `cfrg`, 68k applications and code resources, 68k and PowerPC disassembly to annotated listings.
 
 **Command line** (`classicmac`)
@@ -38,7 +38,7 @@ First release of ClassicMac: libraries, a command line and a desktop app for cla
 
 **Desktop app** (Windows, macOS, Linux)
 - Browse disks, archives and files in one tree; previews of pictures, sounds, text, fonts, dialogs, menus, Finder
-  windows, documents, code and hex; export; resource editing with undo, typed forms and templates; image and sound
+  windows, documents, PDFs (Windows and macOS), code and hex; export; resource editing with undo, typed forms and templates; image and sound
   import; Save As in every wrapper; the Volume menu with First Aid, Defragment and Resize.
 
 **Releases**

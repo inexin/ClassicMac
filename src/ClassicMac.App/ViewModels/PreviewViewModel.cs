@@ -40,6 +40,9 @@ public enum PreviewKind
 
     /// <summary>An Apple Help page (or another HTML file), rendered by a web view (docs/formats/resources/help-pages.md).</summary>
     HelpPage,
+
+    /// <summary>A PDF document, shown by the web view's own PDF viewer (Windows and macOS; docs/formats/documents/pdf.md).</summary>
+    Pdf,
 }
 
 /// <summary>One of a sound's detail chips: "Rate" "22,254.545 Hz".</summary>
@@ -129,17 +132,23 @@ public sealed class PreviewViewModel
     public MenuResource? Menu { get; private init; }
 
     public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json or PreviewKind.Sound or PreviewKind.Document
-        or PreviewKind.Dialog or PreviewKind.Menu or PreviewKind.Folder or PreviewKind.SoundError or PreviewKind.FontFamily or PreviewKind.HelpPage;
+        or PreviewKind.Dialog or PreviewKind.Menu or PreviewKind.Folder or PreviewKind.SoundError or PreviewKind.FontFamily or PreviewKind.HelpPage
+        or PreviewKind.Pdf;
 
     /// <summary>An Apple Help page: its source and the page made ready for the web view.</summary>
     public HelpPagePreview? Help { get; private init; }
 
     public bool IsHelpPage => Kind == PreviewKind.HelpPage;
 
-    /// <summary>The page the web view shows: a help page, or a document's HTML.</summary>
-    public IWebPreview? Web => (IWebPreview?)Help ?? Document;
+    /// <summary>A PDF document, for the web view.</summary>
+    public PdfPreview? Pdf { get; private init; }
 
-    /// <summary>Whether the preview is a page for the web view (a help page or a document).</summary>
+    public bool IsPdf => Kind == PreviewKind.Pdf;
+
+    /// <summary>The page the web view shows: a help page, a document's HTML, or a PDF.</summary>
+    public IWebPreview? Web => (IWebPreview?)Help ?? (IWebPreview?)Document ?? Pdf;
+
+    /// <summary>Whether the preview is a page for the web view (a help page, a document or a PDF).</summary>
     public bool IsWebPage => Web is not null;
 
     /// <summary>A font family's sample and tables (P6); its JSON is <see cref="Text"/>.</summary>
@@ -297,6 +306,11 @@ public sealed class PreviewViewModel
     private static PreviewViewModel ForFile(MacFile file, DecodeOptions options, ReadOptions readOptions, ICollection<Diagnostic> diagnostics)
     {
         var type = file.FinderInfo.Type.ToString();
+        if (PdfPreview.Create(file) is { } pdf)
+        {
+            return new PreviewViewModel(PreviewKind.Pdf, "") { Pdf = pdf };
+        }
+
         if (DocumentOf(file, options, readOptions, diagnostics) is { } document)
         {
             return new PreviewViewModel(PreviewKind.Document, "") { Document = DocumentWebPreview.Create(document, options, diagnostics) };

@@ -87,7 +87,7 @@ Realmz resources/
 | `<type folder>/` | One per resource type (§3.4) |
 | `<type folder>/<stem><extension>` | The files for each resource, the stem `<id> <name>` or `<id>` (§3.5). A decoder may write several files for one resource; a resource no decoder handles is written as its data, `.bin` (§3.7) |
 | `raw/<type folder>/<id>.bin` | With raw copies kept: each resource's stored data (§3.7) |
-| `document/` | With document converters: a file that is a whole document (DOCMaker, SimpleText or Word, or an AIFF sound) converted (§3.14) |
+| `document/` | With document converters: a file that is a whole document (DOCMaker, SimpleText or Word, an AIFF sound, or a PDF) converted (§3.14) |
 | `manifest.json` | Every resource, with where it came from and what was written (§1.3). Written last: a folder without it is an incomplete export |
 
 When an input holds several forks (a disk image, an archive), each gets its own export folder, placed as `unpack`
@@ -615,7 +615,8 @@ converted only when every type is exported (no type filter). A converter that th
 (`export.converter-failed`) and the next converter is tried.
 
 The built-in converters: `document.html` version 1 converts DOCMaker, SimpleText and Word documents to HTML
-([html.md](html.md)), and the AIFF converter AIFF and AIFF-C sounds to WAV. Its diagnostics (`document.*`) join the manifest's `diagnostics`.
+([html.md](html.md)), the AIFF converter AIFF and AIFF-C sounds to WAV, and `document.pdf` writes PDF documents out
+as they are ([pdf.md](../documents/pdf.md)). Its diagnostics (`document.*`) join the manifest's `diagnostics`.
 
 ### 3.15 Producing an export
 

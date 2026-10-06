@@ -21,7 +21,7 @@ output and the exit codes, is [docs/cli.md](https://github.com/inexin/ClassicMac
 | `list <input>` | The files and resources inside |
 | `unpack <input> -o <folder>` | Every Mac file inside, with both forks and Finder info |
 | `extract <input> -o <folder>` | Resources as modern files, with a manifest (`--image-format webp`, `--loadable-fonts`) |
-| `convert <input> -o <folder>` | DOCMaker, SimpleText and Word documents to HTML, AIFF sounds to WAV |
+| `convert <input> -o <folder>` | DOCMaker, SimpleText and Word documents to HTML, AIFF sounds to WAV, PDFs out as `.pdf` |
 | `disasm <input> -o <folder>` | 68k and PowerPC code as listings, with `code.json` |
 | `pack <folder> -o <file>` | A resource fork (or a container holding it) rebuilt from an export folder |
 | `check <input>` | Damage in the input's own structures; First Aid on HFS and HFS Plus volumes |

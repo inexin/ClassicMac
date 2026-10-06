@@ -139,6 +139,7 @@ Documents whose data fork is the document (DOCMaker and SimpleText documents liv
 | Document | Formats | Code |
 | --- | --- | --- |
 | [aiff.md](documents/aiff.md) | AIFF and AIFF-C sound files (`'AIFF'`, `'AIFC'`): the chunks, the samples through the `'snd '` codecs, loops and base note | `ClassicMac.Resources.Decoders.Sound` (`AiffFile`) |
+| [pdf.md](documents/pdf.md) | PDF documents (`'PDF '`): found by their header, written out as they are, previewed in the app's web view | `ClassicMac.Resources.Decoders.Documents` (`PdfDocuments`) |
 | [word-mac.md](documents/word-mac.md) | Microsoft Word 4 and 5 for the Macintosh (`'WDBN'`): text, character and paragraph formatting | `ClassicMac.Resources.Decoders.Documents` (`MacWordDocuments`) |
 | [word-binary.md](documents/word-binary.md) | Microsoft Word 6 to 97 binary documents (Word 6 and Word 98 for the Macintosh, `'W6BN'`, `'W8BN'`): text through the piece table, character and paragraph formatting | `ClassicMac.Resources.Decoders.Documents` (`WordBinaryDocuments`) |
 
