@@ -9,7 +9,7 @@ QuickTime imported it. Mac programs wrote it big-endian (`MM`). ClassicMac reads
 | --- | --- |
 | Identified by | File type `TIFF`; extensions `.tif`, `.tiff`; `II` and 42 little-endian, or `MM` and 42 big-endian, at the start |
 | ClassicMac | Reads; `ClassicMac.Graphics.TiffFile`; the app's preview |
-| Verified against | libtiff's sample images (libtiff-pics): all 62 read; every one ImageSharp also reads decodes as it does, within 1 level per channel, except one ImageSharp gets wrong (§7) |
+| Verified against | TIFFs written by GraphicConverter 4.6.1 and QuickTime 5.0.2 on Mac OS 9.2.2 (50 files, every option they offer); libtiff's sample images (libtiff-pics): all 62 read; every one ImageSharp also reads decodes as it does, within 1 level per channel, except one ImageSharp gets wrong (§7) |
 | Sources | Adobe Developers Association, *TIFF Revision 6.0* (1992); Adobe, *TIFF Technical Note 2* (Deflate); libtiff, as behaviour |
 
 Contents
@@ -205,7 +205,11 @@ None.
   bit is 1 [Reference: libtiff].
 - Some writers put a tiled image's TileOffsets and TileByteCounts under the strip tags (273, 279); libtiff takes them
   as the same fields [Reference: libtiff].
-- Mac OS 9 and the 68k ROM have no TIFF code; QuickTime's importer read it.
+- Mac OS 9 and the 68k ROM have no TIFF code; QuickTime's importer read it, and its exporter (QuickTime 5) wrote
+  uncompressed and PackBits TIFFs in either byte order, from 1-bit to RGBA with unassociated alpha, every grey as
+  WhiteIsZero [Verified: QuickTime 5.0.2].
+- GraphicConverter 4.6.1 labels compression 2 (modified Huffman, without EOLs) "CCITT 3", writes grey as WhiteIsZero,
+  and writes the whole image as one strip unless asked for strips of about 8 KB [Verified: GraphicConverter 4.6.1].
 
 ## 5. ClassicMac
 
@@ -257,6 +261,11 @@ None.
   Group 3 one- and two-dimensional, fill bits before EOLs, Group 4 vertical and pass modes, FillOrder 2, BlackIsZero,
   damaged data.
 - `tests/ClassicMac.App.Tests/FilePreviewTests.cs`: the preview by type and by extension.
+- TIFFs written on Mac OS 9.2.2 (not in the repository): GraphicConverter 4.6.1 (28 files: RGB uncompressed,
+  PackBits, LZW and LZW with the predictor, in both byte orders and in strips; grey; 1-bit uncompressed, PackBits,
+  modified Huffman and Group 4 with both fill orders; 4- and 8-bit palettes) and QuickTime 5.0.2 (22 files: RGB and
+  RGBA uncompressed and PackBits in both byte orders; 1-bit; 2-, 4- and 8-bit grey and palettes; strips) all match
+  ImageSharp's reader, and every lossless RGB and RGBA file decodes to exactly the picture exported.
 - libtiff's sample images (libtiff-pics, not in the repository) were decoded and compared with ImageSharp's reader:
   `cramps.tif` (big-endian PackBits), `cramps-tile.tif` and `quad-tile.tif` (tiles), `jello.tif`, `strike.tif` (LZW
   palette, RGBA), `ladoga.tif` (16-bit Deflate), `oxford.tif` (planar LZW), `pc260001.tif`, the `jim___*` halftones
