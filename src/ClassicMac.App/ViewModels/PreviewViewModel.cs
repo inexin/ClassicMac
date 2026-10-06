@@ -349,6 +349,17 @@ public sealed class PreviewViewModel
 
             return StyledPreview(StyledText.Read(file.DataFork.ToArray(), styl, options));
         }
+
+        if (FilePictures.Read(file) is { } pictureFile)
+        {
+            var detail = string.Create(CultureInfo.InvariantCulture, $"{pictureFile.Width}×{pictureFile.Height} · {pictureFile.Format}");
+            return new PreviewViewModel(PreviewKind.Image, "") { Images = [new PreviewImage(pictureFile.Png, pictureFile.Width, pictureFile.Height, null, null, detail)] };
+        }
+
+        if (UntypedText(file) && file.DataFork.Length is > 0 and <= MaxTextFile)
+        {
+            return new PreviewViewModel(PreviewKind.Text, "") { Text = PlainText(file.DataFork.ToArray(), options) };
+        }
         return None;
     }
 
@@ -465,6 +476,37 @@ public sealed class PreviewViewModel
                 ? new SoundLoop(frames.Start / sound.SampleRate, frames.End / sound.SampleRate)
                 : null,
         };
+    }
+
+    // Text files with no Mac type (from zip archives, ISO 9660 discs, FAT disks), known by their extension.
+    private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "txt", "text", "me", "md", "log", "csv", "ini", "cfg", "nfo", "diz", "json", "xml", "c", "h", "cpp", "s", "a", "p", "r",
+    };
+
+    private static bool UntypedText(MacFile file)
+    {
+        var type = file.FinderInfo.Type;
+        var name = file.Name.ToString();
+        var dot = name.LastIndexOf('.');
+        return (type == default || type.ToString() == "????") && dot > 0 && TextExtensions.Contains(name[(dot + 1)..]);
+    }
+
+    // A text file's text: UTF-8 when it is valid UTF-8 (as files from other systems often are), else the Mac encoding;
+    // line ends as '\n'.
+    private static string PlainText(byte[] data, DecodeOptions options)
+    {
+        string text;
+        try
+        {
+            text = new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(data);
+        }
+        catch (DecoderFallbackException)
+        {
+            text = MacEncodings.Decode(data, options.TextEncoding);
+        }
+
+        return text.TrimStart('\uFEFF').Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
     }
 
     private static PreviewViewModel StyledPreview(StyledText styled) => new(PreviewKind.Text, "") { Styled = styled, Text = styled.Text.Replace('\r', '\n') };
