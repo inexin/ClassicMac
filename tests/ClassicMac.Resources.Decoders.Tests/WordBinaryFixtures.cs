@@ -29,6 +29,9 @@ internal sealed class WordBinaryBuilder
     /// <summary>A piece's Prm, for a fast save's property changes.</summary>
     public ushort Prm { get; set; }
 
+    /// <summary>The Clx's Prcs: the property lists a Prm1 picks by index.</summary>
+    public List<byte[]> Prcs { get; } = [];
+
     /// <summary>The default font's index (rgftcStandardChp).</summary>
     public ushort DefaultFont { get; set; }
 
@@ -231,7 +234,8 @@ internal sealed class WordBinaryBuilder
             plc.AddRange(BitConverter.GetBytes(Prm));
         }
 
-        return [0x02, .. BitConverter.GetBytes(plc.Count), .. plc];
+        var prcs = Prcs.SelectMany(g => (byte[])[0x01, .. BitConverter.GetBytes((short)g.Length), .. g]);
+        return [.. prcs, 0x02, .. BitConverter.GetBytes(plc.Count), .. plc];
     }
 
     private byte[] FontTable()

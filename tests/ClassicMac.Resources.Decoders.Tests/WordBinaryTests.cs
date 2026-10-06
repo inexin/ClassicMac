@@ -160,11 +160,50 @@ public class WordBinaryTests
         Assert.True(Assert.Single(Read(builder.Build()).Chapters).Text.Runs[0].Bold);
     }
 
+    // A fast save's property changes ([MS-DOC] §2.9.208 Prm): a Prm0 (one sprm, by isprm, and its operand byte) or a
+    // Prm1 (the Clx's Prc it names), applied over the piece's text; a paragraph's from its mark's piece.
     [Fact]
-    public void A_fast_save_s_property_changes_are_reported()
+    public void A_Prm0_centres_the_paragraph_whose_mark_is_in_its_piece()
+    {
+        var builder = Builder().Text("One\rTwo\r");
+        builder.Prm = 0x010A;                                                       // isprm 5 (sprmPJc), 1: centred
+        var diagnostics = new List<Diagnostic>();
+
+        var chapter = Assert.Single(Read(builder.Build(), diagnostics).Chapters);
+
+        Assert.All(chapter.Paragraphs, p => Assert.Equal(Justification.Center, p.Justification));
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void A_Prm0_sets_a_character_property()
+    {
+        var builder = Builder().Text("Bold\r");
+        builder.Prm = (0x55 << 1) | (1 << 8);                                        // isprm $55 (sprmCFBold), on
+
+        Assert.True(Assert.Single(Read(builder.Build()).Chapters).Text.Runs[0].Bold);
+    }
+
+    [Fact]
+    public void A_Prm1_applies_the_Prc_it_names()
+    {
+        var builder = Builder().Text("Both\r");
+        builder.Prcs.Add(Sprm(0x0836, 1));                                          // Prc 0: italic, not named
+        builder.Prcs.Add([.. Sprm(0x0835, 1), .. Sprm(0x2403, 2)]);                 // Prc 1: bold, right-aligned
+        builder.Prm = (1 << 1) | 1;
+
+        var chapter = Assert.Single(Read(builder.Build()).Chapters);
+
+        Assert.True(chapter.Text.Runs[0].Bold);
+        Assert.False(chapter.Text.Runs[0].Italic);
+        Assert.Equal(Justification.Right, chapter.Paragraphs[0].Justification);
+    }
+
+    [Fact]
+    public void A_Prm1_naming_no_Prc_is_reported_and_left_out()
     {
         var builder = Builder().Text("Text\r");
-        builder.Prm = 0x0101;
+        builder.Prm = 0x0101;                                                       // Prc $80, of none
         var diagnostics = new List<Diagnostic>();
 
         Assert.Equal("Text\r", Assert.Single(Read(builder.Build(), diagnostics).Chapters).Text.Text);

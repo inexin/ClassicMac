@@ -179,3 +179,10 @@ WORD 98 (w98-*.bin), made 2026-10-06
   w98-table-fast:            "FAST START Table follows." / cell A2 = "A2 FAST MID"
   w98-picture-footnote-fast: "FAST START Picture follows:" / "Text with a f FAST MIDootnote<REF 1> here."
 - Everything else is as in the base documents. The hidden run "Hidden run." is present but not displayed.
+
+w98-prm-fast.bin (made 2026-10-06): a fast save whose only change is paragraph formatting
+- A Finder duplicate of w98-plain. It was opened in Word 98 with Allow Fast Saves on. The cursor was put in the 2nd
+  paragraph ("The quick brown fox ...") and Cmd-E (centre) pressed, then Cmd-S. There was no text edit.
+- FIB fComplex=1, cQuickSaves=1. The piece table has 4 pieces. Piece 1 (CP 81-82, the 2nd paragraph's paragraph
+  mark) carries Prm 0x010A: a Prm0 with isprm 0x05 (sprmPJc), value 1 = centred. The other pieces have Prm 0.
+- Text is identical to w98-plain. Only the 2nd paragraph is centred.

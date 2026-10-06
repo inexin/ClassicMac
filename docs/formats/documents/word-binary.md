@@ -60,6 +60,14 @@ FcCompressed ([MS-DOC] §2.9.73): bits 0–29 an FC, bit 30 `fCompressed`. When 
 character from FC ÷ 2, in Windows-1252 (bytes `$80`–`$9F` map to its characters there, the rest are Latin-1); when
 clear, UTF-16 from the FC. [Author]
 
+A Pcd's Prm ([MS-DOC] Prm, Prm0, Prm1) is a fast save's property changes to the piece's text. Bit 0 set (Prm1):
+bits 1–15 index the Clx's Prcs, whose grpprl applies. Clear (Prm0): bits 1–7 an isprm naming one sprm, bits 8–15
+its one-byte operand; 0 is no change. The isprms used here: `$05` sprmPJc, `$18` sprmPFInTable, `$19` sprmPFTtp,
+`$53` sprmCPlain, `$55`–`$56` sprmCFBold and sprmCFItalic, `$58`–`$5C` sprmCFOutline, sprmCFShadow, sprmCFSmallCaps,
+sprmCFCaps and sprmCFVanish, `$5E` sprmCKul, `$62` sprmCIco; [MS-DOC] lists the rest. [Author] They are Word 6's
+sprm numbers for the same properties, so a Word 6 Prm0's isprm is read as its sprm. [Fitted: the tables agree; no
+Word 6 Prm sample]
+
 ### 1.3 Bin tables and FKP pages
 
 PlcBteChpx and PlcBtePapx ([MS-DOC] §2.8.5, §2.8.6): *n* + 1 FCs, then *n* 4-byte page numbers (the low 22 bits). Page
@@ -183,8 +191,9 @@ text, character and paragraph formats, line breaks and tables read as below. Non
 - A field shows its result; its instructions are left out. [ClassicMac]
 - Pictures, footnote references, annotation marks and drawings are left out; non-breaking and optional hyphens become
   U+2011 and U+00AD. Hidden text is left out and all-caps text upper-cased. [ClassicMac]
-- A fast-saved document is read through its piece table as [MS-DOC] specifies; a piece's Prm (property changes made
-  by a fast save) is not applied and is reported. [ClassicMac]
+- A fast-saved document is read through its piece table as [MS-DOC] specifies, each piece's Prm applied over its
+  characters' properties, and over a paragraph's from the piece that holds its mark (§1.2). A Prm1 naming a Prc the
+  Clx lacks is reported and left out. [ClassicMac]
 - An encrypted or obfuscated document is reported and not read. [ClassicMac]
 
 ## 6. Diagnostics
@@ -199,7 +208,7 @@ text, character and paragraph formats, line breaks and tables read as below. Non
 | `word.bad-zone` | Warning | A table-stream structure or a formatting page lies past its stream's end | Leaves it out | Not traced |
 | `word.encrypted` | Error | fEncrypted is set (encrypted or obfuscated) | Reads nothing | Word asks for the password |
 | `word.not-shown` | Info | The text has pictures, footnote references or other special characters | Leaves them out | Word shows them |
-| `word.piece-properties` | Warning | A piece carries a fast save's Prm | Reads the text without those changes | Word applies them |
+| `word.piece-properties` | Warning | A piece's Prm1 names a Prc the Clx does not have | Reads the text without those changes | Not traced |
 | `word.unsupported-version` | Error | nFib below `$0065` (older than Word 6) | Reads nothing | Not traced |
 
 The compound file's own diagnostics are in [compound-file.md §6](../containers/compound-file.md#6-diagnostics).
@@ -221,13 +230,15 @@ The compound file's own diagnostics are in [compound-file.md §6](../containers/
 - The same tests on `Word/w98-*.bin`: 10 documents Word 98 for the Macintosh (8.0) wrote on Mac OS 9.2.2 for
   ClassicMac, the same content saved in full (nFib 193), and five fast saved (fComplex 1, cQuickSaves 1, one edit
   each): the text, formats and table read as Word showed them, the fast saves through their piece tables with each
-  insertion in the formatting of the character before it. None of the five pieces carries a Prm.
+  insertion in the formatting of the character before it. None of the five pieces carries a Prm; `w98-prm-fast`, a
+  fast save that only centred a paragraph, does (Prm0 `$010A` on that paragraph's mark), and reads with only that
+  paragraph centred.
 
 ## 8. Not covered
 
 - Fast-saved Word 6 documents (none was made: Word 6 saved every sample in full); Word 95's East Asian and Unicode text.
-- A fast save whose pieces carry a Prm (none of Word 98's samples has one).
-- Pieces' Prm (fast saves' property changes), character styles (`sprmCIstd`), list numbering, tabs, borders, line
+- A Prm1 from a real document (only built ones are tested), and Prm0s for properties this reader does not apply.
+- Character styles (`sprmCIstd`), list numbering, tabs, borders, line
   spacing, sections, headers, footnotes, pictures and East Asian text.
 - Decrypting password-protected documents.
 

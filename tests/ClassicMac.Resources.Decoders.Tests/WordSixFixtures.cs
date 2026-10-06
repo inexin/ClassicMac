@@ -28,6 +28,9 @@ internal sealed class WordSixBuilder
     /// <summary>Writes a piece table (a fast-saved document's) instead of the FIB's text range alone.</summary>
     public bool PieceTable { get; set; }
 
+    /// <summary>The piece's Prm, for a fast save's property changes.</summary>
+    public ushort Prm { get; set; }
+
     public WordSixBuilder Text(string value)
     {
         text = value;
@@ -181,7 +184,7 @@ internal sealed class WordSixBuilder
         plc.AddRange(BitConverter.GetBytes(text.Length));
         plc.AddRange(BitConverter.GetBytes((ushort)0));
         plc.AddRange(BitConverter.GetBytes(TextStart));
-        plc.AddRange(BitConverter.GetBytes((ushort)0));
+        plc.AddRange(BitConverter.GetBytes(Prm));
         return [0x02, .. BitConverter.GetBytes(plc.Count), .. plc];
     }
 

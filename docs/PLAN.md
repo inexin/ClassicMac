@@ -151,8 +151,7 @@ In rough priority; each item names what blocks it, if anything.
    archives for Windows, macOS (`.app` with its icon) and Linux (icons, `.desktop`, `install.sh`). Still to do: signing
    (Apple Developer ID and notarization, a Windows code-signing certificate) and installers (`.dmg`, `.msi`).
 4. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
-   encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types; fast-saved Word 6 documents and a Word 98
-   fast save with a Prm; a Mac-made zip; Mac OS X-made `.dmg`; NDIF version 2 and chunk type `$F0`; 68k ROM images;
+   encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types; fast-saved Word 6 documents; a Mac-made zip; Mac OS X-made `.dmg`; NDIF version 2 and chunk type `$F0`; 68k ROM images;
    PEF section kinds 5, 6, 8 and CFM-68K; THINK C code. PCE MAR is blocked (no sample; layout only in GPL source).
 5. **Owner's steps**: publish the NuGet packages, then deprecate the QuickDraw.Pict ones.
 6. **Rez** (CLI only, not in the app until asked for): typed `resource` statements and the preprocessor; `rez` compiles

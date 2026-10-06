@@ -240,6 +240,21 @@ public class WordSampleTests
         Assert.Contains("Text with a f FAST MIDootnote", ReadWord6("w98-picture-footnote-fast").Chapters[0].Text.Text, StringComparison.Ordinal);
     }
 
+    // A Word 98 fast save whose only change is a centred paragraph: piece 1, the 2nd paragraph's mark, carries Prm0
+    // $010A (isprm 5, sprmPJc, 1).
+    [Fact]
+    public void A_Word_98_fast_save_s_property_change_applies()
+    {
+        var diagnostics = new List<Diagnostic>();
+        var document = ReadWord6("w98-prm-fast", diagnostics);
+
+        Assert.Equal(Paragraphs(ReadWord6("w98-plain")), Paragraphs(document));
+        Assert.Equal(Justification.Center, FormatAt(document, "The quick brown fox").Justification);
+        Assert.Equal(Justification.Left, FormatAt(document, "Plain text test").Justification);
+        Assert.Equal(Justification.Left, FormatAt(document, "Mac Roman").Justification);
+        Assert.Empty(diagnostics);
+    }
+
     [Fact]
     public void The_HTML_has_line_breaks_small_caps_colour_and_a_real_table()
     {

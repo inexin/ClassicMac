@@ -142,6 +142,7 @@ public static class WordBinaryDocuments
         private readonly HashSet<string> reported = [];
         private readonly Dictionary<int, (Chp Chp, Pap Pap)> styleCache = [];
         private List<string> fonts = [];
+        private readonly List<byte[]> prcs = [];                // the Clx's Prcs, which a Prm1 names
         private List<Style?> styles = [];
         private int defaultFont;
 
@@ -198,19 +199,13 @@ public static class WordBinaryDocuments
                 return null;
             }
 
-            if (pieces.Any(p => p.Prm != 0))
-            {
-                Report(DiagnosticSeverity.Warning, "word.piece-properties",
-                    "some text was formatted by a fast save's property changes, which this reader does not apply.");
-            }
-
             fonts = word6 ? ReadSixFonts(Table(SttbfFfn), mac) : ReadFonts(Table(SttbfFfn));
             ReadStyles(Table(Stshf));
             var characters = Bins(Table(PlcfBteChpx), paragraphs: false);
             var paragraphs = Bins(Table(PlcfBtePapx), paragraphs: true);
 
             // The main text: CPs 0 up to ccpText ([MS-DOC] §2.4.1), with each character's FC.
-            var text = new List<(char Char, long Fc)>();
+            var text = new List<(char Char, long Fc, ushort Prm)>();
             foreach (var piece in pieces)
             {
                 for (var cp = Math.Max(piece.Cp, 0); cp < piece.CpEnd && cp < ccpText; cp++)
@@ -224,7 +219,7 @@ public static class WordBinaryDocuments
 
                     var c = !piece.Compressed ? (char)BinaryPrimitives.ReadUInt16LittleEndian(document.Span[(int)fc..])
                         : mac ? MacRoman.ToChar(document.Span[(int)fc]) : Compressed(document.Span[(int)fc]);
-                    text.Add((c, fc));
+                    text.Add((c, fc, piece.Prm));
                 }
             }
 
@@ -241,7 +236,9 @@ public static class WordBinaryDocuments
             var at = 0;
             while (at < span.Length && span[at] == 0x01 && at + 3 <= span.Length)
             {
-                at += 3 + BinaryPrimitives.ReadInt16LittleEndian(span[(at + 1)..]);
+                var size = BinaryPrimitives.ReadInt16LittleEndian(span[(at + 1)..]);
+                prcs.Add(span.Slice(at + 3, Math.Clamp((int)size, 0, span.Length - at - 3)).ToArray());
+                at += 3 + size;
             }
 
             if (at + 5 > span.Length || span[at] != 0x02)
@@ -637,6 +634,62 @@ public static class WordBinaryDocuments
             }
         }
 
+        // A piece's Prm ([MS-DOC] Prm, Prm0, Prm1): a fast save's property changes to its text. A Prm1 (bit 0 set) names
+        // the Clx's Prc by index (bits 1–15); a Prm0 is one sprm, by isprm (bits 1–7), with its operand byte (bits 8–15),
+        // by [MS-DOC] Prm0's table in Word 97. That table's isprms are Word 6's sprm numbers (5 sprmPJc, $55 sprmCFBold
+        // …), so a Word 6 Prm0's isprm is taken as its sprm [Fitted: the tables agree; no Word 6 Prm sample]. A Prm0 of
+        // 0 has no effect; only the sprms this reader applies are mapped.
+        private IEnumerable<(ushort Sprm, byte[] Operand)> PrmSprms(ushort prm)
+        {
+            if ((prm & 1) != 0)
+            {
+                var index = prm >> 1;
+                if (index < prcs.Count)
+                {
+                    return Sprms(prcs[index]);
+                }
+
+                Report(DiagnosticSeverity.Warning, "word.piece-properties",
+                    "a fast save's property changes name a list the document does not have, so they are left out.");
+                return [];
+            }
+
+            var (isprm, val) = ((byte)((prm >> 1) & 0x7F), (byte)(prm >> 8));
+            if (prm == 0)
+            {
+                return [];
+            }
+
+            if (word6)
+            {
+                return SixSprm(isprm) switch
+                {
+                    (0, var same and not 0) => [(same, [])],
+                    (1, var same and not 0) => [(same, [val])],
+                    _ => [],
+                };
+            }
+
+            ushort? sprm = isprm switch
+            {
+                0x05 => 0x2403,              // sprmPJc
+                0x18 => 0x2416,              // sprmPFInTable
+                0x19 => 0x2417,              // sprmPFTtp
+                0x53 => 0xFFFF,              // sprmCPlain (as Word 6's, the style's properties)
+                0x55 => 0x0835,              // sprmCFBold
+                0x56 => 0x0836,              // sprmCFItalic
+                0x58 => 0x0838,              // sprmCFOutline
+                0x59 => 0x0839,              // sprmCFShadow
+                0x5A => 0x083A,              // sprmCFSmallCaps
+                0x5B => 0x083B,              // sprmCFCaps
+                0x5C => 0x083C,              // sprmCFVanish
+                0x5E => 0x2A3E,              // sprmCKul
+                0x62 => 0x2A42,              // sprmCIco
+                _ => null,
+            };
+            return sprm is { } code ? [(code, [val])] : [];
+        }
+
         // A ToggleOperand ([MS-DOC] §2.9.327): 0 off, 1 on, $80 the style's value, $81 its opposite.
         private static bool Toggle(byte value, bool style) => value switch
         {
@@ -648,9 +701,11 @@ public static class WordBinaryDocuments
         };
 
         // Character sprms ([MS-DOC] §2.6.1).
-        private Chp ApplyChp(Chp chp, byte[] grpprl, Chp style)
+        private Chp ApplyChp(Chp chp, byte[] grpprl, Chp style) => ApplyChp(chp, Sprms(grpprl), style);
+
+        private static Chp ApplyChp(Chp chp, IEnumerable<(ushort Sprm, byte[] Operand)> sprms, Chp style)
         {
-            foreach (var (sprm, operand) in Sprms(grpprl))
+            foreach (var (sprm, operand) in sprms)
             {
                 chp = sprm switch
                 {
@@ -674,9 +729,11 @@ public static class WordBinaryDocuments
         }
 
         // Paragraph sprms ([MS-DOC] §2.6.2).
-        private Pap ApplyPap(Pap pap, byte[] grpprl)
+        private Pap ApplyPap(Pap pap, byte[] grpprl) => ApplyPap(pap, Sprms(grpprl));
+
+        private static Pap ApplyPap(Pap pap, IEnumerable<(ushort Sprm, byte[] Operand)> sprms)
         {
-            foreach (var (sprm, operand) in Sprms(grpprl))
+            foreach (var (sprm, operand) in sprms)
             {
                 short Word() => BinaryPrimitives.ReadInt16LittleEndian(operand);
                 pap = sprm switch
@@ -743,7 +800,7 @@ public static class WordBinaryDocuments
             return -1;
         }
 
-        private StyledDocument Build(List<(char Char, long Fc)> text, List<(long From, long To, byte[] Block)> characters,
+        private StyledDocument Build(List<(char Char, long Fc, ushort Prm)> text, List<(long From, long To, byte[] Block)> characters,
             List<(long From, long To, byte[] Block)> paragraphs)
         {
             characters.Sort((a, b) => a.From.CompareTo(b.From));
@@ -769,6 +826,7 @@ public static class WordBinaryDocuments
                 var istd = block.Length >= 2 ? BinaryPrimitives.ReadUInt16LittleEndian(block) : 0;
                 var (styleChp, stylePap) = StyleProperties(istd);
                 var pap = block.Length > 2 ? ApplyPap(stylePap, block[2..]) : stylePap;
+                pap = ApplyPap(pap, PrmSprms(text[end].Prm));                       // the changes of the piece holding its mark
                 // A table: the rows from its first cell to the paragraph after its last row.
                 if (pap.InTable && tableStart is null)
                 {
@@ -789,9 +847,10 @@ public static class WordBinaryDocuments
                     pap.Before / 20.0, pap.After / 20.0));
                 for (var i = start; i <= end; i++)
                 {
-                    var (c, fc) = text[i];
+                    var (c, fc, prm) = text[i];
                     var chpRun = Find(characters, fc);
                     var chp = chpRun >= 0 ? ApplyChp(styleChp, characters[chpRun].Block, styleChp) : styleChp;
+                    chp = ApplyChp(chp, PrmSprms(prm), styleChp);
 
                     // Fields ([MS-DOC]): $13 begins, $14 separates the instructions from the result, $15 ends; the
                     // instructions are left out, the result shown.

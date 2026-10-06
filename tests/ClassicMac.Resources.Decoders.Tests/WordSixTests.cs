@@ -106,6 +106,18 @@ public class WordSixTests
         Assert.True(chapter.Text.Runs[0].Bold);
     }
 
+    // Word 6's Prm0 names a Word 6 sprm itself (isprm is its number) with its operand byte.
+    [Fact]
+    public void A_fast_save_s_Prm0_applies_its_Word_6_sprm()
+    {
+        var builder = Builder().Text("Centred\r");
+        builder.PieceTable = true;
+        builder.Flags = 0x0004;
+        builder.Prm = (5 << 1) | (1 << 8);                                           // sprm 5 (sprmPJc), centred
+
+        Assert.Equal(Justification.Center, Assert.Single(Read(builder.Build()).Chapters).Paragraphs[0].Justification);
+    }
+
     [Fact]
     public void An_unknown_sprm_ends_its_property_list()
     {
