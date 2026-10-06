@@ -456,11 +456,7 @@ public sealed class InputEditSession
         volume.Overlay = HfsWriter.Rename(Overlay(volume), inner, volume.Kind == InputEditKind.HfsVolume ? Stored(newName) : newName);
         var parent = macPath.Contains(':') ? macPath[..(macPath.LastIndexOf(':') + 1)] : "";
         var renamed = parent + newName;
-        foreach (var key in forks.Keys.Where(k => Within(k, macPath)).ToList())
-        {
-            forks[renamed + key[macPath.Length..]] = forks[key];
-            forks.Remove(key);
-        }
+        MoveForkEdits(macPath, renamed);
 
         changes.Add(new PlannedChange("rename", macPath, $"to {newName}"));
     }
@@ -595,11 +591,7 @@ public sealed class InputEditSession
         volume.Overlay = HfsWriter.Move(Overlay(volume), inner, folder);
         var name = macPath.Contains(':') ? macPath[(macPath.LastIndexOf(':') + 1)..] : macPath;
         var moved = folderPath.Length == 0 ? name : folderPath + ":" + name;
-        foreach (var key in forks.Keys.Where(k => Within(k, macPath)).ToList())
-        {
-            forks[moved + key[macPath.Length..]] = forks[key];
-            forks.Remove(key);
-        }
+        MoveForkEdits(macPath, moved);
 
         changes.Add(new PlannedChange("move", macPath, folderPath.Length == 0 ? "to the volume's top level" : $"to {folderPath}"));
     }
@@ -727,6 +719,26 @@ public sealed class InputEditSession
     private MacFile? FileAt(EditedVolume volume, string macPath) =>
         HfsReader.Instance.Read(Overlay(volume).AsForkData(), new ContainerContext(options))
             .FirstOrDefault(f => string.Join(":", f.FolderPath.Select(n => n.ToMacRoman()).Append(f.Name.ToMacRoman())) == macPath);
+
+    // The resource edits made to an item (or in it) follow it to its new path; renamed to its own name, they stay.
+    private void MoveForkEdits(string from, string to)
+    {
+        if (from == to)
+        {
+            return;
+        }
+
+        var moving = forks.Where(f => Within(f.Key, from)).ToList();
+        foreach (var (key, _) in moving)
+        {
+            forks.Remove(key);
+        }
+
+        foreach (var (key, session) in moving)
+        {
+            forks[to + key[from.Length..]] = session;
+        }
+    }
 
     private static bool Within(string key, string macPath) => key == macPath || key.StartsWith(macPath + ":", StringComparison.Ordinal);
 

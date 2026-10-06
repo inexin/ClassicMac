@@ -115,6 +115,20 @@ public sealed class InputEditSessionTests : IDisposable
         Assert.NotNull(session.Current());
     }
 
+    // Found by fuzzing (volume-session): renamed to its own name, a file keeps its resource edits.
+    [Fact]
+    public void A_file_renamed_to_its_own_name_keeps_its_resource_edits()
+    {
+        var session = InputEditSession.Open(Volume());
+        session.SetResource("Read Me", Str, 200, "x"u8.ToArray());
+        session.Rename("Read Me", "Read Me");
+        var target = Path.Combine(directory, "Out.img");
+        session.SaveAs(target);
+
+        var file = Files(target).Single(f => f.MacPath == "Read Me");
+        Assert.Equal("x"u8.ToArray(), ResourceFork.Read(file.ResourceFork.ToArray()).Find(Str, 200)!.GetData().ToArray());
+    }
+
     [Fact]
     public void An_item_moves_to_another_folder_and_its_resource_edits_follow()
     {
