@@ -151,7 +151,7 @@ Documents whose data fork is the document (DOCMaker and SimpleText documents liv
 | [quickdraw.md](graphics/quickdraw.md) | How QuickDraw draws (Mac OS 9 and the 68k ROM): shapes, patterns, transfer modes, CopyBits, bitmap text and the Font Manager, screen depths | `ClassicMac.Graphics.QuickDraw` |
 | [quicktime.md](graphics/quicktime.md) | QuickTime still images in pictures, the codecs, QTIF files | `ClassicMac.Graphics.QuickTime` |
 | [macpaint.md](graphics/macpaint.md) | MacPaint documents | `ClassicMac.Graphics` |
-| [tiff.md](graphics/tiff.md) | TIFF images (baseline TIFF 6.0: strips, none, PackBits and LZW, bilevel to CMYK) | `ClassicMac.Graphics` (`TiffFile`) |
+| [tiff.md](graphics/tiff.md) | TIFF images: strips and tiles, chunky and planar; none, PackBits, LZW (6.0 and 5.0), Deflate, ThunderScan; bilevel to CMYK, 1 to 32 bits | `ClassicMac.Graphics` (`TiffFile`) |
 
 ### Code
 

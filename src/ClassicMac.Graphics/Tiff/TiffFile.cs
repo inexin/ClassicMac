@@ -2,22 +2,25 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using ClassicMac.Core;
 
 namespace ClassicMac.Graphics;
 
 /// <summary>
-/// TIFF images (file type <c>TIFF</c>; <c>.tif</c>, <c>.tiff</c>; docs/formats/graphics/tiff.md): baseline TIFF 6.0,
-/// the first image of the file. Either byte order; uncompressed, PackBits and LZW strips, with the horizontal predictor;
-/// bilevel, grey, palette, RGB (with an alpha extra sample) and CMYK pixels of 1 to 16 bits per sample.
+/// TIFF images (file type <c>TIFF</c>; <c>.tif</c>, <c>.tiff</c>; docs/formats/graphics/tiff.md): the first image of
+/// the file, in either byte order, in strips or tiles, chunky or planar; uncompressed, PackBits, LZW (TIFF 6.0's and
+/// TIFF 5.0's), Deflate and ThunderScan, with the horizontal predictor; bilevel, grey, palette, RGB (with an alpha extra
+/// sample) and CMYK pixels of 1 to 32 bits per sample.
 /// </summary>
 public static class TiffFile
 {
-    private const ushort ImageWidth = 256, ImageLength = 257, BitsPerSample = 258, Compression = 259, Photometric = 262,
+    private const ushort ImageWidth = 256, ImageLength = 257, BitsPerSample = 258, CompressionTag = 259, PhotometricTag = 262,
         StripOffsets = 273, SamplesPerPixel = 277, RowsPerStrip = 278, StripByteCounts = 279, PlanarConfiguration = 284,
-        Predictor = 317, ColorMap = 320, TileWidth = 322, ExtraSamples = 338, InkSet = 332;
+        PredictorTag = 317, ColorMap = 320, TileWidth = 322, TileLength = 323, TileOffsets = 324, TileByteCounts = 325,
+        InkSet = 332, ExtraSamples = 338, SampleFormat = 339;
 
-    private const ushort None = 1, Lzw = 5, PackBitsCompression = 32773;
+    private const ushort None = 1, Lzw = 5, Deflate = 8, AdobeDeflate = 32946, PackBitsCompression = 32773, ThunderScan = 32809;
 
     private const ushort WhiteIsZero = 0, BlackIsZero = 1, Rgb = 2, Palette = 3, Separated = 5;
 
@@ -46,11 +49,11 @@ public static class TiffFile
             throw new InvalidDataException($"The first IFD at {ifd} lies outside the {data.Length}-byte file.");
         }
 
-        var tags = ReadIfd(file, ifd);
-        return DecodeImage(file, tags, diagnostics ?? []);
+        var image = Image.Read(file, ReadIfd(file, ifd));
+        return image.Decode(file, diagnostics ?? []);
     }
 
-    // The IFD's entries: tag → its values (each widened to uint; RATIONALs are not needed and are skipped).
+    // The IFD's entries: tag → its values (each widened to uint; RATIONALs and the floating types are not needed).
     private static Dictionary<ushort, uint[]> ReadIfd(TiffData file, long ifd)
     {
         var count = file.U16(ifd);
@@ -90,108 +93,319 @@ public static class TiffFile
         return tags;
     }
 
-    private static RgbaBitmap DecodeImage(TiffData file, Dictionary<ushort, uint[]> tags, ICollection<Diagnostic> diagnostics)
+    // One image's layout, read from its tags: what its pixels are and where its strips or tiles lie.
+    private sealed class Image
     {
-        uint One(ushort tag, uint fallback) => tags.TryGetValue(tag, out var v) ? v[0] : fallback;
-        uint Required(ushort tag, string name) =>
-            tags.TryGetValue(tag, out var v) ? v[0] : throw new InvalidDataException($"The image has no {name} (tag {tag}).");
+        public int Width, Height, Samples, Depth, ColorSamples;
+        public uint Photometric, Compression, Predictor, Alpha;
+        public bool Planar;
+        public RgbaColor[]? Map;
 
-        var width = Required(ImageWidth, "ImageWidth");
-        var height = Required(ImageLength, "ImageLength");
-        if (width == 0 || height == 0 || (long)width * height > MaxPixels)
-        {
-            throw new InvalidDataException($"The image is {width} × {height} pixels: none, or more than {MaxPixels}.");
-        }
+        // The units the pixels are stored in (strips or tiles): where each lies in the file and in the image.
+        public readonly List<(long Offset, long Count, int X, int Y, int Width, int Height, int Plane)> Units = [];
 
-        if (tags.ContainsKey(TileWidth))
+        public static Image Read(TiffData file, Dictionary<ushort, uint[]> tags)
         {
-            throw new NotSupportedException("The image is in tiles, which are not read (only strips).");
-        }
+            uint One(ushort tag, uint fallback) => tags.TryGetValue(tag, out var v) ? v[0] : fallback;
+            uint Required(ushort tag, string name) =>
+                tags.TryGetValue(tag, out var v) ? v[0] : throw new InvalidDataException($"The image has no {name} (tag {tag}).");
 
-        var compression = One(Compression, None);
-        if (compression is not (None or Lzw or PackBitsCompression))
-        {
-            throw new NotSupportedException($"The image is compressed with {CompressionName(compression)}, which is not read.");
-        }
-
-        var samples = (int)One(SamplesPerPixel, 1);
-        var bits = tags.TryGetValue(BitsPerSample, out var b) ? b : [1];
-        var depth = (int)bits[0];
-        if (samples is < 1 or > 8 || Array.Exists(bits, x => x != depth) || depth is not (1 or 2 or 4 or 8 or 16))
-        {
-            throw new NotSupportedException($"Samples of {string.Join("/", bits)} bits ({samples} per pixel) are not read.");
-        }
-
-        if (One(PlanarConfiguration, 1) == 2 && samples > 1)
-        {
-            throw new NotSupportedException("The samples are planar (PlanarConfiguration 2), which is not read.");
-        }
-
-        var photometric = Required(Photometric, "PhotometricInterpretation");
-        var colorSamples = photometric switch
-        {
-            WhiteIsZero or BlackIsZero or Palette => 1,
-            Rgb => 3,
-            Separated when One(InkSet, 1) == 1 => 4,
-            _ => throw new NotSupportedException($"Photometric interpretation {photometric} is not read."),
-        };
-        if (samples < colorSamples || photometric is Rgb or Separated && depth < 8)
-        {
-            throw new NotSupportedException($"{samples} samples of {depth} bits for photometric interpretation {photometric} are not read.");
-        }
-
-        var alpha = samples > colorSamples && tags.TryGetValue(ExtraSamples, out var extra) ? extra[0] : 0u;
-        var map = photometric == Palette ? Map(tags, depth) : null;
-
-        var rowBytes = (width * (long)samples * depth + 7) / 8;
-        var rowsPerStrip = Math.Min(One(RowsPerStrip, uint.MaxValue), height);
-        var offsets = tags.TryGetValue(StripOffsets, out var o) ? o : throw new InvalidDataException("The image has no StripOffsets.");
-        var counts = tags.TryGetValue(StripByteCounts, out var c) ? c : throw new InvalidDataException("The image has no StripByteCounts.");
-        var strips = (height + rowsPerStrip - 1) / rowsPerStrip;
-        if (offsets.Length < strips || counts.Length < strips)
-        {
-            throw new InvalidDataException($"The image needs {strips} strips; StripOffsets and StripByteCounts give {Math.Min(offsets.Length, counts.Length)}.");
-        }
-
-        var predictor = One(Predictor, 1);
-        var bitmap = new RgbaBitmap((int)width, (int)height);
-        Array.Fill(bitmap.Pixels, (byte)255);
-        var row = new byte[rowBytes];
-        for (var s = 0; s < strips; s++)
-        {
-            var first = s * rowsPerStrip;
-            var rows = Math.Min(rowsPerStrip, height - first);
-            var expected = rows * rowBytes;
-            var start = (long)offsets[s];
-            var length = Math.Min(counts[s], Math.Max(0, file.Length - start));
-            var packed = file.Slice(start, length);
-            var strip = new byte[expected];
-            var written = compression switch
+            var image = new Image();
+            var width = Required(ImageWidth, "ImageWidth");
+            var height = Required(ImageLength, "ImageLength");
+            if (width == 0 || height == 0 || (long)width * height > MaxPixels)
             {
-                Lzw => LzwDecode(packed, strip),
-                PackBitsCompression => PackBits.Unpack(packed, strip).Written,
-                _ => Copy(packed, strip),
-            };
-            if (written < expected)
-            {
-                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "tiff.short-strip",
-                    $"Strip {s} gives {written} of its {expected} bytes; the rows it lacks are left white."));
+                throw new InvalidDataException($"The image is {width} × {height} pixels: none, or more than {MaxPixels}.");
             }
 
-            var whole = (int)(written / rowBytes);
-            for (var r = 0; r < whole; r++)
+            (image.Width, image.Height) = ((int)width, (int)height);
+            image.Compression = One(CompressionTag, None);
+            if (image.Compression is not (None or Lzw or Deflate or AdobeDeflate or PackBitsCompression or ThunderScan))
             {
-                strip.AsSpan((int)(r * rowBytes), (int)rowBytes).CopyTo(row);
-                if (predictor == 2)
+                throw new NotSupportedException($"The image is compressed with {CompressionName(image.Compression)}, which is not read.");
+            }
+
+            image.Samples = (int)One(SamplesPerPixel, 1);
+            var bits = tags.TryGetValue(BitsPerSample, out var b) ? b : [1];
+            image.Depth = (int)bits[0];
+            if (image.Samples is < 1 or > 8 || Array.Exists(bits, x => x != image.Depth) || image.Depth is < 1 or > 32)
+            {
+                throw new NotSupportedException($"Samples of {string.Join("/", bits)} bits ({image.Samples} per pixel) are not read.");
+            }
+
+            if (One(SampleFormat, 1) is not (1 or 2))
+            {
+                throw new NotSupportedException("The samples are floating point (SampleFormat 3), which is not read.");
+            }
+
+            image.Photometric = Required(PhotometricTag, "PhotometricInterpretation");
+            image.ColorSamples = image.Photometric switch
+            {
+                WhiteIsZero or BlackIsZero or Palette => 1,
+                Rgb => 3,
+                Separated when One(InkSet, 1) == 1 => 4,
+                _ => throw new NotSupportedException($"Photometric interpretation {image.Photometric} ({PhotometricName(image.Photometric)}) is not read."),
+            };
+            if (image.Samples < image.ColorSamples || image.Photometric == Palette && image.Depth > 16)
+            {
+                throw new NotSupportedException($"{image.Samples} samples of {image.Depth} bits for photometric interpretation {image.Photometric} are not read.");
+            }
+
+            if (image.Compression == ThunderScan && (image.Depth != 4 || image.Samples != 1))
+            {
+                throw new NotSupportedException($"ThunderScan compression of {image.Samples} samples of {image.Depth} bits is not read (only 4-bit grey).");
+            }
+
+            image.Predictor = One(PredictorTag, 1);
+            if (image.Predictor == 2 && image.Depth is not (8 or 16 or 32) || image.Predictor > 2)
+            {
+                throw new NotSupportedException($"Predictor {image.Predictor} with {image.Depth}-bit samples is not read.");
+            }
+
+            image.Alpha = image.Samples > image.ColorSamples && tags.TryGetValue(ExtraSamples, out var extra) ? extra[0] : 0u;
+            image.Map = image.Photometric == Palette ? ReadMap(tags, image.Depth) : null;
+            image.Planar = One(PlanarConfiguration, 1) == 2 && image.Samples > 1;
+            var planes = image.Planar ? image.Samples : 1;
+
+            if (tags.ContainsKey(TileWidth))
+            {
+                var tileWidth = (int)Required(TileWidth, "TileWidth");
+                var tileLength = (int)Required(TileLength, "TileLength");
+                if (tileWidth is <= 0 or > 65536 || tileLength is <= 0 or > 65536)
                 {
-                    Undifference(row, samples, depth, file.BigEndian);
+                    throw new InvalidDataException($"Tiles of {tileWidth} × {tileLength} pixels.");
                 }
 
-                WriteRow(bitmap, (int)(first + r), row, photometric, samples, depth, alpha, map, file.BigEndian);
+                var across = (image.Width + tileWidth - 1) / tileWidth;
+                var down = (image.Height + tileLength - 1) / tileLength;
+                // A tiled image's offsets may stand under the strip tags, which libtiff takes as the same fields.
+                var offsets = Values(tags, tags.ContainsKey(TileOffsets) ? TileOffsets : StripOffsets, "TileOffsets", (long)across * down * planes);
+                var counts = Values(tags, tags.ContainsKey(TileByteCounts) ? TileByteCounts : StripByteCounts, "TileByteCounts", (long)across * down * planes);
+                for (var p = 0; p < planes; p++)
+                {
+                    for (var t = 0; t < across * down; t++)
+                    {
+                        var i = p * across * down + t;
+                        image.Units.Add((offsets[i], counts[i], t % across * tileWidth, t / across * tileLength, tileWidth, tileLength, p));
+                    }
+                }
+            }
+            else
+            {
+                var rowsPerStrip = (int)Math.Min(One(RowsPerStrip, uint.MaxValue), (uint)image.Height);
+                var strips = (image.Height + rowsPerStrip - 1) / rowsPerStrip;
+                var offsets = Values(tags, StripOffsets, "StripOffsets", (long)strips * planes);
+                var counts = Values(tags, StripByteCounts, "StripByteCounts", (long)strips * planes);
+                for (var p = 0; p < planes; p++)
+                {
+                    for (var s = 0; s < strips; s++)
+                    {
+                        var first = s * rowsPerStrip;
+                        image.Units.Add((offsets[p * strips + s], counts[p * strips + s], 0, first, image.Width,
+                            Math.Min(rowsPerStrip, image.Height - first), p));
+                    }
+                }
+            }
+
+            return image;
+        }
+
+        private static uint[] Values(Dictionary<ushort, uint[]> tags, ushort tag, string name, long needed)
+        {
+            var values = tags.TryGetValue(tag, out var v) ? v : throw new InvalidDataException($"The image has no {name}.");
+            return values.Length >= needed ? values : throw new InvalidDataException($"The image needs {needed} {name}; it has {values.Length}.");
+        }
+
+        public RgbaBitmap Decode(TiffData file, ICollection<Diagnostic> diagnostics)
+        {
+            var bitmap = new RgbaBitmap(Width, Height);
+            Array.Fill(bitmap.Pixels, (byte)255);
+            var unitSamples = Planar ? 1 : Samples;
+            // Planar images gather each plane's samples first; chunky ones go straight to the pixels.
+            var planes = Planar ? new uint[Samples][] : null;
+            if (planes is not null)
+            {
+                for (var p = 0; p < Samples; p++)
+                {
+                    planes[p] = new uint[(long)Width * Height];
+                }
+            }
+
+            int shortUnits = 0;
+            var pixel = new uint[Samples];
+            foreach (var unit in Units)
+            {
+                var rowBytes = ((long)unit.Width * unitSamples * Depth + 7) / 8;
+                var expected = rowBytes * unit.Height;
+                var start = unit.Offset;
+                var length = Math.Min(unit.Count, Math.Max(0, file.Length - start));
+                var packed = file.Slice(start, length);
+                var buffer = new byte[expected];
+                var written = Compression switch
+                {
+                    Lzw => LzwDecode(packed, buffer),
+                    Deflate or AdobeDeflate => Inflate(packed, buffer),
+                    PackBitsCompression => PackBits.Unpack(packed, buffer).Written,
+                    ThunderScan => ThunderDecode(packed, buffer, unit.Width, unit.Height),
+                    _ => Copy(packed, buffer),
+                };
+                if (written < expected)
+                {
+                    shortUnits++;
+                }
+
+                // One reader over the unit's bytes for its big-endian samples.
+                var reader = file.BigEndian ? new BigEndianReader(buffer) : null;
+                var rows = (int)Math.Min(unit.Height, written / rowBytes);
+                for (var r = 0; r < rows; r++)
+                {
+                    var y = unit.Y + r;
+                    if (y >= Height)
+                    {
+                        break;
+                    }
+
+                    var row = new Row(buffer, (int)(r * rowBytes), (int)rowBytes, reader);
+                    if (Predictor == 2)
+                    {
+                        Undifference(row, unitSamples, Depth);
+                    }
+
+                    var columns = Math.Min(unit.Width, Width - unit.X);
+                    for (var c = 0; c < columns; c++)
+                    {
+                        var x = unit.X + c;
+                        if (planes is not null)
+                        {
+                            planes[unit.Plane][(long)y * Width + x] = row.Sample(c, Depth);
+                            continue;
+                        }
+
+                        for (var s = 0; s < Samples; s++)
+                        {
+                            pixel[s] = row.Sample(c * Samples + s, Depth);
+                        }
+
+                        WritePixel(bitmap, x, y, pixel);
+                    }
+                }
+            }
+
+            if (planes is not null)
+            {
+                for (long i = 0; i < (long)Width * Height; i++)
+                {
+                    for (var s = 0; s < Samples; s++)
+                    {
+                        pixel[s] = planes[s][i];
+                    }
+
+                    WritePixel(bitmap, (int)(i % Width), (int)(i / Width), pixel);
+                }
+            }
+
+            if (shortUnits > 0)
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "tiff.short-strip",
+                    $"{shortUnits} of the image's {Units.Count} strips or tiles give fewer bytes than their rows; what they lack is left white."));
+            }
+
+            return bitmap;
+        }
+
+        // A sample scaled to 8 bits: the high bits of a deeper one; a shallower one spread over 0–255.
+        private int Scaled(uint sample) =>
+            Depth >= 8 ? (int)(sample >> (Depth - 8)) : (int)(sample * 255 / ((1u << Depth) - 1));
+
+        // One pixel's samples into RGBA.
+        private void WritePixel(RgbaBitmap bitmap, int x, int y, uint[] samples)
+        {
+            var at = (y * bitmap.Width + x) * 4;
+            int r, g, b, a = 255;
+            switch (Photometric)
+            {
+                case Palette:
+                    var color = samples[0] < Map!.Length ? Map[samples[0]] : new RgbaColor(0, 0, 0);
+                    (r, g, b) = (color.R, color.G, color.B);
+                    break;
+                case WhiteIsZero or BlackIsZero:
+                    r = g = b = Photometric == WhiteIsZero ? 255 - Scaled(samples[0]) : Scaled(samples[0]);
+                    break;
+                case Rgb:
+                    (r, g, b) = (Scaled(samples[0]), Scaled(samples[1]), Scaled(samples[2]));
+                    break;
+                default:
+                    // CMYK without colour management, as libtiff's RGBA interface converts it: each ink and black
+                    // multiply what is left.
+                    var k = 255 - Scaled(samples[3]);
+                    r = (255 - Scaled(samples[0])) * k / 255;
+                    g = (255 - Scaled(samples[1])) * k / 255;
+                    b = (255 - Scaled(samples[2])) * k / 255;
+                    break;
+            }
+
+            if (Alpha is 1 or 2 && Photometric is Rgb or BlackIsZero or WhiteIsZero)
+            {
+                a = Scaled(samples[ColorSamples]);
+                if (Alpha == 1 && a is > 0 and < 255)
+                {
+                    // Associated alpha: the colour was multiplied by it.
+                    r = Math.Min(255, (r * 255 + a / 2) / a);
+                    g = Math.Min(255, (g * 255 + a / 2) / a);
+                    b = Math.Min(255, (b * 255 + a / 2) / a);
+                }
+            }
+
+            bitmap.Pixels[at] = (byte)r;
+            bitmap.Pixels[at + 1] = (byte)g;
+            bitmap.Pixels[at + 2] = (byte)b;
+            bitmap.Pixels[at + 3] = (byte)a;
+        }
+    }
+
+    // A row of a decoded unit: its bytes, and the unit's reader when the file is big-endian.
+    private readonly record struct Row(byte[] Buffer, int Start, int Length, BigEndianReader? Reader)
+    {
+        // The sample at an index: whole bytes (8, 16, 24, 32 bits) in the file's byte order; other depths as a bit
+        // stream, most significant bit first.
+        public uint Sample(int index, int depth)
+        {
+            switch (depth)
+            {
+                case 8:
+                    return Buffer[Start + index];
+                case 16:
+                    var at16 = Start + index * 2;
+                    return Reader is not null ? Reader.ReadUInt16At(at16) : BinaryPrimitives.ReadUInt16LittleEndian(Buffer.AsSpan(at16));
+                case 24:
+                    var at24 = Start + index * 3;
+                    return Reader is not null
+                        ? (uint)(Reader.ReadUInt16At(at24) << 8 | Buffer[at24 + 2])
+                        : (uint)(Buffer[at24 + 2] << 16 | BinaryPrimitives.ReadUInt16LittleEndian(Buffer.AsSpan(at24)));
+                case 32:
+                    var at32 = Start + index * 4;
+                    return Reader is not null ? Reader.ReadUInt32At(at32) : BinaryPrimitives.ReadUInt32LittleEndian(Buffer.AsSpan(at32));
+                default:
+                    var bit = (long)Start * 8 + (long)index * depth;
+                    uint value = 0;
+                    for (var k = 0; k < depth; k++, bit++)
+                    {
+                        value = (value << 1) | (uint)((Buffer[(int)(bit >> 3)] >> (7 - (int)(bit & 7))) & 1);
+                    }
+
+                    return value;
             }
         }
 
-        return bitmap;
+        // Writes a whole-byte sample back in the file's byte order.
+        public void Put(int index, int size, uint value)
+        {
+            var at = Start + index * size;
+            for (var k = 0; k < size; k++)
+            {
+                Buffer[at + (Reader is not null ? size - 1 - k : k)] = (byte)(value >> (8 * k));
+            }
+        }
     }
 
     private static int Copy(ReadOnlySpan<byte> from, Span<byte> to)
@@ -201,12 +415,32 @@ public static class TiffFile
         return n;
     }
 
-    // TIFF's LZW (TIFF 6.0 §13): codes most significant bit first, 9 to 12 bits, Clear 256, EndOfInformation 257; the
-    // code width grows one code early, as every TIFF writer does (libtiff's "early change"). The 5.0 bit-reversed
-    // variant is not read.
+    // Deflate (zlib) data, as Adobe's and the TIFF 6.0 technical note's code 8 have it.
+    private static int Inflate(ReadOnlySpan<byte> input, Span<byte> output)
+    {
+        using var stream = new ZLibStream(new MemoryStream(input.ToArray()), CompressionMode.Decompress);
+        var written = 0;
+        try
+        {
+            while (written < output.Length && stream.Read(output[written..]) is var n and > 0)
+            {
+                written += n;
+            }
+        }
+        catch (InvalidDataException)
+        {
+            // Damaged data: what was inflated stays.
+        }
+
+        return written;
+    }
+
+    // TIFF's LZW (TIFF 6.0 §13), or TIFF 5.0's: a strip starting with Clear written least significant bit first
+    // (00 01) is the old kind, whose codes are bit-reversed and whose width grows at the usual place, not one code early.
     private static int LzwDecode(ReadOnlySpan<byte> input, Span<byte> output)
     {
         const int Clear = 256, End = 257;
+        var old = input.Length >= 2 && input[0] == 0 && (input[1] & 1) == 1;
         var prefix = new short[4096];
         var suffix = new byte[4096];
         var lengths = new short[4096];
@@ -218,13 +452,16 @@ public static class TiffFile
 
         int next = 258, width = 9, previous = -1, written = 0;
         long bitPos = 0, totalBits = input.Length * 8L;
-        Span<byte> stack = stackalloc byte[4096];
+        Span<byte> stack = stackalloc byte[4097];
         while (bitPos + width <= totalBits && written < output.Length)
         {
             var code = 0;
             for (var k = 0; k < width; k++, bitPos++)
             {
-                code = (code << 1) | ((input[(int)(bitPos >> 3)] >> (7 - (int)(bitPos & 7))) & 1);
+                var bit = old
+                    ? (input[(int)(bitPos >> 3)] >> (int)(bitPos & 7)) & 1
+                    : (input[(int)(bitPos >> 3)] >> (7 - (int)(bitPos & 7))) & 1;
+                code = old ? code | bit << k : (code << 1) | bit;
             }
 
             if (code == End)
@@ -280,7 +517,8 @@ public static class TiffFile
                 suffix[next] = firstByte;
                 lengths[next] = (short)(lengths[previous] + 1);
                 next++;
-                if (next == (1 << width) - 1 && width < 12)
+                var grow = old ? 1 << width : (1 << width) - 1;
+                if (next == grow && width < 12)
                 {
                     width++;
                 }
@@ -292,120 +530,97 @@ public static class TiffFile
         return written;
     }
 
-    // The horizontal predictor (TIFF 6.0 §14): each sample but a row's first is the difference from the one a pixel
-    // before it.
-    private static void Undifference(byte[] row, int samples, int depth, bool bigEndian)
+    // ThunderScan's 4-bit compression (Thunderware's Macintosh scanner software; tiff.md §2.4), row by row: each row
+    // starts from pixel 0. A byte's top two bits say what it is: 00 the last pixel again, as many times as its low six
+    // bits; 01 three 2-bit deltas; 10 two 3-bit deltas; 11 a pixel in its low four bits.
+    private static int ThunderDecode(ReadOnlySpan<byte> input, Span<byte> output, int width, int height)
     {
-        if (depth == 8)
+        ReadOnlySpan<int> twoBit = [0, 1, 0, -1];      // 2 is "skip"
+        ReadOnlySpan<int> threeBit = [0, 1, 2, 3, 0, -3, -2, -1];  // 4 is "skip"
+        var rowBytes = (width + 1) / 2;
+        var at = 0;
+        var rows = 0;
+        for (; rows < height && at < input.Length; rows++)
         {
-            for (var i = samples; i < row.Length; i++)
+            var row = output.Slice(rows * rowBytes, rowBytes);
+            row.Clear();
+            int last = 0, count = 0;
+            void Set(Span<byte> r, int value)
             {
-                row[i] += row[i - samples];
+                last = value & 0xF;
+                if (count < width)
+                {
+                    r[count >> 1] |= (byte)((count & 1) == 0 ? last << 4 : last);
+                }
+
+                count++;
+            }
+
+            while (count < width && at < input.Length)
+            {
+                var n = input[at++];
+                switch (n & 0xC0)
+                {
+                    case 0x00:
+                        for (var k = 0; k < (n & 0x3F); k++)
+                        {
+                            Set(row, last);
+                        }
+
+                        break;
+                    case 0x40:
+                        foreach (var shift in (ReadOnlySpan<int>)[4, 2, 0])
+                        {
+                            var delta = (n >> shift) & 3;
+                            if (delta != 2)
+                            {
+                                Set(row, last + twoBit[delta]);
+                            }
+                        }
+
+                        break;
+                    case 0x80:
+                        foreach (var shift in (ReadOnlySpan<int>)[3, 0])
+                        {
+                            var delta = (n >> shift) & 7;
+                            if (delta != 4)
+                            {
+                                Set(row, last + threeBit[delta]);
+                            }
+                        }
+
+                        break;
+                    default:
+                        Set(row, n);
+                        break;
+                }
+            }
+
+            if (count < width)
+            {
+                break;
             }
         }
-        else if (depth == 16)
-        {
-            var stride = samples * 2;
-            for (var i = stride; i + 1 < row.Length; i += 2)
-            {
-                var sum = (ushort)(Read16(row, i, bigEndian) + Read16(row, i - stride, bigEndian));
-                if (bigEndian)
-                {
-                    BinaryPrimitives.WriteUInt16BigEndian(row.AsSpan(i), sum);
-                }
-                else
-                {
-                    BinaryPrimitives.WriteUInt16LittleEndian(row.AsSpan(i), sum);
-                }
-            }
-        }
+
+        return rows * rowBytes;
     }
 
-    private static ushort Read16(byte[] row, int at, bool bigEndian) =>
-        bigEndian ? new BigEndianReader(row).ReadUInt16At(at) : BinaryPrimitives.ReadUInt16LittleEndian(row.AsSpan(at));
-
-    // One row of samples into RGBA.
-    private static void WriteRow(RgbaBitmap bitmap, int y, byte[] row, uint photometric, int samples, int depth, uint alpha,
-        RgbaColor[]? map, bool bigEndian)
+    // The horizontal predictor (TIFF 6.0 §14): each sample but a row's first is the difference from the one a pixel
+    // before it, modulo its size.
+    private static void Undifference(Row row, int samples, int depth)
     {
-        var width = bitmap.Width;
-        var pixels = bitmap.Pixels;
-        var reader = depth == 16 && bigEndian ? new BigEndianReader(row) : null;
-
-        // A sample scaled to 8 bits (16-bit samples keep their high byte; fewer bits are spread over 0–255).
-        int Sample(int index)
+        var size = depth / 8;
+        var count = row.Length / size;
+        for (var i = samples; i < count; i++)
         {
-            switch (depth)
-            {
-                case 8:
-                    return row[index];
-                case 16:
-                    var v = reader is not null ? reader.ReadUInt16At(index * 2) : BinaryPrimitives.ReadUInt16LittleEndian(row.AsSpan(index * 2));
-                    return v >> 8;
-                default:
-                    var bit = (long)index * depth;
-                    var raw = (row[(int)(bit >> 3)] >> (8 - depth - (int)(bit & 7))) & ((1 << depth) - 1);
-                    return raw;
-            }
-        }
-
-        var max = (1 << Math.Min(depth, 8)) - 1;
-        for (var x = 0; x < width; x++)
-        {
-            var at = (y * width + x) * 4;
-            var first = x * samples;
-            byte r, g, bl, a = 255;
-            switch (photometric)
-            {
-                case Palette:
-                    var index = Sample(first);
-                    var color = index < map!.Length ? map[index] : new RgbaColor(0, 0, 0);
-                    (r, g, bl) = (color.R, color.G, color.B);
-                    break;
-                case WhiteIsZero or BlackIsZero:
-                    var level = (byte)(Sample(first) * 255 / max);
-                    if (photometric == WhiteIsZero)
-                    {
-                        level = (byte)(255 - level);
-                    }
-
-                    r = g = bl = level;
-                    break;
-                case Rgb:
-                    (r, g, bl) = ((byte)Sample(first), (byte)Sample(first + 1), (byte)Sample(first + 2));
-                    break;
-                default:
-                    // CMYK by subtraction: each ink takes away its colour and black takes away all (no colour management).
-                    var k = Sample(first + 3);
-                    r = (byte)Math.Max(0, 255 - Sample(first) - k);
-                    g = (byte)Math.Max(0, 255 - Sample(first + 1) - k);
-                    bl = (byte)Math.Max(0, 255 - Sample(first + 2) - k);
-                    break;
-            }
-
-            if (alpha is 1 or 2 && photometric is Rgb or BlackIsZero or WhiteIsZero)
-            {
-                a = (byte)Sample(first + (photometric == Rgb ? 3 : 1));
-                if (alpha == 1 && a is > 0 and < 255)
-                {
-                    // Associated alpha: the colour was multiplied by it.
-                    r = (byte)Math.Min(255, (r * 255 + a / 2) / a);
-                    g = (byte)Math.Min(255, (g * 255 + a / 2) / a);
-                    bl = (byte)Math.Min(255, (bl * 255 + a / 2) / a);
-                }
-            }
-
-            pixels[at] = r;
-            pixels[at + 1] = g;
-            pixels[at + 2] = bl;
-            pixels[at + 3] = a;
+            row.Put(i, size, row.Sample(i, depth) + row.Sample(i - samples, depth));
         }
     }
 
     // A palette image's ColorMap: all reds, then all greens, then all blues, 16 bits each.
-    private static RgbaColor[] Map(Dictionary<ushort, uint[]> tags, int depth)
+    private static RgbaColor[] ReadMap(Dictionary<ushort, uint[]> tags, int depth)
     {
-        var entries = 1 << Math.Min(depth, 8);
+        var entries = 1 << depth;
         if (!tags.TryGetValue(ColorMap, out var values) || values.Length < 3 * entries)
         {
             throw new InvalidDataException($"A palette image needs a ColorMap of {3 * entries} values.");
@@ -426,9 +641,18 @@ public static class TiffFile
         3 => "CCITT Group 3",
         4 => "CCITT Group 4",
         6 or 7 => "JPEG",
-        8 or 32946 => "Deflate",
         32771 => "NeXT",
+        34676 or 34677 => "SGILog",
         _ => $"scheme {compression}",
+    };
+
+    private static string PhotometricName(uint photometric) => photometric switch
+    {
+        4 => "transparency mask",
+        6 => "YCbCr",
+        8 => "CIE L*a*b*",
+        32844 or 32845 => "LogL/LogLuv",
+        _ => "unknown",
     };
 
     // The file's bytes in its byte order: big-endian through BigEndianReader, little-endian through BinaryPrimitives.
