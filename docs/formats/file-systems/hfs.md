@@ -603,7 +603,9 @@ sectors). For the new size of N' logical blocks [ClassicMac]:
    verify as needing repair: `drClpSiz`, when 0, not a multiple of `drAlBlkSiz` or over a quarter of the volume
    (⌊`drNmAlBlks` ÷ 4⌋ × `drAlBlkSiz`), becomes 4 blocks (one block when 4 blocks are over 1 MB); `drXTClpSiz` and
    `drCTClpSiz`, when not a multiple of `drAlBlkSiz` or over that quarter, become their file's first extent. A volume
-   laid out again in a new geometry (§3.2) does the same. [ClassicMac; found by fuzzing]
+   laid out again in a new geometry (§3.2) does the same, and so does every later write of the MDB: on a volume this
+   small the catalog is over a quarter of it, so its clump stays its first extent as that grows. [ClassicMac; found by
+   fuzzing]
 5. The MDB's block is copied to N' − 2.
 
 The result must pass the writer's checks (§5.5), and every file must read back as the source's, both forks byte for
@@ -874,7 +876,8 @@ header node, then a depth-first walk from the root; %3 = the node):
    and depth 0 → #29. An empty tree (both 0) is not walked.
 2. Walk, each node once, every one of these ending the check: a node reached twice → #23 "Overlapped node
    allocation"; no records and no links → #22; a key longer than 7 (extents) or 37 (catalog) → #25 "Invalid key
-   length"; a key not greater than the one before it in its node (§1.11) → #26 "Keys out of order"; links that do not
+   length", and so is one too short for its fields: an extents key under 7, a catalog key without its name length or
+   shorter than its name [ClassicMac: not traced; Disk First Aid would compare bytes past the key]; a key not greater than the one before it in its node (§1.11) → #26 "Keys out of order"; links that do not
    chain each level's nodes in walk order → #21 "Invalid sibling link"; a first child pointer of 0 or past the last
    node → #20 "Invalid index link"; an extents leaf record whose extent starts or counts at or past `drNmAlBlks`, or
    has blocks after an empty extent → #11 "Invalid extent entry" (a start plus count past the end is not checked).

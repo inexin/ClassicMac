@@ -214,7 +214,7 @@ internal static class HfsResizer
             mdbWriter.WriteUInt16At(0x10, 0);                                          // drAllocPtr
         }
 
-        FitClumpSizes(mdbBytes, count, state.BlockSize);
+        FitClumpSizes(mdbBytes);
         mdbWriter.WriteUInt32At(0x06, MacDate.FromDateTime(Now).Seconds);              // drLsMod
         mdbWriter.WriteUInt32At(0x46, unchecked(mdb.ReadUInt32At(0x46) + 1));                  // drWrCnt
         mdbBytes.CopyTo(result.AsSpan(MdbOffset));
@@ -487,29 +487,6 @@ internal static class HfsResizer
         return GrowBTree(tree, bytes);
     }
 
-    // Clump sizes that no longer fit a new block count are set as First Aid's MDB compare sets them (hfs.md §3.3): the
-    // default clump to 4 blocks (one block over 1 MB), a B-tree's to its first extent.
-    private static void FitClumpSizes(byte[] mdb, long count, uint blockSize)
-    {
-        var reader = new BigEndianReader(mdb);
-        var writer = new BigEndianWriter(mdb);
-        long maxClump = count / 4 * blockSize;
-        uint clump = reader.ReadUInt32At(0x18);
-        if (clump == 0 || clump > maxClump || clump % blockSize != 0)
-        {
-            writer.WriteUInt32At(0x18, 4L * blockSize > 1024 * 1024 ? blockSize : 4L * blockSize);
-        }
-
-        foreach (var (field, firstExtent) in new[] { (0x4A, 0x88), (0x4E, 0x98) })
-        {
-            uint treeClump = reader.ReadUInt32At(field);
-            if (treeClump % blockSize != 0 || treeClump > maxClump)
-            {
-                writer.WriteUInt32At(field, reader.ReadUInt16At(firstExtent) * blockSize);
-            }
-        }
-    }
-
     // The volume laid out again over a template (hfs.md §3.2, §3.4): the template's MDB gives the geometry, clump sizes
     // and the extents tree's place (an empty tree written at block 0); the catalog's nodes are kept (grown to whole blocks
     // and at least catalogBlocks) after it, each file's forks given one extent each in turn after that, and the source
@@ -607,7 +584,7 @@ internal static class HfsResizer
         writerMdb.WriteUInt16At(0x96, extentsBlocks);                                   // drCTExtRec
         writerMdb.WriteUInt16At(0x98, catalogBlocks);
 
-        FitClumpSizes(sector, count, blockSize);
+        FitClumpSizes(sector);
         writerMdb.WriteUInt32At(0x06, MacDate.FromDateTime(Now).Seconds);               // drLsMod
         writerMdb.WriteUInt32At(0x46, unchecked(mdb.ReadUInt32At(0x46) + 1));                   // drWrCnt
         sector.CopyTo(result, MdbOffset);

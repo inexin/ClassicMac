@@ -257,6 +257,7 @@ public static class HfsWriter
             WriteFork(result, firstBlock, blockSize, extFileExtents, extFile);
         }
 
+        FitClumpSizes(mdbOut);
         result.Write(MdbOffset, mdbOut);
         long alternateMdbOffset = result.Length - 2 * BlockSize;
         if (resizeContext.AllocatedTreeBlocks != 0 && alternateMdbOffset >= 0 &&

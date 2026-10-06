@@ -265,6 +265,14 @@ public sealed class PixMap
         }
 
         pm.ReadPixData(b);
+
+        // Empty bounds: no pixel data, but the pattern still tiles one pixel from its base address, which QuickDraw reads
+        // from whatever memory follows; here that is zeros (pict.md §5, damaged pictures) [ClassicMac].
+        if (pm.Data.Length < (pm.PixelSize + 7) / 8)
+        {
+            pm.Data = new byte[(pm.PixelSize + 7) / 8];
+        }
+
         return pm;
     }
 

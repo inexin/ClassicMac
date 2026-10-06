@@ -274,6 +274,37 @@ internal static class HfsCatalogEditing
         return sector;
     }
 
+    // Clump sizes that do not fit the volume are set as First Aid's MDB compare sets them (hfs.md §3.3), so it finds
+    // nothing to repair: the default clump, when 0, not whole blocks or over a quarter of the volume, to 4 blocks (one
+    // block over 1 MB); a B-tree's, when not whole blocks or over that quarter, to its first extent, which a shrunk
+    // volume's catalog outgrows as it grows or is defragmented [ClassicMac].
+    internal static void FitClumpSizes(byte[] mdb)
+    {
+        var reader = new BigEndianReader(mdb);
+        var writer = new BigEndianWriter(mdb);
+        uint blockSize = reader.ReadUInt32At(0x14);
+        if (blockSize == 0)
+        {
+            return;
+        }
+
+        long maxClump = reader.ReadUInt16At(0x12) / 4 * (long)blockSize;
+        uint clump = reader.ReadUInt32At(0x18);
+        if (clump == 0 || clump > maxClump || clump % blockSize != 0)
+        {
+            writer.WriteUInt32At(0x18, 4L * blockSize > 1024 * 1024 ? blockSize : 4L * blockSize);
+        }
+
+        foreach (var (field, firstExtent) in new[] { (0x4A, 0x88), (0x4E, 0x98) })
+        {
+            uint treeClump = reader.ReadUInt32At(field);
+            if (treeClump % blockSize != 0 || treeClump > maxClump)
+            {
+                writer.WriteUInt32At(field, reader.ReadUInt16At(firstExtent) * (long)blockSize);
+            }
+        }
+    }
+
     internal static CatalogEditState OpenCatalog(ForkData image, bool writable = true) => OpenCatalog(new HfsVolume(image), writable);
 
     internal static CatalogEditState OpenCatalog(HfsVolume source, bool writable = true)
@@ -427,6 +458,7 @@ internal static class HfsCatalogEditing
                 state.Result.Write(state.BitmapOffset + at, state.Bitmap.AsSpan(at, length));
             }
         }
+        FitClumpSizes(state.Mdb);
         state.Result.Write(MdbOffset, state.Mdb);
         long alternateMdbOffset = state.Result.Length - 2 * BlockSize;
         if (allocatedSystemBlocks != 0 && alternateMdbOffset >= 0 &&

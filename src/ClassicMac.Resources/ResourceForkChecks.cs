@@ -144,6 +144,13 @@ internal static class ResourceForkChecks
             return (-40, "the map offset is negative");
         }
 
+        // −12 to −1 passes that check; the map is then read from before the fork's start, which the File Manager refuses
+        // (resource-fork.md §2.3, check 3a; not traced).
+        if (mO < 0)
+        {
+            return (-40, "the map starts before the fork");
+        }
+
         if (mO + mL > eof)
         {
             return (-39, "the map cannot be read");

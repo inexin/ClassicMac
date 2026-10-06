@@ -47,14 +47,16 @@ internal sealed class FirstAidTree(int fileId, byte[] bytes, int nodeSize, List<
     };
 
     /// <summary>
-    /// Whether an HFS Plus key's fields fit it: a catalog key's name (8 + 2n bytes), an extents key (12 bytes), an
-    /// attributes key's name (14 + 2n); HFS keys are compared by their own bounds.
+    /// Whether a key's fields fit it: an HFS Plus catalog key's name (8 + 2n bytes), extents key (12 bytes) and
+    /// attributes key's name (14 + 2n); an HFS catalog key's parent ID, name length and name (at least 7 + n bytes) and
+    /// extents key (8 bytes). A key that does not is #25, as one too long is (hfs.md §5.6) [ClassicMac: Disk First Aid
+    /// compares such a key's bytes past it; not traced].
     /// </summary>
     public bool KeyFits(BigEndianReader key)
     {
         if (!Plus)
         {
-            return true;
+            return IsCatalog ? key.Length >= 7 && 7 + key.ReadByteAt(6) <= key.Length : key.Length >= 8;
         }
 
         return FileId switch

@@ -311,6 +311,7 @@ The 68k ROM reads the header as signed longs and checks little [Code: 68k ROM]:
 | 1 | The first 36 bytes can be read | `eofErr` −39 |
 | 2 | `mL` ≥ 12 (the read count stays positive) | `paramErr` −50 |
 | 3 | `mO` + 12 ≥ 0 | `posErr` −40 |
+| 3a | `mO` ≥ 0: an offset of −12 to −1 passes check 3, and the map is then read from before the fork's start [ClassicMac: not traced; the File Manager refuses a negative position] | `posErr` −40 |
 | 4 | `mO` + `mL` ≤ `EOF` (the map can be read) | −39 |
 | 5 | `mL` ≥ 28 | Opens, but reads memory past the map |
 | 6 | max(`dO` + `dL`, `mO` + `mL`) < `$FFFFFF` | −199 |

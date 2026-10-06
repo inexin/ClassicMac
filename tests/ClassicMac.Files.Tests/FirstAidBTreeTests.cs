@@ -80,6 +80,30 @@ public class FirstAidBTreeTests
         Assert.Equal(26, Only(image).Number);
     }
 
+    // Found by fuzzing (first-aid): a catalog key too short for its parent ID and name length, or whose name runs past
+    // it, is an invalid key length too [ClassicMac].
+    [Theory]
+    [InlineData(5, -1)]             // the parent ID but no name length
+    [InlineData(-1, 40)]            // a name longer than the key
+    public void A_catalog_key_too_short_for_its_fields_cannot_be_repaired(int keyLength, int nameLength)
+    {
+        var image = Base();
+        int leaf = CatalogNode(image, FirstLeaf(image));
+        int record = leaf + U16(image, leaf + Sector - 4);
+        if (keyLength >= 0)
+        {
+            image[record] = (byte)keyLength;
+        }
+
+        if (nameLength >= 0)
+        {
+            image[record + 6] = (byte)nameLength;
+        }
+
+        Assert.Equal(25, Only(image).Number);
+        Assert.Equal(FirstAidVerdict.CannotRepair, Verify(image).Verdict);
+    }
+
     [Fact]
     public void A_wrong_node_height_is_repaired_by_rebuilding_the_tree()
     {

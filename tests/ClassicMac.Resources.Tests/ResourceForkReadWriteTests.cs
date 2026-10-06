@@ -417,6 +417,19 @@ public class ResourceForkReadWriteTests
         Assert.DoesNotContain("fork.mac-rejects", Codes(bytes, ResourceManagerModel.Rom68k));
     }
 
+    // Found by fuzzing (resource-fork): a map offset of −12 to −1 passes the ROM's mO + 12 ≥ 0 check, and the map read
+    // before the fork's start fails (posErr).
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(-12)]
+    public void A_map_offset_just_below_zero_is_rejected_by_the_ROM(int mapOffset)
+    {
+        var bytes = Canonical();
+        BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(4), mapOffset);
+        Assert.Contains("fork.mac-rejects", Codes(bytes, ResourceManagerModel.Rom68k));
+        Assert.Contains("fork.mac-rejects", Codes(bytes, ResourceManagerModel.MacOS9));
+    }
+
     [Fact]
     public void A_negative_type_count_is_rejected_by_OS_9_only()
     {

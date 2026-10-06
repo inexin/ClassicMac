@@ -62,6 +62,40 @@ public sealed class HfsResizeTests
             string.Join("; ", report.Problems.Select(p => $"{p.Number} {p.Message} {p.Arg2} {p.Arg3}")));
     }
 
+    // Found by fuzzing (hfs-edit): a volume shrunk to 29 sectors, grown and shrunk again, defragmented, then edited.
+    [Fact]
+    public void A_tiny_volume_resized_and_defragmented_still_passes_First_Aid_after_edits()
+    {
+        var date = new MacDate(3_000_000_000);
+        var image = HfsWriter.Format(409_600, "Fuzz", date);
+        void Check(string after)
+        {
+            var report = HfsFirstAid.Verify(ForkData.FromBytes(image));
+            Assert.True(report.Verdict == FirstAidVerdict.AppearsOk,
+                $"after {after}: " + string.Join("; ", report.Problems.Select(p => $"{p.Number} {p.Message} {p.Arg2} {p.Arg3}")));
+        }
+
+        image = HfsWriter.CreateFolder(ForkData.FromBytes(image), "abb2222", date, date);
+        image = HfsWriter.Defragment(ForkData.FromBytes(image));
+        foreach (var size in new long[] { 62_464, 9_216, 62_464, 14_848 })
+        {
+            image = HfsWriter.Resize(ForkData.FromBytes(image), size);
+            Check($"resizing to {size}");
+        }
+
+        image = HfsWriter.DeleteFolder(ForkData.FromBytes(image), "abb2222");
+        image = HfsWriter.CreateFolder(ForkData.FromBytes(image), "a", date, date);
+        image = HfsWriter.CreateFolder(ForkData.FromBytes(image), "c", date, date);
+        image = HfsWriter.DeleteFolder(ForkData.FromBytes(image), "a");
+        image = HfsWriter.Defragment(ForkData.FromBytes(image));
+        Check("defragmenting");
+        image = HfsWriter.CreateFolder(ForkData.FromBytes(image), "cbdca", date, date);
+        image = HfsWriter.CreateFolder(ForkData.FromBytes(image), "cbdca: ", date, date);
+        Check("making folders");
+        image = HfsWriter.Rename(ForkData.FromBytes(image), "cbdca", "f0é02");
+        Check("renaming");
+    }
+
     private static void AssertSameFiles(byte[] before, byte[] after)
     {
         var old = Files(before);

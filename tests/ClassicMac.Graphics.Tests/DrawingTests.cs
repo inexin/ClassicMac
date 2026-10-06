@@ -267,6 +267,27 @@ public class DrawingTests
         }
     }
 
+    // Found by fuzzing (pict): a pixel pattern whose pixmap bounds are empty has no pixel data; QuickDraw reads whatever
+    // memory follows, here zeros, so index 0 (black in an empty colour table) on both QuickDraws.
+    [Theory]
+    [InlineData(QuickDrawVersion.MacOS9, 0, 0)]
+    [InlineData(QuickDrawVersion.MacRom, 0, 0)]
+    [InlineData(QuickDrawVersion.MacOS9, -32, 44)]       // as wide as 44 pixels, but upside down
+    public void PixelPattern_WithEmptyBoundsPaintsItsZeroPixel(QuickDrawVersion quickDraw, int bottom, int right)
+    {
+        var bmp = Draw(2, 1, b =>
+        {
+            b.U16(0x0013).U16(1).Zeros(8);                                       // PnPixPat, a pixmap pattern
+            b.U16(0x8002).Rect(0, 0, bottom, right);                            // rowBytes 2, empty bounds
+            b.U16(0).U16(0).Zeros(4).U16(0x48).U16(0).U16(0x48).U16(0);         // pmVersion, packType, packSize, hRes, vRes
+            b.U16(0).U16(8).U16(1).U16(8).Zeros(12);                            // pixelType, pixelSize 8, cmpCount, cmpSize, …
+            b.Zeros(4).U16(0).U16(0xFFFF);                                      // an empty colour table
+            b.U16(0x0031).Rect(0, 0, 1, 2);                                     // paintRect
+        }, new PictDecodeOptions { QuickDraw = quickDraw });
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[1, 0]);
+    }
+
     [Fact]
     public void ArithmeticBlend_WeightsByOpColor()
     {

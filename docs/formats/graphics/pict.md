@@ -586,7 +586,8 @@ Picture recording (§3.3) differs [Code: 68k ROM $077D] [Code: Mac OS 9.0 QuickD
   it) is refused with `InvalidDataException`, since the 68k's `DIVU` traps on a zero divisor (a "zero divide" system
   error). A BitMap or PixMap whose rowBytes is too small for its width is drawn with its rows overlapping as QuickDraw
   reads them; what the last row would read past the pixel data is zeros, where the Mac reads whatever memory follows.
-  Both modes. [ClassicMac]
+  A pixel pattern whose pixel map has empty bounds has no pixel data but still tiles one pixel, read the same way:
+  zeros, so pixel value 0. Both modes. [ClassicMac]
 - **Size limit:** a picture whose canvas (§2.2) has more than `PictDecodeOptions.MaxPixels` pixels (64 Mi by
   default) is refused with `InvalidDataException` before anything is allocated; the Mac has no such limit, as
   DrawPicture draws into the port, clipped to it. `ClassicMac.Resources.Decoders` passes `DecodeOptions.MaxImagePixels`.

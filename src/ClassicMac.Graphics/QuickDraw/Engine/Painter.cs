@@ -177,9 +177,11 @@ internal static class Painter
         return clip == null ? area : area.Intersect(clip);
     }
 
+    // A pattern's pixel at (x, y), tiled; empty bounds tile one pixel (pict.md §5, damaged pictures) [ClassicMac].
     private static RgbaColor PatternPixel(PixMap pm, int x, int y)
     {
-        int w = Math.Max(1, pm.Width), h = Math.Max(1, pm.Height);
+        bool empty = pm.Width <= 0 || pm.Height <= 0;
+        int w = empty ? 1 : pm.Width, h = empty ? 1 : pm.Height;
         return pm.GetPixel(((x % w) + w) % w, ((y % h) + h) % h);
     }
 
