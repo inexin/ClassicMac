@@ -54,7 +54,7 @@ A count (2 bytes), that many 12-byte entries sorted by tag, then the next IFD's 
 | 257 | ImageLength | (required) | Rows [Author] |
 | 258 | BitsPerSample | 1 | One value per sample [Author] |
 | 259 | Compression | 1 | 1 none, 2 CCITT modified Huffman, 3 CCITT Group 3, 4 CCITT Group 4, 5 LZW, 8 and 32946 Deflate, 32771 word-aligned modified Huffman, 32773 PackBits, 32809 ThunderScan [Author] |
-| 262 | PhotometricInterpretation | (required) | 0 WhiteIsZero, 1 BlackIsZero, 2 RGB, 3 palette, 5 separated (CMYK) [Author] |
+| 262 | PhotometricInterpretation | (required) | 0 WhiteIsZero, 1 BlackIsZero, 2 RGB, 3 palette, 5 separated (CMYK), 6 YCbCr, 8 CIE L\*a\*b\*, 9 ICC L\*a\*b\* [Author] |
 | 266 | FillOrder | 1 | 1 most significant bit first; 2 least significant first [Author] |
 | 273 | StripOffsets | (required for strips) | One per strip, per plane when planar [Author] |
 | 277 | SamplesPerPixel | 1 | [Author] |
@@ -62,13 +62,16 @@ A count (2 bytes), that many 12-byte entries sorted by tag, then the next IFD's 
 | 279 | StripByteCounts | (required for strips) | Compressed bytes per strip [Author] |
 | 284 | PlanarConfiguration | 1 | 1 chunky (a pixel's samples together), 2 planar (a plane per sample) [Author] |
 | 292 | T4Options | 0 | Bit 0 two-dimensional coding; bit 2 fill bits before each EOL [Author] |
-| 317 | Predictor | 1 | 2 the horizontal predictor [Author] |
+| 317 | Predictor | 1 | 2 the horizontal predictor; 3 the floating-point predictor [Author] |
 | 320 | ColorMap | | 3 × 2^bits SHORTs: all reds, all greens, all blues; 0–65535 [Author] |
 | 322, 323 | TileWidth, TileLength | | Present only in a tiled image [Author] |
 | 324, 325 | TileOffsets, TileByteCounts | | One per tile, per plane when planar, tiles left to right, top to bottom [Author] |
 | 332 | InkSet | 1 | 1 CMYK [Author] |
 | 338 | ExtraSamples | | 0 unspecified, 1 associated alpha (premultiplied), 2 unassociated alpha [Author] |
 | 339 | SampleFormat | 1 | 1 unsigned, 2 signed integer, 3 IEEE floating point [Author] |
+| 529 | YCbCrCoefficients | 299/1000, 587/1000, 114/1000 | LumaRed, LumaGreen, LumaBlue (RATIONALs) [Author] |
+| 530 | YCbCrSubSampling | 2, 2 | Horizontal and vertical: 1, 2 or 4 each [Author] |
+| 532 | ReferenceBlackWhite | 0, 255, 128, 255, 128, 255 | Footroom and headroom of Y, Cb, Cr (RATIONALs) [Author] |
 
 ### 1.4 Rows
 
@@ -136,6 +139,28 @@ white [Author]. With FillOrder 2 each byte's bits are reversed first [Author].
    T.6].
 5. **Group 4** (4): two-dimensional rows without EOLs or alignment [Author: ITU-T T.6].
 
+### 2.6 YCbCr
+
+Without subsampling (1, 1) a pixel's samples are Y, Cb, Cr. Subsampled, the data comes in units of
+YCbCrSubSampling[0] × YCbCrSubSampling[1] Y samples (row by row within the unit) followed by one Cb and one Cr,
+the units left to right, then down; units past the image's right or bottom edge are padded [Author: TIFF 6.0 §21].
+Each component is first scaled by ReferenceBlackWhite, Y to 0–255 and Cb and Cr to ±127, then
+R = Y + Cr × (2 − 2 × LumaRed), B = Y + Cb × (2 − 2 × LumaBlue), G = (Y − LumaBlue × B − LumaRed × R) / LumaGreen
+[Author: TIFF 6.0 §21].
+
+### 2.7 CIE L\*a\*b\*
+
+L runs over the sample's range for 0–100; a\* and b\* are two's complement numbers (CIELab, 8) or numbers about the
+middle of their range (ICCLab, 9), in units of 1 at 8 bits and 1/256 at 16 [Author: TIFF 6.0 §23; Adobe TIFF
+Technical Note: ICCLab].
+
+### 2.8 Sample formats and the floating-point predictor
+
+SampleFormat 2 samples are two's complement; 3 are IEEE 754 numbers of 16, 32 or 64 bits [Author]. The floating-point
+predictor (3) splits each row's samples into byte planes, most significant byte first, then codes each byte as the
+difference from the one a pixel (as many bytes as there are samples) before it [Author: Adobe Photoshop TIFF
+Technical Note 3].
+
 ## 3. Writing
 
 None.
@@ -154,6 +179,11 @@ None.
 - The first image of the file is read; further IFDs (pages, thumbnails) are not. [ClassicMac]
 - Samples deeper than 8 bits keep their high 8 bits; shallower ones are spread over 0–255; a palette index uses all
   its bits. [ClassicMac]
+- Signed samples are moved up by half their range. Floating-point samples between 0 and 1 are levels; an image
+  whose colour samples reach outside 0–1 is stretched linearly from its smallest to its largest value (a
+  satellite or scientific image has no white). [ClassicMac]
+- YCbCr is converted with the image's coefficients and reference black and white, without filtering the
+  subsampled chroma; CIE L\*a\*b\* becomes sRGB through XYZ with the D65 white. [ClassicMac]
 - CMYK becomes RGB without colour management, as libtiff's RGBA interface converts it: R = (255 − C) × (255 − K) / 255,
   likewise G and B. [Reference: libtiff]
 - Associated alpha is divided out, rounded; RGB and grey take alpha, palette and CMYK do not. [ClassicMac]
@@ -176,6 +206,9 @@ None.
   RGB; palettes of 4 and 16 bits; PackBits; LZW past 9-bit codes with the predictor over two strips; TIFF 5.0 LZW;
   Deflate; ThunderScan; planar samples; tiles cut at the edge; alpha, associated and not; 16-bit RGB; CMYK; a short
   strip; what is not read; damage; other files.
+- `tests/ClassicMac.Graphics.Tests/TiffColorTests.cs`: YCbCr with and without subsampling, its coefficients and
+  reference black and white; CIELab and ICCLab; signed samples; 16-, 32- and 64-bit floats, in and outside 0–1;
+  the floating-point predictor.
 - `tests/ClassicMac.Graphics.Tests/TiffFaxTests.cs`: modified Huffman, word-aligned rows, makeup and extended codes,
   Group 3 one- and two-dimensional, fill bits before EOLs, Group 4 vertical and pass modes, FillOrder 2, BlackIsZero,
   damaged data.
@@ -184,15 +217,19 @@ None.
   `cramps.tif` (big-endian PackBits), `cramps-tile.tif` and `quad-tile.tif` (tiles), `jello.tif`, `strike.tif` (LZW
   palette, RGBA), `ladoga.tif` (16-bit Deflate), `oxford.tif` (planar LZW), `pc260001.tif`, the `jim___*` halftones
   and the `depth/flower-*` set (grey, palette, RGB chunky and planar, CMYK, 2 to 32 bits), and `fax2d.tif` and
-  `g3test.tif` (Group 3 two- and one-dimensional), all match within 1 level.
+  `g3test.tif` (Group 3 two- and one-dimensional), and `ycbcr-cat.tif` (subsampled YCbCr), all match within 1 level.
+  `caspian.tif` (64-bit floats with Deflate), which ImageSharp draws as stripes, shows the satellite image;
+  `dscf0013.tif` (a camera's YCbCr) and the 16-bit and planar CMYK images, which ImageSharp does not read, were
+  checked by eye.
   `quad-lzw.tif` (TIFF 5.0 LZW) and `text.tif` (ThunderScan, a scanned Mac printout), which ImageSharp does not read,
   were checked by eye; `text.tif`'s last strip holds 36 of its 39 rows.
 
 ## 8. Not covered
 
 - Compression: JPEG (6, 7), SGILog (34676, 34677), NeXT (32766) and others; CCITT's uncompressed mode (T.4 extensions).
-- Photometric interpretations: YCbCr (6), CIE L\*a\*b\* (8), LogL and LogLuv; CMYK ink sets other than 1.
-- Floating-point samples (SampleFormat 3) and the floating-point predictor (3).
+- Photometric interpretations: ITU L\*a\*b\* (10), LogL and LogLuv; CMYK ink sets other than 1; subsampled YCbCr
+  that is planar, not 8-bit or with a predictor.
+- 24-bit floating-point samples.
 - More than one image; colour management (ICC profiles); writing TIFF.
 
 ## 9. References

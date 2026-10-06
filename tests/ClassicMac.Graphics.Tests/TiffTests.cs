@@ -6,10 +6,10 @@ namespace ClassicMac.Graphics.Tests;
 // strips, the horizontal predictor, bilevel, grey, palette, RGB (with alpha) and CMYK pixels.
 public class TiffTests
 {
-    private const ushort Short = 3, Long = 4;
+    internal const ushort Short = 3, Long = 4, Rational = 5;
 
     // A TIFF built tag by tag: one IFD, then the strips, in either byte order.
-    private sealed class TiffBuilder(bool bigEndian = true)
+    internal sealed class TiffBuilder(bool bigEndian = true)
     {
         private readonly SortedDictionary<ushort, (ushort Type, uint[] Values)> tags = [];
         private readonly List<byte[]> strips = [];
@@ -63,7 +63,7 @@ public class TiffTests
             {
                 U16(tag);
                 U16(type);
-                U32((uint)values.Length);
+                U32((uint)(type == Rational ? values.Length / 2 : values.Length));
                 var size = type == Short ? 2 : 4;
                 var body = new List<byte>();
                 foreach (var v in values)
@@ -475,7 +475,7 @@ public class TiffTests
     [Theory]
     [InlineData(259, 7, "JPEG")]
     [InlineData(259, 4, "CCITT")]
-    [InlineData(262, 6, "YCbCr")]
+    [InlineData(262, 4, "transparency mask")]
     [InlineData(339, 3, "floating point")]
     public void What_is_not_read_is_named(ushort tag, uint value, string what)
     {

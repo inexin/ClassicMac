@@ -18,12 +18,14 @@ public static class TiffFile
     private const ushort ImageWidth = 256, ImageLength = 257, BitsPerSample = 258, CompressionTag = 259, PhotometricTag = 262,
         StripOffsets = 273, SamplesPerPixel = 277, RowsPerStrip = 278, StripByteCounts = 279, PlanarConfiguration = 284,
         PredictorTag = 317, ColorMap = 320, TileWidth = 322, TileLength = 323, TileOffsets = 324, TileByteCounts = 325,
-        InkSet = 332, ExtraSamples = 338, SampleFormat = 339, FillOrder = 266, T4Options = 292;
+        InkSet = 332, ExtraSamples = 338, SampleFormat = 339, FillOrder = 266, T4Options = 292,
+        YCbCrCoefficients = 529, YCbCrSubSampling = 530, ReferenceBlackWhite = 532;
 
     private const ushort None = 1, Lzw = 5, Deflate = 8, AdobeDeflate = 32946, PackBitsCompression = 32773, ThunderScan = 32809,
         CcittRle = 2, CcittGroup3 = 3, CcittGroup4 = 4, CcittRlew = 32771;
 
-    private const ushort WhiteIsZero = 0, BlackIsZero = 1, Rgb = 2, Palette = 3, Separated = 5;
+    private const ushort WhiteIsZero = 0, BlackIsZero = 1, Rgb = 2, Palette = 3, Separated = 5, YCbCr = 6, CieLab = 8,
+        IccLab = 9;
 
     /// <summary>The most pixels an image may have (width × height). Default 64 Mi.</summary>
     public const long MaxPixels = 64L * 1024 * 1024;
@@ -50,12 +52,14 @@ public static class TiffFile
             throw new InvalidDataException($"The first IFD at {ifd} lies outside the {data.Length}-byte file.");
         }
 
-        var image = Image.Read(file, ReadIfd(file, ifd));
+        var rationals = new Dictionary<ushort, double[]>();
+        var image = Image.Read(file, ReadIfd(file, ifd, rationals), rationals);
         return image.Decode(file, diagnostics ?? []);
     }
 
-    // The IFD's entries: tag → its values (each widened to uint; RATIONALs and the floating types are not needed).
-    private static Dictionary<ushort, uint[]> ReadIfd(TiffData file, long ifd)
+    // The IFD's entries: tag → its values, each widened to uint; RATIONAL and SRATIONAL ones go to rationals as
+    // numbers. The floating types are not needed.
+    private static Dictionary<ushort, uint[]> ReadIfd(TiffData file, long ifd, Dictionary<ushort, double[]> rationals)
     {
         var count = file.U16(ifd);
         if (count == 0 || ifd + 2 + count * 12L > file.Length)
@@ -70,7 +74,7 @@ public static class TiffFile
             var tag = file.U16(entry);
             var type = file.U16(entry + 2);
             long n = file.U32(entry + 4);
-            var size = type switch { 1 or 2 or 6 or 7 => 1, 3 or 8 => 2, 4 or 9 => 4, _ => 0 };
+            var size = type switch { 1 or 2 or 6 or 7 => 1, 3 or 8 => 2, 4 or 9 => 4, 5 or 10 => 8, _ => 0 };
             if (size == 0 || n == 0)
             {
                 continue;
@@ -80,6 +84,21 @@ public static class TiffFile
             if (n > file.Length || at + n * size > file.Length)
             {
                 throw new InvalidDataException($"Tag {tag}'s {n} values lie outside the file.");
+            }
+
+            if (size == 8)
+            {
+                var numbers = new double[n];
+                for (var k = 0; k < n; k++)
+                {
+                    uint numerator = file.U32(at + k * 8L), denominator = file.U32(at + k * 8L + 4);
+                    numbers[k] = type == 10
+                        ? (denominator == 0 ? 0 : (double)(int)numerator / (int)denominator)
+                        : (denominator == 0 ? 0 : (double)numerator / denominator);
+                }
+
+                rationals[tag] = numbers;
+                continue;
             }
 
             var values = new uint[n];
@@ -98,14 +117,20 @@ public static class TiffFile
     private sealed class Image
     {
         public int Width, Height, Samples, Depth, ColorSamples;
-        public uint Photometric, Compression, Predictor, Alpha, FaxOptions;
+        public uint Photometric, Compression, Predictor, Alpha, FaxOptions, Format;
         public bool Planar, Reversed;
         public RgbaColor[]? Map;
+        public int SubH = 1, SubV = 1;
+        public double[] Coefficients = [0.299, 0.587, 0.114];
+        public double[] Reference = [0, 255, 128, 255, 128, 255];
+        public double FloatLow, FloatHigh = 1;
+
+        public bool Float => Format == 3;
 
         // The units the pixels are stored in (strips or tiles): where each lies in the file and in the image.
         public readonly List<(long Offset, long Count, int X, int Y, int Width, int Height, int Plane)> Units = [];
 
-        public static Image Read(TiffData file, Dictionary<ushort, uint[]> tags)
+        public static Image Read(TiffData file, Dictionary<ushort, uint[]> tags, Dictionary<ushort, double[]> rationals)
         {
             uint One(ushort tag, uint fallback) => tags.TryGetValue(tag, out var v) ? v[0] : fallback;
             uint Required(ushort tag, string name) =>
@@ -130,14 +155,16 @@ public static class TiffFile
             image.Samples = (int)One(SamplesPerPixel, 1);
             var bits = tags.TryGetValue(BitsPerSample, out var b) ? b : [1];
             image.Depth = (int)bits[0];
-            if (image.Samples is < 1 or > 8 || Array.Exists(bits, x => x != image.Depth) || image.Depth is < 1 or > 32)
+            image.Format = One(SampleFormat, 1);
+            if (image.Format is not (1 or 2 or 3))
             {
-                throw new NotSupportedException($"Samples of {string.Join("/", bits)} bits ({image.Samples} per pixel) are not read.");
+                throw new NotSupportedException($"SampleFormat {image.Format} is not read.");
             }
 
-            if (One(SampleFormat, 1) is not (1 or 2))
+            var depthRead = image.Float ? image.Depth is 16 or 32 or 64 : image.Depth is >= 1 and <= 32;
+            if (image.Samples is < 1 or > 8 || Array.Exists(bits, x => x != image.Depth) || !depthRead)
             {
-                throw new NotSupportedException("The samples are floating point (SampleFormat 3), which is not read.");
+                throw new NotSupportedException($"Samples of {string.Join("/", bits)} bits ({image.Samples} per pixel{(image.Float ? ", floating point" : "")}) are not read.");
             }
 
             image.Photometric = Required(PhotometricTag, "PhotometricInterpretation");
@@ -146,9 +173,11 @@ public static class TiffFile
                 WhiteIsZero or BlackIsZero or Palette => 1,
                 Rgb => 3,
                 Separated when One(InkSet, 1) == 1 => 4,
+                YCbCr or CieLab or IccLab => 3,
                 _ => throw new NotSupportedException($"Photometric interpretation {image.Photometric} ({PhotometricName(image.Photometric)}) is not read."),
             };
-            if (image.Samples < image.ColorSamples || image.Photometric == Palette && image.Depth > 16)
+            if (image.Samples < image.ColorSamples || image.Photometric == Palette && (image.Depth > 16 || image.Float)
+                || image.Photometric is YCbCr or CieLab or IccLab && image.Float)
             {
                 throw new NotSupportedException($"{image.Samples} samples of {image.Depth} bits for photometric interpretation {image.Photometric} are not read.");
             }
@@ -166,9 +195,49 @@ public static class TiffFile
             image.FaxOptions = One(T4Options, 0);
             image.Reversed = One(FillOrder, 1) == 2;
             image.Predictor = One(PredictorTag, 1);
-            if (image.Predictor == 2 && image.Depth is not (8 or 16 or 32) || image.Predictor > 2)
+            var predictorRead = image.Predictor switch
             {
-                throw new NotSupportedException($"Predictor {image.Predictor} with {image.Depth}-bit samples is not read.");
+                1 => true,
+                2 => !image.Float && image.Depth is 8 or 16 or 32,
+                3 => image.Float,
+                _ => false,
+            };
+            if (!predictorRead)
+            {
+                throw new NotSupportedException($"Predictor {image.Predictor} with {image.Depth}-bit {(image.Float ? "floating-point" : "integer")} samples is not read.");
+            }
+
+            if (image.Photometric == YCbCr)
+            {
+                if (tags.TryGetValue(YCbCrSubSampling, out var sub) && sub.Length >= 2)
+                {
+                    (image.SubH, image.SubV) = ((int)sub[0], (int)sub[1]);
+                }
+                else
+                {
+                    (image.SubH, image.SubV) = (2, 2);
+                }
+
+                if (image.SubH is not (1 or 2 or 4) || image.SubV is not (1 or 2 or 4))
+                {
+                    throw new InvalidDataException($"YCbCr subsampling {image.SubH} × {image.SubV}.");
+                }
+
+                if ((image.SubH, image.SubV) != (1, 1) && (image.Depth != 8 || One(PlanarConfiguration, 1) == 2 || image.Predictor != 1 || image.Samples != 3))
+                {
+                    throw new NotSupportedException("Subsampled YCbCr other than 8-bit, chunky and without a predictor is not read.");
+                }
+
+                if (rationals.TryGetValue(YCbCrCoefficients, out var luma) && luma.Length >= 3 && luma[1] > 0)
+                {
+                    image.Coefficients = luma[..3];
+                }
+            }
+
+            if (rationals.TryGetValue(ReferenceBlackWhite, out var reference) && reference.Length >= 6
+                && reference[1] > reference[0] && reference[3] > reference[2] && reference[5] > reference[4])
+            {
+                image.Reference = reference[..6];
             }
 
             image.Alpha = image.Samples > image.ColorSamples && tags.TryGetValue(ExtraSamples, out var extra) ? extra[0] : 0u;
@@ -230,22 +299,27 @@ public static class TiffFile
             var bitmap = new RgbaBitmap(Width, Height);
             Array.Fill(bitmap.Pixels, (byte)255);
             var unitSamples = Planar ? 1 : Samples;
-            // Planar images gather each plane's samples first; chunky ones go straight to the pixels.
-            var planes = Planar ? new uint[Samples][] : null;
-            if (planes is not null)
+            // Planar and floating-point images gather their samples first (a plane each; floats for their range);
+            // others go straight to the pixels.
+            var gathered = Planar || Float ? new double[Samples][] : null;
+            if (gathered is not null)
             {
                 for (var p = 0; p < Samples; p++)
                 {
-                    planes[p] = new uint[(long)Width * Height];
+                    gathered[p] = new double[(long)Width * Height];
                 }
             }
 
             int shortUnits = 0;
-            var pixel = new uint[Samples];
+            var pixel = new double[Samples];
             foreach (var unit in Units)
             {
+                var subsampled = Photometric == YCbCr && !Planar && (SubH, SubV) != (1, 1);
                 var rowBytes = ((long)unit.Width * unitSamples * Depth + 7) / 8;
-                var expected = rowBytes * unit.Height;
+                var blockBytes = SubH * SubV + 2;
+                var expected = subsampled
+                    ? (long)((unit.Width + SubH - 1) / SubH) * ((unit.Height + SubV - 1) / SubV) * blockBytes
+                    : rowBytes * unit.Height;
                 var start = unit.Offset;
                 var length = Math.Min(unit.Count, Math.Max(0, file.Length - start));
                 var packed = file.Slice(start, length);
@@ -276,6 +350,12 @@ public static class TiffFile
                     shortUnits++;
                 }
 
+                if (subsampled)
+                {
+                    WriteBlocks(bitmap, unit.X, unit.Y, unit.Width, unit.Height, buffer, written);
+                    continue;
+                }
+
                 // One reader over the unit's bytes for its big-endian samples.
                 var reader = file.BigEndian ? new BigEndianReader(buffer) : null;
                 var rows = (int)Math.Min(unit.Height, written / rowBytes);
@@ -292,20 +372,34 @@ public static class TiffFile
                     {
                         Undifference(row, unitSamples, Depth);
                     }
+                    else if (Predictor == 3)
+                    {
+                        FloatUndifference(row, unitSamples, Depth);
+                    }
 
                     var columns = Math.Min(unit.Width, Width - unit.X);
                     for (var c = 0; c < columns; c++)
                     {
                         var x = unit.X + c;
-                        if (planes is not null)
+                        if (gathered is not null)
                         {
-                            planes[unit.Plane][(long)y * Width + x] = row.Sample(c, Depth);
+                            if (Planar)
+                            {
+                                gathered[unit.Plane][(long)y * Width + x] = Value(row.Sample(c, Depth));
+                                continue;
+                            }
+
+                            for (var s = 0; s < Samples; s++)
+                            {
+                                gathered[s][(long)y * Width + x] = Value(row.Sample(c * Samples + s, Depth));
+                            }
+
                             continue;
                         }
 
                         for (var s = 0; s < Samples; s++)
                         {
-                            pixel[s] = row.Sample(c * Samples + s, Depth);
+                            pixel[s] = Value(row.Sample(c * Samples + s, Depth));
                         }
 
                         WritePixel(bitmap, x, y, pixel);
@@ -313,13 +407,36 @@ public static class TiffFile
                 }
             }
 
-            if (planes is not null)
+            if (gathered is not null)
             {
+                if (Float)
+                {
+                    // Floats in 0–1 are levels; others are stretched over the range the colour samples span.
+                    (FloatLow, FloatHigh) = (0, 1);
+                    double low = double.MaxValue, high = double.MinValue;
+                    for (var s = 0; s < ColorSamples; s++)
+                    {
+                        foreach (var v in gathered[s])
+                        {
+                            if (double.IsFinite(v))
+                            {
+                                low = Math.Min(low, v);
+                                high = Math.Max(high, v);
+                            }
+                        }
+                    }
+
+                    if (low < 0 || high > 1)
+                    {
+                        (FloatLow, FloatHigh) = (low, high > low ? high : low + 1);
+                    }
+                }
+
                 for (long i = 0; i < (long)Width * Height; i++)
                 {
                     for (var s = 0; s < Samples; s++)
                     {
-                        pixel[s] = planes[s][i];
+                        pixel[s] = gathered[s][i];
                     }
 
                     WritePixel(bitmap, (int)(i % Width), (int)(i / Width), pixel);
@@ -335,40 +452,165 @@ public static class TiffFile
             return bitmap;
         }
 
-        // A sample scaled to 8 bits: the high bits of a deeper one; a shallower one spread over 0–255.
-        private int Scaled(uint sample) =>
-            Depth >= 8 ? (int)(sample >> (Depth - 8)) : (int)(sample * 255 / ((1u << Depth) - 1));
+        // A sample's bits as a number: unsigned, signed (two's complement) or IEEE floating point.
+        private double Value(ulong raw)
+        {
+            switch (Format)
+            {
+                case 2:
+                    var shift = 64 - Depth;
+                    return (long)(raw << shift) >> shift;
+                case 3:
+                    return Depth switch
+                    {
+                        16 => (double)BitConverter.UInt16BitsToHalf((ushort)raw),
+                        32 => BitConverter.UInt32BitsToSingle((uint)raw),
+                        64 => BitConverter.UInt64BitsToDouble(raw),
+                        _ => 0,
+                    };
+                default:
+                    return raw;
+            }
+        }
 
-        // One pixel's samples into RGBA.
-        private void WritePixel(RgbaBitmap bitmap, int x, int y, uint[] samples)
+        // A colour sample's value as a level 0–255: an integer's high 8 bits (a signed one first moved up by half its
+        // range), a shallower integer spread over 0–255, a float by its range.
+        private int Level(double value)
+        {
+            switch (Format)
+            {
+                case 3:
+                    var level = (value - FloatLow) / (FloatHigh - FloatLow) * 255;
+                    return double.IsNaN(level) ? 0 : (int)Math.Round(Math.Clamp(level, 0, 255));
+                case 2:
+                    value += Math.Pow(2, Depth - 1);
+                    break;
+            }
+
+            var raw = (ulong)value;
+            return Depth >= 8 ? (int)(raw >> (Depth - 8)) : (int)(raw * 255 / ((1UL << Depth) - 1));
+        }
+
+        // Subsampled YCbCr data units (TIFF 6.0 §21): each SubH × SubV luma samples, row by row, then Cb and Cr.
+        private void WriteBlocks(RgbaBitmap bitmap, int x0, int y0, int unitWidth, int unitHeight, byte[] buffer, long written)
+        {
+            var across = (unitWidth + SubH - 1) / SubH;
+            var down = (unitHeight + SubV - 1) / SubV;
+            var blockBytes = SubH * SubV + 2;
+            for (var by = 0; by < down; by++)
+            {
+                for (var bx = 0; bx < across; bx++)
+                {
+                    var at = ((long)by * across + bx) * blockBytes;
+                    if (at + blockBytes > written)
+                    {
+                        return;
+                    }
+
+                    var cb = buffer[at + SubH * SubV];
+                    var cr = buffer[at + SubH * SubV + 1];
+                    for (var j = 0; j < SubV; j++)
+                    {
+                        for (var i = 0; i < SubH; i++)
+                        {
+                            var x = x0 + bx * SubH + i;
+                            var y = y0 + by * SubV + j;
+                            if (x >= Width || y >= Height || x >= x0 + unitWidth || y >= y0 + unitHeight)
+                            {
+                                continue;
+                            }
+
+                            var (r, g, b) = FromYCbCr(buffer[at + j * SubH + i], cb, cr);
+                            var p = (y * Width + x) * 4;
+                            (bitmap.Pixels[p], bitmap.Pixels[p + 1], bitmap.Pixels[p + 2], bitmap.Pixels[p + 3]) = (r, g, b, 255);
+                        }
+                    }
+                }
+            }
+        }
+
+        // YCbCr to RGB (TIFF 6.0 §21): each component scaled by ReferenceBlackWhite (Y to 0–255, Cb and Cr to ±127),
+        // then R = Y + Cr × (2 − 2 × LumaRed), B = Y + Cb × (2 − 2 × LumaBlue), G = (Y − LumaBlue × B − LumaRed × R) / LumaGreen.
+        private (byte R, byte G, byte B) FromYCbCr(double y, double cb, double cr)
+        {
+            var luma = (y - Reference[0]) * 255 / (Reference[1] - Reference[0]);
+            var blue = (cb - Reference[2]) * 127 / (Reference[3] - Reference[2]);
+            var red = (cr - Reference[4]) * 127 / (Reference[5] - Reference[4]);
+            var r = luma + red * (2 - 2 * Coefficients[0]);
+            var b = luma + blue * (2 - 2 * Coefficients[2]);
+            var g = (luma - Coefficients[2] * b - Coefficients[0] * r) / Coefficients[1];
+            static byte Clamp(double v) => (byte)Math.Round(Math.Clamp(v, 0, 255));
+            return (Clamp(r), Clamp(g), Clamp(b));
+        }
+
+        // CIE L*a*b* to sRGB: L in 0–100, a and b about 0, through XYZ with the D65 white, the sRGB matrix and curve.
+        private static (byte R, byte G, byte B) FromLab(double l, double a, double b)
+        {
+            const double Xn = 0.95047, Yn = 1.0, Zn = 1.08883;
+            var fy = (l + 16) / 116;
+            var fx = fy + a / 500;
+            var fz = fy - b / 200;
+            static double Inverse(double t) => t > 6.0 / 29 ? t * t * t : 3 * (6.0 / 29) * (6.0 / 29) * (t - 4.0 / 29);
+            var x = Xn * Inverse(fx);
+            var y = Yn * Inverse(fy);
+            var z = Zn * Inverse(fz);
+            var rl = 3.2404542 * x - 1.5371385 * y - 0.4985314 * z;
+            var gl = -0.9692660 * x + 1.8760108 * y + 0.0415560 * z;
+            var bl = 0.0556434 * x - 0.2040259 * y + 1.0572252 * z;
+            static byte Gamma(double v)
+            {
+                v = Math.Clamp(v, 0, 1);
+                var s = v <= 0.0031308 ? 12.92 * v : 1.055 * Math.Pow(v, 1 / 2.4) - 0.055;
+                return (byte)Math.Round(s * 255);
+            }
+
+            return (Gamma(rl), Gamma(gl), Gamma(bl));
+        }
+
+        // One pixel's sample values into RGBA.
+        private void WritePixel(RgbaBitmap bitmap, int x, int y, double[] samples)
         {
             var at = (y * bitmap.Width + x) * 4;
             int r, g, b, a = 255;
             switch (Photometric)
             {
                 case Palette:
-                    var color = samples[0] < Map!.Length ? Map[samples[0]] : new RgbaColor(0, 0, 0);
+                    var index = (ulong)samples[0];
+                    var color = index < (ulong)Map!.Length ? Map[index] : new RgbaColor(0, 0, 0);
                     (r, g, b) = (color.R, color.G, color.B);
                     break;
                 case WhiteIsZero or BlackIsZero:
-                    r = g = b = Photometric == WhiteIsZero ? 255 - Scaled(samples[0]) : Scaled(samples[0]);
+                    r = g = b = Photometric == WhiteIsZero ? 255 - Level(samples[0]) : Level(samples[0]);
                     break;
                 case Rgb:
-                    (r, g, b) = (Scaled(samples[0]), Scaled(samples[1]), Scaled(samples[2]));
+                    (r, g, b) = (Level(samples[0]), Level(samples[1]), Level(samples[2]));
+                    break;
+                case YCbCr:
+                    (r, g, b) = FromYCbCr(Level(samples[0]), Level(samples[1]), Level(samples[2]));
+                    break;
+                case CieLab or IccLab:
+                    // L over 0–100 from the sample's range; a and b signed (CIELab) or about 2^(bits−1) (ICCLab), in
+                    // units of 1 at 8 bits and 1/256 at 16.
+                    var full = Math.Pow(2, Depth) - 1;
+                    var unit = Depth > 8 ? Math.Pow(2, Depth - 8) : 1;
+                    var middle = Photometric == IccLab ? Math.Pow(2, Depth - 1) : 0;
+                    var signedA = Photometric == CieLab && Format != 2 ? Signed(samples[1]) : samples[1];
+                    var signedB = Photometric == CieLab && Format != 2 ? Signed(samples[2]) : samples[2];
+                    (r, g, b) = FromLab(samples[0] * 100 / full, (signedA - middle) / unit, (signedB - middle) / unit);
                     break;
                 default:
                     // CMYK without colour management, as libtiff's RGBA interface converts it: each ink and black
                     // multiply what is left.
-                    var k = 255 - Scaled(samples[3]);
-                    r = (255 - Scaled(samples[0])) * k / 255;
-                    g = (255 - Scaled(samples[1])) * k / 255;
-                    b = (255 - Scaled(samples[2])) * k / 255;
+                    var k = 255 - Level(samples[3]);
+                    r = (255 - Level(samples[0])) * k / 255;
+                    g = (255 - Level(samples[1])) * k / 255;
+                    b = (255 - Level(samples[2])) * k / 255;
                     break;
             }
 
             if (Alpha is 1 or 2 && Photometric is Rgb or BlackIsZero or WhiteIsZero)
             {
-                a = Scaled(samples[ColorSamples]);
+                a = Level(samples[ColorSamples]);
                 if (Alpha == 1 && a is > 0 and < 255)
                 {
                     // Associated alpha: the colour was multiplied by it.
@@ -383,14 +625,17 @@ public static class TiffFile
             bitmap.Pixels[at + 2] = (byte)b;
             bitmap.Pixels[at + 3] = (byte)a;
         }
+
+        // CIELab's a and b stored unsigned (SampleFormat 1) are still two's complement numbers.
+        private double Signed(double raw) => raw >= Math.Pow(2, Depth - 1) ? raw - Math.Pow(2, Depth) : raw;
     }
 
     // A row of a decoded unit: its bytes, and the unit's reader when the file is big-endian.
     private readonly record struct Row(byte[] Buffer, int Start, int Length, BigEndianReader? Reader)
     {
-        // The sample at an index: whole bytes (8, 16, 24, 32 bits) in the file's byte order; other depths as a bit
-        // stream, most significant bit first.
-        public uint Sample(int index, int depth)
+        // The sample at an index: whole bytes (8, 16, 24, 32, 64 bits) in the file's byte order; other depths as a
+        // bit stream, most significant bit first.
+        public ulong Sample(int index, int depth)
         {
             switch (depth)
             {
@@ -402,14 +647,19 @@ public static class TiffFile
                 case 24:
                     var at24 = Start + index * 3;
                     return Reader is not null
-                        ? (uint)(Reader.ReadUInt16At(at24) << 8 | Buffer[at24 + 2])
-                        : (uint)(Buffer[at24 + 2] << 16 | BinaryPrimitives.ReadUInt16LittleEndian(Buffer.AsSpan(at24)));
+                        ? (ulong)(Reader.ReadUInt16At(at24) << 8 | Buffer[at24 + 2])
+                        : (ulong)(Buffer[at24 + 2] << 16 | BinaryPrimitives.ReadUInt16LittleEndian(Buffer.AsSpan(at24)));
                 case 32:
                     var at32 = Start + index * 4;
                     return Reader is not null ? Reader.ReadUInt32At(at32) : BinaryPrimitives.ReadUInt32LittleEndian(Buffer.AsSpan(at32));
+                case 64:
+                    var at64 = Start + index * 8;
+                    return Reader is not null
+                        ? (ulong)Reader.ReadUInt32At(at64) << 32 | Reader.ReadUInt32At(at64 + 4)
+                        : BinaryPrimitives.ReadUInt64LittleEndian(Buffer.AsSpan(at64));
                 default:
                     var bit = (long)Start * 8 + (long)index * depth;
-                    uint value = 0;
+                    ulong value = 0;
                     for (var k = 0; k < depth; k++, bit++)
                     {
                         value = (value << 1) | (uint)((Buffer[(int)(bit >> 3)] >> (7 - (int)(bit & 7))) & 1);
@@ -420,7 +670,7 @@ public static class TiffFile
         }
 
         // Writes a whole-byte sample back in the file's byte order.
-        public void Put(int index, int size, uint value)
+        public void Put(int index, int size, ulong value)
         {
             var at = Start + index * size;
             for (var k = 0; k < size; k++)
@@ -636,6 +886,31 @@ public static class TiffFile
         for (var i = samples; i < count; i++)
         {
             row.Put(i, size, row.Sample(i, depth) + row.Sample(i - samples, depth));
+        }
+    }
+
+    // The floating-point predictor (Adobe Photoshop TIFF Technical Note 3): a row's samples split into byte planes,
+    // most significant first, then each byte the difference from the one a pixel (a sample count) before it.
+    private static void FloatUndifference(Row row, int samples, int depth)
+    {
+        var size = depth / 8;
+        var bytes = row.Buffer.AsSpan(row.Start, row.Length);
+        for (var i = samples; i < bytes.Length; i++)
+        {
+            bytes[i] += bytes[i - samples];
+        }
+
+        var count = bytes.Length / size;
+        var planes = bytes.ToArray();
+        for (var c = 0; c < count; c++)
+        {
+            ulong value = 0;
+            for (var k = 0; k < size; k++)
+            {
+                value = value << 8 | planes[k * count + c];
+            }
+
+            row.Put(c, size, value);
         }
     }
 
