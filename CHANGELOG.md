@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- CLI: `classicmac help [<command>]` shows the list of commands or one command's help, and every help ends with
+  examples (docs/cli.md §6).
+
 - Fuzzing the writers: `hfs-edit` (edit sequences on a new HFS volume, checked against a model, the writer's checks and
   First Aid after each), `wrappers` (MacBinary III, AppleSingle, BinHex, resource forks, DeRez and Rez, ADC, KenCode,
   PackBits round trips) and `pict-write` (PictWriter in every pixel format; recordings on both QuickDraws). Fixed from

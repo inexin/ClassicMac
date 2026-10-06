@@ -8,10 +8,10 @@ Status: in development. See [docs/PLAN.md](docs/PLAN.md) and [CHANGELOG.md](CHAN
 
 ## Apps
 
-| | What it is |
+| App | What it is |
 | --- | --- |
-| [ClassicMac](src/ClassicMac.App/README.md) | The desktop viewer and editor (Avalonia; Windows, macOS, Linux) |
-| [classicmac](src/ClassicMac.Cli/README.md) | The command-line tool, with an MCP server and a DOS-like shell |
+| [Desktop app](src/ClassicMac.App/README.md) (`ClassicMac.App`) | The viewer and editor (Avalonia; Windows, macOS, Linux) |
+| [Command line](src/ClassicMac.Cli/README.md) (`classicmac`, `ClassicMac.Cli`) | The command-line tool, with an MCP server and a DOS-like shell; `classicmac help` lists its commands |
 
 ```
 dotnet run --project src/ClassicMac.App -- "some disk.img"

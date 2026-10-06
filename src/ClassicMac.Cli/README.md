@@ -1,4 +1,4 @@
-# classicmac (command line)
+# ClassicMac command line (`classicmac`)
 
 The ClassicMac command-line tool: list, extract, convert and write classic Mac OS files, whatever they are wrapped
 in. It also serves its file commands over MCP and as a DOS-like shell.
@@ -8,8 +8,8 @@ dotnet tool install --global ClassicMac.Cli      # once published
 dotnet run --project src/ClassicMac.Cli -- --help # from the repository
 ```
 
-The full reference, with every option, the JSON output and the exit codes, is
-[docs/cli.md](https://github.com/inexin/ClassicMac/blob/main/docs/cli.md).
+`classicmac help <command>` shows a command's options and examples. The full reference, with every option, the JSON
+output and the exit codes, is [docs/cli.md](https://github.com/inexin/ClassicMac/blob/main/docs/cli.md).
 
 ## Commands
 
@@ -50,6 +50,7 @@ The full reference, with every option, the JSON output and the exit codes, is
 | --- | --- |
 | `mcp` | The file commands as MCP tools over standard input and output |
 | `shell <input>` | A DOS-like shell: `cd` into disk images and archives, `dir`, `type`, `copy`, `del`, `md`, `save` |
+| `help [<command>]` | The commands, or one command's help; every help ends with examples |
 
 ## Examples
 

@@ -138,7 +138,29 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
 
         root.Subcommands.Add(McpCommand());
         root.Subcommands.Add(ShellCommand());
+        root.Subcommands.Add(HelpCommand(root));
+        HelpExamples.AddTo(root);
         return root;
+    }
+
+    // help [command] (docs/cli.md §6): the root's help, or a command's, as --help gives them.
+    private Command HelpCommand(RootCommand root)
+    {
+        var name = new Argument<string?>("command") { Description = "The command to show the help of", Arity = ArgumentArity.ZeroOrOne };
+        var command = new Command("help", "Show the help of a command, with examples, or the list of commands") { name };
+        command.SetAction(result =>
+        {
+            var typed = result.GetValue(name);
+            if (typed is not null && !root.Subcommands.Any(c => string.Equals(c.Name, typed, StringComparison.Ordinal)))
+            {
+                error.WriteLine($"{typed}: no such command (classicmac help lists them).");
+                return ExitCodes.Usage;
+            }
+
+            string[] args = typed is null ? ["--help"] : [typed, "--help"];
+            return root.Parse(args).Invoke(result.InvocationConfiguration);
+        });
+        return command;
     }
 
     private Command ShellCommand()

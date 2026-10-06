@@ -1,6 +1,6 @@
 # The command line
 
-`classicmac` reads, lists, converts and extracts classic Mac OS files (`classicmac --help` lists the commands). This
+`classicmac` reads, lists, converts and extracts classic Mac OS files (`classicmac help` lists the commands, §6). This
 document describes the file commands that work on *Mac paths* the MCP server that offers them (§4) and the shell (§5) (planned in [PLAN.md](PLAN.md), "File commands, shell
 and MCP"); the library's `MacPathTree` (`ClassicMac.Files`) implements the paths.
 
@@ -545,3 +545,10 @@ as §2.6). A command that fails prints `{ "command": "<command>", "error": "<why
 As the commands' (§2, §3.5): 0 success, 2 a usage error or refused change, 4 a host file not read or written, 5 a path
 that names nothing. A script exits with the failing command's code; leaving with changes not saved (a script, or
 the input ending while the shell asks) exits 2; otherwise the shell exits 0.
+
+## 6. Help
+
+`classicmac help` (or `--help`, `-h`, `-?`) lists the commands and the options they share. `classicmac help <command>`
+is that command's help, as `classicmac <command> --help` gives it: its arguments and options, with their defaults.
+An unknown command is a usage error (exit 2). Every help, the list's included, ends with examples: what each does, then
+the command line. Inside the shell, `help` lists the shell's commands (§5.1).

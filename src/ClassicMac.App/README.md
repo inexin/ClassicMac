@@ -1,4 +1,4 @@
-# ClassicMac (desktop app)
+# ClassicMac desktop app
 
 A viewer and editor for classic Mac OS files on Windows, macOS and Linux, built with Avalonia.
 
