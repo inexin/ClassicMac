@@ -4,8 +4,9 @@ namespace ClassicMac.Graphics;
 
 /// <summary>
 /// SGILog high dynamic range pixels (Greg Ward's LogLuv encoding; docs/formats/graphics/tiff.md §2.10): LogL16, a sign
-/// and 15 bits of log luminance, and LogLuv32, that and 8-bit u′ and v′. Each row's pixels are run-length coded a byte
-/// plane at a time, most significant first. The pixels become CIE XYZ, then a display image by a global tone mapping.
+/// and 15 bits of log luminance; LogLuv32, that and 8-bit u′ and v′, each row's pixels run-length coded a byte plane at a
+/// time, most significant first; and LogLuv24, 10 bits of log luminance and a 14-bit index into a grid of the visible
+/// (u′, v′), not compressed. The pixels become CIE XYZ, then a display image by a global tone mapping.
 /// </summary>
 internal static class SgiLog
 {
@@ -55,6 +56,82 @@ internal static class SgiLog
         return true;
     }
 
+    /// <summary>One row of LogLuv24 pixels: three bytes each, most significant first, not compressed.</summary>
+    public static bool ReadRow24(ReadOnlySpan<byte> input, ref int at, Span<uint> pixels)
+    {
+        for (var i = 0; i < pixels.Length; i++)
+        {
+            if (at + 3 > input.Length)
+            {
+                return false;
+            }
+
+            pixels[i] = (uint)(input[at] << 16 | input[at + 1] << 8 | input[at + 2]);
+            at += 3;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// A LogLuv24 value as CIE XYZ: Y = 2^((Le + 0.5) / 64 − 12) from its top 10 bits, 0 for Le 0; (u′, v′) the centre
+    /// of the grid cell its low 14 bits index, the equal-energy white for an index past the grid.
+    /// </summary>
+    public static (double X, double Y, double Z) Xyz24(uint luv)
+    {
+        var le = luv >> 14 & 0x3FF;
+        if (le == 0)
+        {
+            return (0, 0, 0);
+        }
+
+        var y = Math.Exp(Math.Log(2) / 64 * (le + 0.5) - Math.Log(2) * 12);
+        var (u, v) = Cell((int)(luv & 0x3FFF));
+        return FromChromaticity(u, v, y);
+    }
+
+    // The centre of a grid cell (libtiff's uv_decode): the last row whose cells before it are at most the index.
+    private static (double U, double V) Cell(int index)
+    {
+        if (index < 0 || index >= LogLuvTable.Cells)
+        {
+            return (0.210526316, 0.473684211);
+        }
+
+        int lower = 0, upper = LogLuvTable.Rows.Length;
+        while (upper - lower > 1)
+        {
+            var middle = (lower + upper) >> 1;
+            var past = index - LogLuvTable.Rows[middle].Before;
+            if (past > 0)
+            {
+                lower = middle;
+            }
+            else if (past < 0)
+            {
+                upper = middle;
+            }
+            else
+            {
+                lower = middle;
+                break;
+            }
+        }
+
+        var row = LogLuvTable.Rows[lower];
+        var u = (double)row.UStart + (index - row.Before + 0.5) * LogLuvTable.CellSize;
+        var v = (double)LogLuvTable.VStart + (lower + 0.5) * LogLuvTable.CellSize;
+        return (u, v);
+    }
+
+    private static (double X, double Y, double Z) FromChromaticity(double u, double v, double y)
+    {
+        var s = 1 / (6 * u - 16 * v + 12);
+        var x = 9 * u * s;
+        var yc = 4 * v * s;
+        return (x / yc * y, y, (1 - x - yc) / yc * y);
+    }
+
     /// <summary>The luminance of a LogL16 value: 2^((Le + 0.5) / 256 − 64), 0 for Le 0, negative with the sign bit.</summary>
     public static double Luminance(uint logL)
     {
@@ -79,10 +156,7 @@ internal static class SgiLog
 
         var u = ((luv >> 8 & 0xFF) + 0.5) / 410;
         var v = ((luv & 0xFF) + 0.5) / 410;
-        var s = 1 / (6 * u - 16 * v + 12);
-        var x = 9 * u * s;
-        var yc = 4 * v * s;
-        return (x / yc * y, y, (1 - x - yc) / yc * y);
+        return FromChromaticity(u, v, y);
     }
 
     /// <summary>

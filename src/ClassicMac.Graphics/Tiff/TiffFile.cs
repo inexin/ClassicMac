@@ -161,12 +161,12 @@ public static class TiffFile
             image.Photometric = Required(PhotometricTag, "PhotometricInterpretation");
             if (image.Photometric is LogL or LogLuv)
             {
-                if (image.Compression == SgiLog24)
+                if (image.Compression == SgiLog24 && image.Photometric != LogLuv)
                 {
-                    throw new NotSupportedException("The image is LogLuv24 (compression 34677), whose colour table is not read; LogL and LogLuv32 are.");
+                    throw new NotSupportedException("SGILog24 compression of a LogL image is not read (it holds LogLuv24).");
                 }
 
-                if (image.Compression != SgiLogRle)
+                if (image.Compression is not (SgiLogRle or SgiLog24))
                 {
                     throw new NotSupportedException($"A {(image.Photometric == LogL ? "LogL" : "LogLuv")} image compressed with {CompressionName(image.Compression)} is not read (only SGILog, 34676).");
                 }
@@ -367,7 +367,8 @@ public static class TiffFile
                 var at = 0;
                 for (var r = 0; r < unit.Height; r++)
                 {
-                    if (!SgiLog.DecodeRow(data, ref at, row, planes))
+                    var whole = Compression == SgiLog24 ? SgiLog.ReadRow24(data, ref at, row) : SgiLog.DecodeRow(data, ref at, row, planes);
+                    if (!whole)
                     {
                         shortUnits++;
                         break;
@@ -384,7 +385,7 @@ public static class TiffFile
                         }
                         else
                         {
-                            (x[line + c], y[line + c], z[line + c]) = SgiLog.Xyz(row[c]);
+                            (x[line + c], y[line + c], z[line + c]) = Compression == SgiLog24 ? SgiLog.Xyz24(row[c]) : SgiLog.Xyz(row[c]);
                         }
                     }
                 }

@@ -58,14 +58,39 @@ public class TiffLogLuvTests
         Assert.True(red.R > red.G + 50 && red.R > red.B + 50, red.ToString());
     }
 
-    [Fact]
-    public void LogLuv24_is_not_read()
+    // A LogLuv24 pixel: 10-bit log luminance, then a 14-bit index into the (u′, v′) grid, three bytes most significant first.
+    private static byte[] Luv24(int logL, int index)
     {
-        var tiff = TiffBuilder.Image(1, 1, 32845, [16, 16, 16]).Tag(259, Short, 34677).Strip([0, 0, 0]).Build();
+        var p = logL << 14 | index;
+        return [(byte)(p >> 16), (byte)(p >> 8), (byte)p];
+    }
 
-        var e = Assert.Throws<NotSupportedException>(() => TiffFile.Decode(tiff));
+    [Fact]
+    public void LogLuv24_indexes_the_chromaticity_grid()
+    {
+        // Le 768 (Y ≈ 1): the equal-energy white's cell (12266), then a red's (14740, about x 0.64, y 0.33).
+        var tiff = TiffBuilder.Image(2, 1, 32845, [16, 16, 16]).Tag(259, Short, 34677)
+            .Strip([.. Luv24(768, 12266), .. Luv24(768, 14740)]).Build();
 
-        Assert.Contains("LogLuv24", e.Message, StringComparison.Ordinal);
+        var bitmap = TiffFile.Decode(tiff);
+
+        var white = Pixel(bitmap, 0, 0);
+        Assert.True(Math.Abs(white.R - white.G) <= 3 && Math.Abs(white.G - white.B) <= 3, white.ToString());
+        var red = Pixel(bitmap, 1, 0);
+        Assert.True(red.R > red.G + 50 && red.R > red.B + 50, red.ToString());
+    }
+
+    [Fact]
+    public void LogLuv24_luminance_zero_is_black_and_an_index_past_the_grid_is_neutral()
+    {
+        var tiff = TiffBuilder.Image(3, 1, 32845, [16, 16, 16]).Tag(259, Short, 34677)
+            .Strip([.. Luv24(0, 12266), .. Luv24(768, 16383), .. Luv24(768, 12266)]).Build();
+
+        var bitmap = TiffFile.Decode(tiff);
+
+        Assert.Equal(new RgbaColor(0, 0, 0), Pixel(bitmap, 0, 0));
+        var neutral = Pixel(bitmap, 1, 0);
+        Assert.True(Math.Abs(neutral.R - Pixel(bitmap, 2, 0).R) <= 3, neutral.ToString());
     }
 
     [Fact]

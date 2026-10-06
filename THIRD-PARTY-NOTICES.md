@@ -226,6 +226,38 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+## libtiff
+
+<https://gitlab.com/libtiff/libtiff>
+
+`src/ClassicMac.Graphics/Tiff/LogLuvTable.cs` is the LogLuv24 chromaticity table of libtiff's `uvcode.h` (generated
+by Greg Ward Larson, SGI, 1997). The rest of ClassicMac's TIFF reader is its own, following the TIFF specification,
+with libtiff as a behavioural reference.
+
+```
+Copyright (c) 1988-1997 Sam Leffler
+Copyright (c) 1991-1997 Silicon Graphics, Inc.
+
+Permission to use, copy, modify, distribute, and sell this software and
+its documentation for any purpose is hereby granted without fee, provided
+that (i) the above copyright notices and this permission notice appear in
+all copies of the software and related documentation, and (ii) the names of
+Sam Leffler and Silicon Graphics may not be used in any advertising or
+publicity relating to the software without the specific, prior written
+permission of Sam Leffler and Silicon Graphics.
+
+THE SOFTWARE IS PROVIDED "AS-IS" AND WITHOUT WARRANTY OF ANY KIND,
+EXPRESS, IMPLIED OR OTHERWISE, INCLUDING WITHOUT LIMITATION, ANY
+WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+
+IN NO EVENT SHALL SAM LEFFLER OR SILICON GRAPHICS BE LIABLE FOR
+ANY SPECIAL, INCIDENTAL, INDIRECT OR CONSEQUENTIAL DAMAGES OF ANY KIND,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER OR NOT ADVISED OF THE POSSIBILITY OF DAMAGE, AND ON ANY THEORY OF
+LIABILITY, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
+OF THIS SOFTWARE.
+```
+
 ## Multiversal Interfaces
 
 <https://github.com/autc04/multiversal> — the classic Mac OS API definitions (YAML) from Executor 2000.
