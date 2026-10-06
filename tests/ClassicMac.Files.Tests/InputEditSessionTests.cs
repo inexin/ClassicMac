@@ -92,6 +92,29 @@ public sealed class InputEditSessionTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => session.DeleteResource("Notes", Str, 999));
     }
 
+    // Found by fuzzing (volume-session): resource edits wait for the save, so a file locked after them still gets them,
+    // and a locked file's resources are refused as the Mac refuses to write a locked file.
+    [Fact]
+    public void A_file_locked_after_a_resource_edit_keeps_it_and_a_locked_file_s_resources_are_refused()
+    {
+        var session = InputEditSession.Open(Volume());
+        session.SetResource("Read Me", Str, 200, "x"u8.ToArray());
+        session.SetLocked("Read Me", true);
+        var target = Path.Combine(directory, "Out.img");
+        session.SaveAs(target);
+
+        var file = Files(target).Single(f => f.MacPath == "Read Me");
+        Assert.True(file.IsLocked);
+        Assert.Equal("x"u8.ToArray(), ResourceFork.Read(file.ResourceFork.ToArray()).Find(Str, 200)!.GetData().ToArray());
+        Assert.NotNull(session.Current());
+
+        Assert.Throws<InvalidOperationException>(() => session.SetResource("Read Me", Str, 201, "y"u8.ToArray()));
+        Assert.Throws<InvalidOperationException>(() => session.DeleteResource("Read Me", Str, 200));
+        session.SetLocked("Read Me", false);
+        session.SetResource("Read Me", Str, 201, "y"u8.ToArray());
+        Assert.NotNull(session.Current());
+    }
+
     [Fact]
     public void An_item_moves_to_another_folder_and_its_resource_edits_follow()
     {

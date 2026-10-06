@@ -20,8 +20,8 @@ public sealed class FuzzTests : IDisposable
     [Fact]
     public void Every_reader_has_a_target()
     {
-        Assert.Equal(["code", "container", "first-aid", "first-aid-repair", "hfs-edit", "ndif-write", "pef", "pict", "pict-write", "resource", "resource-fork", "tiff", "wav",
-            "wrappers"], FuzzTargets.All.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(["code", "container", "first-aid", "first-aid-repair", "hfs-edit", "ndif-write", "pef", "pict", "pict-write", "resource", "resource-fork", "tiff", "volume-session",
+            "wav", "wrappers"], FuzzTargets.All.Keys.Order(StringComparer.Ordinal));
     }
 
     // A writer given any disk must make it: there, even a malformed-input refusal is a crash.

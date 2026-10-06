@@ -42,7 +42,8 @@ public static class HfsWriter
     public static byte[] ReplaceFork(ForkData image, string macPath, HfsFork fork, ReadOnlyMemory<byte> data) =>
         ReplaceFork(new HfsVolume(image), macPath, fork, data).ToArray();
 
-    internal static HfsVolume ReplaceFork(HfsVolume image, string macPath, HfsFork fork, ReadOnlyMemory<byte> data)
+    // evenIfLocked: an edit session's fork edits, made before the file was locked, are written under the lock.
+    internal static HfsVolume ReplaceFork(HfsVolume image, string macPath, HfsFork fork, ReadOnlyMemory<byte> data, bool evenIfLocked = false)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentException.ThrowIfNullOrEmpty(macPath);
@@ -134,7 +135,7 @@ public static class HfsWriter
             throw new InvalidDataException($"The HFS file '{macPath}' was not found.");
         }
 
-        if ((match.Data[2] & 1) != 0)
+        if ((match.Data[2] & 1) != 0 && !evenIfLocked)
         {
             throw new InvalidDataException($"The HFS file '{macPath}' is locked.");
         }

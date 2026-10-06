@@ -340,8 +340,9 @@ public static class ForkSaver
         return ApplyHfsForks(new HfsVolume(ForkData.FromBytes(volume)), forks).ToArray();
     }
 
-    // The volume with each fork replaced (a fork of it: the volume itself is left as it was), read back and compared.
-    internal static HfsVolume ApplyHfsForks(HfsVolume volume, IReadOnlyList<HfsForkReplacement> forks)
+    // The volume with each fork replaced (a fork of it: the volume itself is left as it was), read back and compared;
+    // with evenIfLocked, a locked file's too (an edit session's edits, made before the file was locked).
+    internal static HfsVolume ApplyHfsForks(HfsVolume volume, IReadOnlyList<HfsForkReplacement> forks, bool evenIfLocked = false)
     {
         ArgumentNullException.ThrowIfNull(volume);
         ArgumentNullException.ThrowIfNull(forks);
@@ -351,7 +352,7 @@ public static class ForkSaver
         {
             var kind = replacement.ForkInDataFork ? HfsFork.Data : HfsFork.Resource;
             var data = replacement.Fork.ToArray();
-            image = HfsWriter.ReplaceFork(image, replacement.MacPath, kind, data);
+            image = HfsWriter.ReplaceFork(image, replacement.MacPath, kind, data, evenIfLocked);
             written.Add((replacement.MacPath, kind, data));
         }
 

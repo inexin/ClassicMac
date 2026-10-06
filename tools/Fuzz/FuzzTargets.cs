@@ -46,6 +46,7 @@ internal static class FuzzTargets
             ["wrappers"] = Strict(WriterTargets.Wrappers),
             ["pict-write"] = Strict(WriterTargets.PictWrite),
             ["first-aid-repair"] = WriterTargets.FirstAidRepair,
+            ["volume-session"] = Strict(SessionTargets.VolumeSession),
         };
 
     /// <summary>Runs <paramref name="target"/> on <paramref name="input"/>, letting only a malformed-input refusal pass.</summary>

@@ -317,7 +317,7 @@ Each write command changes one thing on a Mac path, through the library's `Input
 | `mkdir` | `<Mac path>` | Makes an empty folder |
 | `rm` | `<Mac path> [--recursive/-r]` | Deletes a file, or a folder (with everything in it only with `-r`); each alias on the volume whose original it deletes is named in a warning (`  warning: <alias> will no longer find its original, <path>`; in JSON the change's `warnings`), also with `--dry-run` |
 | `rename` | `<Mac path> <new name>` | Renames a file or folder in its folder (names are at most 31 bytes, unique as HFS compares them) |
-| `lock`, `unlock` | `<Mac path>` | Locks or unlocks a file (an HFS folder has no lock); a locked file cannot be deleted |
+| `lock`, `unlock` | `<Mac path>` | Locks or unlocks a file (an HFS folder has no lock); a locked file cannot be deleted, nor its resources set or deleted (edits made before it was locked are still saved) |
 | `bless` | `<Mac path>` | Makes a folder the volume's System Folder (`drFndrInfo[0]`); it must hold a System file (type `zsys`) |
 | `defrag` | `<volume>` (on a disk with several partitions, `disk.img:<partition>`) | Defragments an HFS volume ([hfs.md §3.4](formats/file-systems/hfs.md#34-defragmenting-a-volume)): every fork in one extent and the free space in one run at the end, the files, folders and volume otherwise as they were; one `defragment` change |
 | `mv` | `<Mac path> <folder>` | Moves a file or folder into another folder of its volume, keeping its name; the folder is a path inside the same input, or a Mac path starting with the input (`disk.img:` for the top level). A folder cannot move into itself, nor anything onto a name the folder holds |

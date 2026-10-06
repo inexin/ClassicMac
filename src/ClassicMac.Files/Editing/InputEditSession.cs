@@ -659,7 +659,7 @@ public sealed class InputEditSession
     /// <summary>Sets a resource: replaces its data (and name, when given) when it exists, else adds it.</summary>
     public void SetResource(string macPath, FourCC type, short id, ReadOnlyMemory<byte> data, MacString? name = null)
     {
-        var session = Session(macPath);
+        var session = Session(macPath, toChange: true);
         if (session.Fork.Find(type, id) is { } existing)
         {
             session.Execute(new SetResourceData(existing, data));
@@ -679,7 +679,7 @@ public sealed class InputEditSession
     /// <summary>Deletes a resource.</summary>
     public void DeleteResource(string macPath, FourCC type, short id)
     {
-        var session = Session(macPath);
+        var session = Session(macPath, toChange: true);
         if (session.Fork.Find(type, id) is not { } existing)
         {
             throw new InvalidOperationException($"{(macPath.Length == 0 ? "The file" : macPath)} has no '{type}' {id}.");
@@ -689,10 +689,21 @@ public sealed class InputEditSession
         changes.Add(new PlannedChange("res-delete", macPath, $"'{type}' {id}"));
     }
 
-    private EditSession Session(string macPath)
+    // A file's resource edits; toChange: refused for a locked file in a volume, as the Mac refuses to write one (edits made
+    // before the file was locked are still saved).
+    private EditSession Session(string macPath, bool toChange = false)
     {
         ArgumentNullException.ThrowIfNull(macPath);
         RequireEditable();
+        if (Kind != InputEditKind.SingleFile && toChange)
+        {
+            var (at, path) = Route(macPath, "hold files");
+            if (FileAt(at, path) is { IsLocked: true })
+            {
+                throw new InvalidOperationException($"{macPath} is locked.");
+            }
+        }
+
         if (forks.TryGetValue(macPath, out var session))
         {
             return session;
@@ -903,7 +914,7 @@ public sealed class InputEditSession
     private List<(EditedVolume Volume, HfsVolume Edited)> EditedVolumes() =>
         [.. volumes.Select(v => (Volume: v, Forks: Replacements(v)))
             .Where(e => e.Volume.Overlay is not null || e.Forks.Count > 0 || volumes.Count == 1)
-            .Select(e => (e.Volume, e.Forks.Count > 0 ? ForkSaver.ApplyHfsForks(Overlay(e.Volume), e.Forks) : Overlay(e.Volume)))];
+            .Select(e => (e.Volume, e.Forks.Count > 0 ? ForkSaver.ApplyHfsForks(Overlay(e.Volume), e.Forks, evenIfLocked: true) : Overlay(e.Volume)))];
 
     private IReadOnlyList<HfsForkReplacement> extra = [];
 
@@ -959,7 +970,7 @@ public sealed class InputEditSession
     // them.
     private IReadOnlyList<MacFile> Rewritten()
     {
-        var edited = ForkSaver.ApplyHfsForks(Overlay(volumes[0]), Replacements(volumes[0]));
+        var edited = ForkSaver.ApplyHfsForks(Overlay(volumes[0]), Replacements(volumes[0]), evenIfLocked: true);
         return ndifParts is null
             ? [NdifWriter.Rewrite(ndif!, edited.ToArray(), edited.Sectors.ToHashSet())]
             : NdifWriter.RewriteSegmented([.. ndifParts.Select(p => p.File)], edited.ToArray(), edited.Sectors.ToHashSet());

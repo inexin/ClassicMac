@@ -8,7 +8,7 @@ using SharpFuzz;
 //   Fuzz replay <target> <file|folder>…  runs inputs without libFuzzer, as a crash is reproduced
 //   Fuzz trace <target> <file|folder>…   replays, printing each step of a writer target (hfs-edit's edits)
 // Targets: container, resource-fork, resource, code, pef, pict, tiff, wav, first-aid; the writers' ndif-write,
-// hfs-edit, first-aid-repair, wrappers, pict-write (FuzzTargets, WriterTargets).
+// hfs-edit, first-aid-repair, volume-session, wrappers, pict-write (FuzzTargets, WriterTargets, SessionTargets).
 switch (args)
 {
     case ["seeds", var output, ..]:

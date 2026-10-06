@@ -108,6 +108,7 @@ internal static class FuzzSeeds
             Add("wrappers", choices);
             Add("pict-write", choices);
             Add("first-aid-repair", choices);
+            Add("volume-session", choices);
         }
         return FuzzTargets.All.Keys.ToDictionary(t => t,
             t => Directory.Exists(Path.Combine(output, t)) ? Directory.GetFiles(Path.Combine(output, t)).Length : 0, StringComparer.Ordinal);

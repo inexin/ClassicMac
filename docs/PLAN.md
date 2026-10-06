@@ -132,13 +132,14 @@ In rough priority; each item names what blocks it, if anything.
    NDIF images (mounted in Disk Copy 6.3.3). HFSX has been tried only on built volumes: it needs Mac OS X 10.3 or later
    (fsck_hfs), which the harness does not have.
 2. **Fuzzing**: `tools/Fuzz` runs libFuzzer through SharpFuzz nightly (`.github/workflows/fuzz.yml`, five minutes a
-   target) on fourteen targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
+   target) on fifteen targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
    code, PEF, PICT on both QuickDraws, TIFF, WAV and First Aid; and the writers, where the input chooses what is
    written and it must read back as meant (any refusal of their own output a crash): the NDIF writer (any disk made
    into an image, rewritten and split), HFS edits (up to 24 edits on a new volume, defragmenting and resizing among
    them, each followed by the writer's checks, First Aid and a comparison with a model of the files and folders), First
    Aid's repairs (a valid HFS or HFS Plus volume damaged in its metadata: a volume called repaired must verify, read
-   cleanly and need no second repair), the wrappers (MacBinary III, AppleSingle, BinHex, resource
+   cleanly and need no second repair), the edit session (HFS volumes plain, partitioned or in a Disk Copy 4.2 image,
+   through every edit it makes, checked as the input stands), the wrappers (MacBinary III, AppleSingle, BinHex, resource
    forks, DeRez and Rez, ADC, KenCode, PackBits) and PICT (PictWriter in every pixel format, and recordings on both
    QuickDraws drawing what the port drew). A reader fault the unwrapper or a decoder reports (`*-fault`) counts as a
    crash. Seeds are the repository's test files and what is inside them, and HFS and HFS Plus volumes (plain and
