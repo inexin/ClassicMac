@@ -39,9 +39,9 @@ First release of ClassicMac: libraries, a command line and a desktop app for cla
 **Desktop app** (Windows, macOS, Linux)
 - Browse disks, archives and files in one tree; previews of pictures, sounds, text, fonts, dialogs, menus, Finder
   windows, documents, PDFs (Windows and macOS), picture files (JPEG, PNG, GIF, BMP, WebP, MacPaint, QuickTime
-  images), text files without a type, code and hex; export; resource editing with undo, typed forms and templates;
-  image and sound
-  import; Save As in every wrapper; the Volume menu with First Aid, Defragment and Resize.
+  images), sound files (WAV, System 7 sound files), font files (suitcases as their family, TrueType and OpenType as a
+  drawn sample), text files without a type, code and hex; export; resource editing with undo, typed forms and
+  templates; image and sound import; Save As in every wrapper; the Volume menu with First Aid, Defragment and Resize.
 - File icons by type in the tree (pictures, sounds, movies, PDFs, web pages, word-processor documents, spreadsheets,
   fonts, extensions, control panels, preferences, System files, archives, disk images), from the file type or the
   name's extension; the inspector's header shows a file's own Finder icon when it has one.

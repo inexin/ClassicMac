@@ -350,6 +350,38 @@ public sealed class PreviewViewModel
             return StyledPreview(StyledText.Read(file.DataFork.ToArray(), styl, options));
         }
 
+        // A WAV file, whatever its type (its RIFF WAVE signature is plain): read as Resource ▸ Import reads one, into a
+        // 'snd ' (docs/formats/resources/sound.md §3.2), and previewed as that sound.
+        if (file.DataFork.Length is > 12 and <= MaxPictureFile && file.DataFork.ReadPrefix(12) is var riff
+            && riff.AsSpan(0, 4).SequenceEqual("RIFF"u8) && riff.AsSpan(8, 4).SequenceEqual("WAVE"u8))
+        {
+            byte[] snd;
+            try
+            {
+                snd = SoundImport.FromWav(file.DataFork.ToArray());
+            }
+            catch (Exception e) when (e is System.IO.InvalidDataException or ArgumentOutOfRangeException)
+            {
+                return SoundError("this sound", e.Message);
+            }
+
+            return SoundResource.Read(snd, diagnostics, file.Name.ToString())?.Sound is { } wav
+                ? SoundPreview(wav, "this sound", null, "WAV")
+                : SoundError("this sound", "The sound cannot be read");
+        }
+
+        // A System 7 sound file shows its sound; a font suitcase its family.
+        if (type is "sfil" or "FFIL" or "ffil" && MacFileResources.Read(file, readOptions).Fork is { } held
+            && held.OfType(FourCC.FromString(type == "sfil" ? "snd " : "FOND")).FirstOrDefault() is { } first)
+        {
+            return ForResource(first, held, options, readOptions, diagnostics);
+        }
+
+        if (FontFileSample.Draw(file) is { } sample)
+        {
+            return new PreviewViewModel(PreviewKind.Image, "") { Images = [new PreviewImage(sample.Png, sample.Width, sample.Height, null, null, sample.Detail)] };
+        }
+
         if (FilePictures.Read(file) is { } pictureFile)
         {
             var detail = string.Create(CultureInfo.InvariantCulture, $"{pictureFile.Width}×{pictureFile.Height} · {pictureFile.Format}");

@@ -326,6 +326,8 @@ packets: 7424 for 44 544 samples of MACE (44 544 / 6), 696 for IMA 4:1 (44 544 /
      is `loopEnd`; an empty loop is none);
    - other chunks are ignored; a file without `fmt ` and `data`, with samples of another format, or a rate of 65536 Hz
      or more is refused.
+   - The app previews a WAV file (one whose data fork starts with `RIFF` and `WAVE`, whatever its type) as the
+     `'snd '` this makes, and says why when it is refused.
 
 ## 4. Variants
 

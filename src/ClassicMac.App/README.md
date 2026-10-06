@@ -15,7 +15,8 @@ archives and wrappers open as a tree, nested to any depth.
   aliases resolved; type to jump to a name.
 - **Preview** pictures, icons, cursors and patterns; sounds, with playback; text and styled text; bitmap and
   TrueType fonts; dialogs, alerts, menus, windows and controls as the Mac drew them; Finder windows; documents and
-  help pages as HTML; PDFs (Windows and macOS); code as listings; anything else in the hex view.
+  help pages as HTML; PDFs (Windows and macOS); picture, sound, font and text files from other systems (JPEG, PNG,
+  GIF, BMP, MacPaint, QuickTime images, WAV, TrueType); code as listings; anything else in the hex view.
 - **Export** files, resources and documents to modern formats (PNG or WebP, WAV, UTF-8, RTF, HTML, TrueType),
   with a manifest that `classicmac pack` can rebuild a fork from.
 - **Edit** resources with undo: typed forms for common types, `TMPL` templates (a file's own win over ClassicMac's),
