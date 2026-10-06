@@ -88,6 +88,15 @@ internal static class FuzzSeeds
         }
 
         Add("pef", Pef());
+        foreach (var tiff in MediaSeeds.Tiffs())
+        {
+            Add("tiff", tiff);
+        }
+
+        foreach (var wav in MediaSeeds.Wavs())
+        {
+            Add("wav", wav);
+        }
 
         // The writers' targets read their input as choices (FuzzReader): a few fixed patterns to start from.
         var random = new Random(7);

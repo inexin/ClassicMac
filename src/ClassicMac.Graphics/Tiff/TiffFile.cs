@@ -52,6 +52,11 @@ public static class TiffFile
             throw new InvalidDataException("Not a TIFF file.");
         }
 
+        if (data.Length < 8)
+        {
+            throw new InvalidDataException($"The {data.Length}-byte file is shorter than a TIFF header (8 bytes).");
+        }
+
         var file = new TiffData(data);
         var ifd = file.U32(4);
         if (ifd < 8 || ifd > data.Length - 2)
@@ -957,9 +962,10 @@ public static class TiffFile
                 written += n;
             }
         }
-        catch (InvalidDataException)
+        catch (Exception e) when (e is InvalidDataException or IOException)
         {
-            // Damaged data: what was inflated stays.
+            // Damaged data: what was inflated stays. A zlib header asking for a preset dictionary makes .NET throw
+            // ZLibException, an IOException (found by fuzzing).
         }
 
         return written;
@@ -1216,9 +1222,13 @@ public static class TiffFile
 
         public byte Byte(long at) => data.Span[(int)at];
 
-        public ushort U16(long at) => BigEndian ? reader.ReadUInt16At((int)at) : BinaryPrimitives.ReadUInt16LittleEndian(data.Span[(int)at..]);
+        public ushort U16(long at) => BigEndian ? reader.ReadUInt16At((int)at) : BinaryPrimitives.ReadUInt16LittleEndian(Within(at, 2));
 
-        public uint U32(long at) => BigEndian ? reader.ReadUInt32At((int)at) : BinaryPrimitives.ReadUInt32LittleEndian(data.Span[(int)at..]);
+        public uint U32(long at) => BigEndian ? reader.ReadUInt32At((int)at) : BinaryPrimitives.ReadUInt32LittleEndian(Within(at, 4));
+
+        // The bytes a little-endian read takes; past the end, as BigEndianReader does (found by fuzzing).
+        private ReadOnlySpan<byte> Within(long at, int size) =>
+            at >= 0 && at <= data.Length - size ? data.Span.Slice((int)at, size) : throw new EndOfStreamException();
 
         public ReadOnlySpan<byte> Slice(long at, long length) =>
             at >= data.Length ? [] : data.Span.Slice((int)at, (int)Math.Min(length, data.Length - at));

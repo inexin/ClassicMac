@@ -14,6 +14,8 @@ target for five minutes and keeps each target's minimised corpus in the Actions 
 | `code` | 68k code: applications, code resources, disassembly |
 | `pef` | PEF containers and their loader data |
 | `pict` | PICT playback on both QuickDraws |
+| `tiff` | TIFF images: every compression and colour model, JPEG streams put together for a stand-in decoder |
+| `wav` | WAV files as the app previews them: made into a `'snd '`, read back and decoded |
 | `first-aid` | First Aid's verify and repair on HFS and HFS Plus volumes |
 | `ndif-write` | NDIF images made, rewritten and split, then read back |
 | `hfs-edit` | Up to 24 edits on a new HFS volume, each checked by the writer's checks, First Aid and a model |

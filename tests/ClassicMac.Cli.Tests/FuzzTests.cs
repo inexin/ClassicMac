@@ -20,7 +20,8 @@ public sealed class FuzzTests : IDisposable
     [Fact]
     public void Every_reader_has_a_target()
     {
-        Assert.Equal(["code", "container", "first-aid", "hfs-edit", "ndif-write", "pef", "pict", "pict-write", "resource", "resource-fork", "wrappers"], FuzzTargets.All.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(["code", "container", "first-aid", "hfs-edit", "ndif-write", "pef", "pict", "pict-write", "resource", "resource-fork", "tiff", "wav",
+            "wrappers"], FuzzTargets.All.Keys.Order(StringComparer.Ordinal));
     }
 
     // A writer given any disk must make it: there, even a malformed-input refusal is a crash.
@@ -129,6 +130,22 @@ public sealed class FuzzTests : IDisposable
         Assert.Contains(Directory.GetFiles(Path.Combine(folder, "container")).Select(File.ReadAllBytes), b => HfsPlus(b, 1024));
         Assert.Contains(Directory.GetFiles(Path.Combine(folder, "pef")).Select(File.ReadAllBytes), b => b.Length > 0x28 && (b[0x20] << 8 | b[0x21]) > 0);
         Assert.True(Directory.GetFiles(Path.Combine(folder, "ndif-write")).Length >= 2);
+    }
+
+    // TIFF seeds in both byte orders and several compressions; WAV seeds of PCM and float samples.
+    [Fact]
+    public void The_seeds_hold_TIFFs_and_WAVs()
+    {
+        FuzzSeeds.Write(folder, Repository());
+
+        var tiffs = Directory.GetFiles(Path.Combine(folder, "tiff")).Select(File.ReadAllBytes).ToList();
+        Assert.Contains(tiffs, t => t[0] == (byte)'M');
+        Assert.Contains(tiffs, t => t[0] == (byte)'I');
+        Assert.All(tiffs, t => Assert.True(ClassicMac.Graphics.TiffFile.IsTiffFile(t)));
+        Assert.True(tiffs.Count >= 5);
+        var wavs = Directory.GetFiles(Path.Combine(folder, "wav")).Select(File.ReadAllBytes).ToList();
+        Assert.True(wavs.Count >= 3);
+        Assert.All(wavs, w => Assert.Equal("RIFF"u8.ToArray(), w[..4]));
     }
 
     [Fact]

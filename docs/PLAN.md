@@ -132,8 +132,8 @@ In rough priority; each item names what blocks it, if anything.
    NDIF images (mounted in Disk Copy 6.3.3). HFSX has been tried only on built volumes: it needs Mac OS X 10.3 or later
    (fsck_hfs), which the harness does not have.
 2. **Fuzzing**: `tools/Fuzz` runs libFuzzer through SharpFuzz nightly (`.github/workflows/fuzz.yml`, five minutes a
-   target) on eleven targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
-   code, PEF, PICT on both QuickDraws and First Aid; and the writers, where the input chooses what is written and it
+   target) on thirteen targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
+   code, PEF, PICT on both QuickDraws, TIFF, WAV and First Aid; and the writers, where the input chooses what is written and it
    must read back as meant (any refusal of their own output a crash): the NDIF writer (any disk made into an image,
    rewritten and split), HFS edits (up to 24 edits on a new volume, each followed by the writer's checks, First Aid and
    a comparison with a model of the files and folders), the wrappers (MacBinary III, AppleSingle, BinHex, resource

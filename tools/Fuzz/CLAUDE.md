@@ -2,9 +2,9 @@
 
 Guidance for the fuzz targets. How to run them is in `README.md`; the repository-wide rules are in the root `CLAUDE.md`.
 
-- Reader targets are in `FuzzTargets.cs`, writer targets in `WriterTargets.cs`. A new target goes in `All`, the
-  seeds in `FuzzSeeds.cs`, the matrix of `.github/workflows/fuzz.yml`, the table in `README.md` and the fuzzing item
-  of `docs/PLAN.md`.
+- Reader targets are in `FuzzTargets.cs`, writer targets in `WriterTargets.cs`; the TIFF and WAV seeds are built in
+  `MediaSeeds.cs`. A new target goes in `All`, the seeds in `FuzzSeeds.cs`, the matrix of
+  `.github/workflows/fuzz.yml`, the table in `README.md` and the fuzzing item of `docs/PLAN.md`.
 - **No instrumented code in static initialisers**: libFuzzer sets up its coverage map only when the target starts, so
   anything built from ClassicMac's assemblies (options, decoders, models) is `Lazy<T>`, made on first use.
 - Targets are strict: only `InvalidDataException` and `EndOfStreamException` (and what an API documents) may escape a

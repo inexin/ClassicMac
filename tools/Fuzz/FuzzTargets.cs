@@ -3,11 +3,13 @@ using ClassicMac.Code.Ppc;
 using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Hfs;
+using ClassicMac.Graphics;
 using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders;
 using ClassicMac.Resources.Decoders.Code;
+using ClassicMac.Resources.Decoders.Sound;
 using ClassicMac.Resources.Export;
 
 namespace Fuzz;
@@ -36,6 +38,8 @@ internal static class FuzzTargets
             ["code"] = Code,
             ["pef"] = Pef,
             ["pict"] = Pict,
+            ["tiff"] = Tiff,
+            ["wav"] = Wav,
             ["first-aid"] = FirstAid,
             ["ndif-write"] = NdifWrite,
             ["hfs-edit"] = Strict(WriterTargets.HfsEdit),
@@ -200,6 +204,42 @@ internal static class FuzzTargets
             {
             }
         }
+    }
+
+    // A JPEG decoder for the tiff target: a small picture for a stream of even length, none for odd, so JPEG streams
+    // are put together and placed, and refused, as with an application's decoder. Made on first use (see Models).
+    private static readonly Lazy<TiffDecodeOptions> TiffOptions =
+        new(() => new TiffDecodeOptions { JpegDecoder = jpeg => jpeg.Length % 2 == 0 ? new RgbaBitmap(3, 2) : null });
+
+    // TIFF (tiff.md): the first image, every compression and colour model; layouts it does not read are refused with
+    // NotSupportedException, as TiffFile documents.
+    private static void Tiff(ReadOnlyMemory<byte> input)
+    {
+        try
+        {
+            _ = TiffFile.Decode(input, [], TiffOptions.Value);
+        }
+        catch (NotSupportedException)
+        {
+        }
+    }
+
+    // A WAV file as the app previews it (sound.md §3.2): made into a 'snd ' as Resource ▸ Import makes one, read back and
+    // decoded. FromWav refuses a rate it cannot write with ArgumentOutOfRangeException; its 'snd ' must read back.
+    private static void Wav(ReadOnlyMemory<byte> input)
+    {
+        byte[] snd;
+        try
+        {
+            snd = SoundImport.FromWav(input.Span);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return;
+        }
+
+        var sound = SoundResource.Read(snd, [], "wav")?.Sound ?? throw new InvalidOperationException("FromWav's 'snd ' did not read back.");
+        _ = SoundSamples.Decode(sound);
     }
 
     // The NDIF writer (ndif.md §3): whole sectors of the input as a disk, made into an image, rewritten around the disk

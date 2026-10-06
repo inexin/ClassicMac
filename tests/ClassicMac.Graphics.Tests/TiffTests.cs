@@ -414,6 +414,20 @@ public class TiffTests
     }
 
     [Fact]
+    public void Deflate_data_asking_for_a_preset_dictionary_is_a_short_strip()
+    {
+        // A zlib header with FDICT set (78 BB, a dictionary ID after it): .NET's inflater throws ZLibException, an
+        // IOException, rather than InvalidDataException. Found by fuzzing.
+        var diagnostics = new List<Diagnostic>();
+        var tiff = TiffBuilder.Image(1, 1, 1, [8]).Tag(259, Short, 8).Strip([0x78, 0xBB, 0, 0, 0, 1, 0x63, 0, 0]).Build();
+
+        var bitmap = TiffFile.Decode(tiff, diagnostics);
+
+        Assert.Equal(White, Pixel(bitmap, 0, 0));
+        Assert.Equal("tiff.short-strip", Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
     public void TIFF_5_LZW_is_written_least_significant_bit_first()
     {
         // The codes Clear, 'A', 'B', 'A', End (256, 65, 66, 65, 257), 9 bits each, least significant bit first.
@@ -492,6 +506,8 @@ public class TiffTests
     [Theory]
     [InlineData(new byte[] { (byte)'M', (byte)'M', 0, 42, 0, 0, 0, 100 })]   // the IFD past the end
     [InlineData(new byte[] { (byte)'I', (byte)'I', 42, 0, 8, 0, 0, 0, 0, 0 })] // an IFD with no entries
+    [InlineData(new byte[] { (byte)'I', (byte)'I', 42, 0 })]                  // no IFD offset (found by fuzzing)
+    [InlineData(new byte[] { (byte)'M', (byte)'M', 0, 42, 0, 0 })]
     public void Damage_is_an_InvalidDataException(byte[] tiff)
     {
         Assert.True(TiffFile.IsTiffFile(tiff));
