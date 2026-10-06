@@ -20,7 +20,7 @@ public sealed class FuzzTests : IDisposable
     [Fact]
     public void Every_reader_has_a_target()
     {
-        Assert.Equal(["code", "container", "first-aid", "hfs-edit", "ndif-write", "pef", "pict", "pict-write", "resource", "resource-fork", "tiff", "wav",
+        Assert.Equal(["code", "container", "first-aid", "first-aid-repair", "hfs-edit", "ndif-write", "pef", "pict", "pict-write", "resource", "resource-fork", "tiff", "wav",
             "wrappers"], FuzzTargets.All.Keys.Order(StringComparer.Ordinal));
     }
 

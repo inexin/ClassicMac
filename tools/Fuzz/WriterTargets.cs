@@ -53,6 +53,68 @@ internal static class WriterTargets
         }
     }
 
+    // ---- first-aid-repair ----
+
+    // A valid volume (HFS made by a few edits, or one of the HFS Plus seeds), damaged in its first 64 KB (the MDB or
+    // volume header, the bitmap, the B-trees) as the input chooses, then repaired. Repair may refuse damaged data; when it
+    // reports the volume repaired, an independent verify agrees, the volume reads cleanly and a second repair writes
+    // nothing.
+    public static void FirstAidRepair(ReadOnlyMemory<byte> input)
+    {
+        var r = new FuzzReader(input);
+        byte[] volume;
+        if (r.Int(4) == 0)
+        {
+            var plus = FuzzSeeds.HfsPlus().ToList();
+            volume = plus[r.Int(plus.Count)];
+        }
+        else
+        {
+            var date = new MacDate(3_000_000_000);
+            volume = HfsWriter.Format(400 * 1024, "Fuzz", date);
+            var files = new Dictionary<string, (byte[] Data, byte[] Resource)>(StringComparer.Ordinal);
+            var folders = new HashSet<string>(StringComparer.Ordinal) { "" };
+            for (var step = 0; step < 6; step++)
+            {
+                try
+                {
+                    volume = Edit(r, volume, files, folders, date);
+                }
+                catch (Exception e) when (e is ArgumentException or InvalidDataException or InvalidOperationException)
+                {
+                }
+            }
+        }
+
+        var damaged = volume.ToArray();
+        var reach = Math.Min(damaged.Length, 64 * 1024);
+        for (int i = 0, changes = 1 + r.Int(8); i < changes; i++)
+        {
+            damaged[r.Int(reach)] ^= (byte)(r.Byte() | 1);
+        }
+
+        var result = HfsFirstAid.Repair(ForkData.FromBytes(damaged));
+        if (result.Volume is not { } repaired || result.After.Verdict != FirstAidVerdict.AppearsOk)
+        {
+            return;
+        }
+
+        var again = HfsFirstAid.Verify(ForkData.FromBytes(repaired));
+        if (again.Verdict != FirstAidVerdict.AppearsOk)
+        {
+            throw Bad($"A volume First Aid called repaired fails a verify: {string.Join("; ", again.Problems.Select(p => p.Message))}");
+        }
+
+        var diagnostics = new List<Diagnostic>();
+        var file = new MacFile { Name = MacString.FromMacRoman("repaired"), DataFork = ForkData.FromBytes(repaired) };
+        _ = ContainerUnwrapper.Default.Unwrap(file, "host file", new ContainerContext(null, diagnostics));
+        FuzzTargets.ThrowOnFault(diagnostics);
+        if (HfsFirstAid.Repair(ForkData.FromBytes(repaired)).Written)
+        {
+            throw Bad("A repaired volume was repaired again.");
+        }
+    }
+
     private static byte[] Edit(FuzzReader r, byte[] volume, Dictionary<string, (byte[] Data, byte[] Resource)> files, HashSet<string> folders, MacDate date)
     {
         var image = ForkData.FromBytes(volume);
@@ -90,7 +152,7 @@ internal static class WriterTargets
             }
         }
 
-        switch (r.Int(7))
+        switch (r.Int(9))
         {
             case 0:
                 {
@@ -144,6 +206,21 @@ internal static class WriterTargets
                     var result = HfsWriter.Move(image, path, into);
                     Moved(path, Join(into, path[(path.LastIndexOf(':') + 1)..]));
                     return result;
+                }
+            case 7:
+                {
+                    // Defragment (hfs.md §3.4): every fork in one extent, the files and folders unchanged.
+                    Trace?.Invoke("defragment");
+                    return HfsWriter.Defragment(image);
+                }
+            case 8:
+                {
+                    // Resize (hfs.md §3.5), from the smallest size the volume allows up to 2 MB larger, sometimes with a
+                    // new allocation block size: the files and folders unchanged.
+                    var size = (HfsWriter.SmallestSize(image) + 511) / 512 * 512 + r.Int(4096) * 512L;
+                    uint? blockSize = r.Int(4) == 0 ? (uint)(512 << r.Int(4)) : null;
+                    Trace?.Invoke($"resize to {size}{(blockSize is { } b ? $", blocks of {b}" : "")}");
+                    return HfsWriter.Resize(image, size, blockSize);
                 }
             default:
                 {

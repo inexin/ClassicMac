@@ -107,6 +107,7 @@ internal static class FuzzSeeds
             Add("hfs-edit", choices);
             Add("wrappers", choices);
             Add("pict-write", choices);
+            Add("first-aid-repair", choices);
         }
         return FuzzTargets.All.Keys.ToDictionary(t => t,
             t => Directory.Exists(Path.Combine(output, t)) ? Directory.GetFiles(Path.Combine(output, t)).Length : 0, StringComparer.Ordinal);
@@ -165,7 +166,7 @@ internal static class FuzzSeeds
 
     // HFS Plus volumes as the tests build them: one with a folder, a fragmented file, hard links and an attribute, and
     // the same wrapped in an HFS volume.
-    private static IEnumerable<byte[]> HfsPlus()
+    internal static IEnumerable<byte[]> HfsPlus()
     {
         foreach (var wrapped in new[] { false, true })
         {

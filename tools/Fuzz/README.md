@@ -18,7 +18,8 @@ target for five minutes and keeps each target's minimised corpus in the Actions 
 | `wav` | WAV files as the app previews them: made into a `'snd '`, read back and decoded |
 | `first-aid` | First Aid's verify and repair on HFS and HFS Plus volumes |
 | `ndif-write` | NDIF images made, rewritten and split, then read back |
-| `hfs-edit` | Up to 24 edits on a new HFS volume, each checked by the writer's checks, First Aid and a model |
+| `hfs-edit` | Up to 24 edits on a new HFS volume (files and folders, defragment, resize), each checked by the writer's checks, First Aid and a model |
+| `first-aid-repair` | A valid HFS or HFS Plus volume damaged in its metadata, then repaired: a volume called repaired must verify, read cleanly and need no second repair |
 | `wrappers` | MacBinary III, AppleSingle, BinHex, resource forks, DeRez and Rez, ADC, KenCode and PackBits round trips |
 | `pict-write` | `PictWriter` in every pixel format, and recordings of what the port drew |
 

@@ -29,6 +29,24 @@ public sealed class HfsResizeTests
         return image;
     }
 
+    // Found by fuzzing (hfs-edit): a volume grown with 4 KB blocks, then shrunk to its smallest, must still pass First
+    // Aid at each step.
+    [Fact]
+    public void A_volume_resized_down_to_its_smallest_still_passes_First_Aid()
+    {
+        var date = new MacDate(3_000_000_000);
+        var image = HfsWriter.Format(1_638_400, "Fuzz", date);
+        image = HfsWriter.CreateFolder(ForkData.FromBytes(image), "1d", date, date);
+        image = HfsWriter.CreateFolder(ForkData.FromBytes(image), "e2é 3", date, date);
+        foreach (var (size, block) in new (long, uint?)[] { (1_157_120, 4096), (774_144, null), (833_024, null), (27_648, null) })
+        {
+            image = HfsWriter.Resize(ForkData.FromBytes(image), size, block);
+            var report = HfsFirstAid.Verify(ForkData.FromBytes(image));
+            Assert.True(report.Verdict == FirstAidVerdict.AppearsOk,
+                $"after resizing to {size}: " + string.Join("; ", report.Problems.Select(p => $"{p.Number} {p.Message} {p.Arg2} {p.Arg3}")));
+        }
+    }
+
     private static void AssertSameFiles(byte[] before, byte[] after)
     {
         var old = Files(before);

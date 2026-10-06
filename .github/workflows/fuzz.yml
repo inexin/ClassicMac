@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [container, resource-fork, resource, code, pef, pict, tiff, wav, first-aid, ndif-write, hfs-edit, wrappers, pict-write]
+        target: [container, resource-fork, resource, code, pef, pict, tiff, wav, first-aid, first-aid-repair, ndif-write, hfs-edit, wrappers, pict-write]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

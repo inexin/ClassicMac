@@ -594,7 +594,12 @@ sectors). For the new size of N' logical blocks [ClassicMac]:
    bad blocks past the new end are refused too, and so is an HFS wrapper.
 3. The bitmap's bits from the new end on are 0, `drFreeBks` is the new count less the blocks in use, `drAllocPtr` goes
    to 0 when it lies past the end, and `drLsMod` and `drWrCnt` change as for any write (§3).
-4. The MDB's block is copied to N' − 2.
+4. A clump size that no longer fits is set as First Aid's MDB compare sets it (§5.6), or a volume shrunk far would
+   verify as needing repair: `drClpSiz`, when 0, not a multiple of `drAlBlkSiz` or over a quarter of the volume
+   (⌊`drNmAlBlks` ÷ 4⌋ × `drAlBlkSiz`), becomes 4 blocks (one block when 4 blocks are over 1 MB); `drXTClpSiz` and
+   `drCTClpSiz`, when not a multiple of `drAlBlkSiz` or over that quarter, become their file's first extent. A volume
+   laid out again in a new geometry (§3.2) does the same. [ClassicMac; found by fuzzing]
+5. The MDB's block is copied to N' − 2.
 
 The result must pass the writer's checks (§5.5), and every file must read back as the source's, both forks byte for
 byte. A shrink refused for want of a free run succeeds after a defragmentation (§3.4). `SmallestSize` gives the size
