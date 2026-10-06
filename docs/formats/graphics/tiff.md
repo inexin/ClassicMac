@@ -53,13 +53,15 @@ A count (2 bytes), that many 12-byte entries sorted by tag, then the next IFD's 
 | 256 | ImageWidth | (required) | Pixels per row [Author] |
 | 257 | ImageLength | (required) | Rows [Author] |
 | 258 | BitsPerSample | 1 | One value per sample [Author] |
-| 259 | Compression | 1 | 1 none, 5 LZW, 8 and 32946 Deflate, 32773 PackBits, 32809 ThunderScan [Author] |
+| 259 | Compression | 1 | 1 none, 2 CCITT modified Huffman, 3 CCITT Group 3, 4 CCITT Group 4, 5 LZW, 8 and 32946 Deflate, 32771 word-aligned modified Huffman, 32773 PackBits, 32809 ThunderScan [Author] |
 | 262 | PhotometricInterpretation | (required) | 0 WhiteIsZero, 1 BlackIsZero, 2 RGB, 3 palette, 5 separated (CMYK) [Author] |
+| 266 | FillOrder | 1 | 1 most significant bit first; 2 least significant first [Author] |
 | 273 | StripOffsets | (required for strips) | One per strip, per plane when planar [Author] |
 | 277 | SamplesPerPixel | 1 | [Author] |
 | 278 | RowsPerStrip | 2³² − 1 | So one strip by default [Author] |
 | 279 | StripByteCounts | (required for strips) | Compressed bytes per strip [Author] |
 | 284 | PlanarConfiguration | 1 | 1 chunky (a pixel's samples together), 2 planar (a plane per sample) [Author] |
+| 292 | T4Options | 0 | Bit 0 two-dimensional coding; bit 2 fill bits before each EOL [Author] |
 | 317 | Predictor | 1 | 2 the horizontal predictor [Author] |
 | 320 | ColorMap | | 3 × 2^bits SHORTs: all reds, all greens, all blues; 0–65535 [Author] |
 | 322, 323 | TileWidth, TileLength | | Present only in a tiled image [Author] |
@@ -115,6 +117,25 @@ byte's top two bits say what it is [Reference: libtiff]:
 
 Each pixel written is kept to four bits and becomes the last pixel.
 
+### 2.5 CCITT
+
+Bilevel images only. A white run is 0 bits and a black run 1 bits; PhotometricInterpretation then says which is
+white [Author]. With FillOrder 2 each byte's bits are reversed first [Author].
+
+1. **Runs** (T.4 §4.1): a run is any makeup codes (64 to 2560) and then one terminating code (0 to 63), from the white
+   or the black table of T.4 Tables 2 and 3; the codes from 1792 up are shared [Author: ITU-T T.4].
+2. **Modified Huffman** (2): each row is runs from white, alternating, until the width is filled; rows start on a
+   byte boundary, without EOLs. Compression 32771 starts them on a 16-bit word [Author].
+3. **Group 3** (3): each row is preceded by an EOL (eleven zeros and a one, after any fill zeros); with T4Options
+   bit 0, a bit after the EOL says the row is one-dimensional (1) or two-dimensional (0) [Author: ITU-T T.4].
+4. **Two-dimensional rows** (Group 3 with bit 0, and every Group 4 row): changes are coded against the row above,
+   which is white above the first row. From a0 (−1 at the start, the colour white), b1 is the first change on the row
+   above past a0 that turns to the other colour and b2 the change after it; the modes are pass (`0001`: a0 moves to
+   b2), horizontal (`001`, then a run of the current colour and one of the other) and vertical (`1`, `011`/`010`,
+   `000011`/`000010`, `0000011`/`0000010`: a1 is b1 + 0, ±1, ±2, ±3, and the colour flips) [Author: ITU-T T.4 §4.2,
+   T.6].
+5. **Group 4** (4): two-dimensional rows without EOLs or alignment [Author: ITU-T T.6].
+
 ## 3. Writing
 
 None.
@@ -155,17 +176,21 @@ None.
   RGB; palettes of 4 and 16 bits; PackBits; LZW past 9-bit codes with the predictor over two strips; TIFF 5.0 LZW;
   Deflate; ThunderScan; planar samples; tiles cut at the edge; alpha, associated and not; 16-bit RGB; CMYK; a short
   strip; what is not read; damage; other files.
+- `tests/ClassicMac.Graphics.Tests/TiffFaxTests.cs`: modified Huffman, word-aligned rows, makeup and extended codes,
+  Group 3 one- and two-dimensional, fill bits before EOLs, Group 4 vertical and pass modes, FillOrder 2, BlackIsZero,
+  damaged data.
 - `tests/ClassicMac.App.Tests/FilePreviewTests.cs`: the preview by type and by extension.
 - libtiff's sample images (libtiff-pics, not in the repository) were decoded and compared with ImageSharp's reader:
   `cramps.tif` (big-endian PackBits), `cramps-tile.tif` and `quad-tile.tif` (tiles), `jello.tif`, `strike.tif` (LZW
   palette, RGBA), `ladoga.tif` (16-bit Deflate), `oxford.tif` (planar LZW), `pc260001.tif`, the `jim___*` halftones
-  and the `depth/flower-*` set (grey, palette, RGB chunky and planar, CMYK, 2 to 32 bits) all match within 1 level.
+  and the `depth/flower-*` set (grey, palette, RGB chunky and planar, CMYK, 2 to 32 bits), and `fax2d.tif` and
+  `g3test.tif` (Group 3 two- and one-dimensional), all match within 1 level.
   `quad-lzw.tif` (TIFF 5.0 LZW) and `text.tif` (ThunderScan, a scanned Mac printout), which ImageSharp does not read,
   were checked by eye; `text.tif`'s last strip holds 36 of its 39 rows.
 
 ## 8. Not covered
 
-- Compression: CCITT (2, 3, 4), JPEG (6, 7), SGILog (34676, 34677), NeXT and others.
+- Compression: JPEG (6, 7), SGILog (34676, 34677), NeXT (32766) and others; CCITT's uncompressed mode (T.4 extensions).
 - Photometric interpretations: YCbCr (6), CIE L\*a\*b\* (8), LogL and LogLuv; CMYK ink sets other than 1.
 - Floating-point samples (SampleFormat 3) and the floating-point predictor (3).
 - More than one image; colour management (ICC profiles); writing TIFF.
@@ -174,6 +199,7 @@ None.
 
 - Adobe Developers Association, *TIFF Revision 6.0, Final*, 3 June 1992.
 - Adobe, *TIFF Technical Note 2*, 17 March 2002: Deflate compression.
+- ITU-T Recommendation T.4 (Group 3 facsimile) and T.6 (Group 4 facsimile).
 - libtiff (BSD-style licence): `tif_lzw.c` (the code-width rule of §2.2 and TIFF 5.0's LZW), `tif_thunder.c` (§2.4),
   `tif_getimage.c` (CMYK), `tif_dirread.c` (the tile and strip tags), as behaviour only.
 - libtiff-pics, the libtiff test images (<https://gitlab.com/libtiff/libtiff-pics>).

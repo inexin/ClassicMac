@@ -10,17 +10,18 @@ namespace ClassicMac.Graphics;
 /// <summary>
 /// TIFF images (file type <c>TIFF</c>; <c>.tif</c>, <c>.tiff</c>; docs/formats/graphics/tiff.md): the first image of
 /// the file, in either byte order, in strips or tiles, chunky or planar; uncompressed, PackBits, LZW (TIFF 6.0's and
-/// TIFF 5.0's), Deflate and ThunderScan, with the horizontal predictor; bilevel, grey, palette, RGB (with an alpha extra
-/// sample) and CMYK pixels of 1 to 32 bits per sample.
+/// TIFF 5.0's), Deflate, ThunderScan and CCITT fax (modified Huffman, Group 3, Group 4), with the horizontal
+/// predictor; bilevel, grey, palette, RGB (with an alpha extra sample) and CMYK pixels of 1 to 32 bits per sample.
 /// </summary>
 public static class TiffFile
 {
     private const ushort ImageWidth = 256, ImageLength = 257, BitsPerSample = 258, CompressionTag = 259, PhotometricTag = 262,
         StripOffsets = 273, SamplesPerPixel = 277, RowsPerStrip = 278, StripByteCounts = 279, PlanarConfiguration = 284,
         PredictorTag = 317, ColorMap = 320, TileWidth = 322, TileLength = 323, TileOffsets = 324, TileByteCounts = 325,
-        InkSet = 332, ExtraSamples = 338, SampleFormat = 339;
+        InkSet = 332, ExtraSamples = 338, SampleFormat = 339, FillOrder = 266, T4Options = 292;
 
-    private const ushort None = 1, Lzw = 5, Deflate = 8, AdobeDeflate = 32946, PackBitsCompression = 32773, ThunderScan = 32809;
+    private const ushort None = 1, Lzw = 5, Deflate = 8, AdobeDeflate = 32946, PackBitsCompression = 32773, ThunderScan = 32809,
+        CcittRle = 2, CcittGroup3 = 3, CcittGroup4 = 4, CcittRlew = 32771;
 
     private const ushort WhiteIsZero = 0, BlackIsZero = 1, Rgb = 2, Palette = 3, Separated = 5;
 
@@ -97,8 +98,8 @@ public static class TiffFile
     private sealed class Image
     {
         public int Width, Height, Samples, Depth, ColorSamples;
-        public uint Photometric, Compression, Predictor, Alpha;
-        public bool Planar;
+        public uint Photometric, Compression, Predictor, Alpha, FaxOptions;
+        public bool Planar, Reversed;
         public RgbaColor[]? Map;
 
         // The units the pixels are stored in (strips or tiles): where each lies in the file and in the image.
@@ -120,7 +121,8 @@ public static class TiffFile
 
             (image.Width, image.Height) = ((int)width, (int)height);
             image.Compression = One(CompressionTag, None);
-            if (image.Compression is not (None or Lzw or Deflate or AdobeDeflate or PackBitsCompression or ThunderScan))
+            if (image.Compression is not (None or Lzw or Deflate or AdobeDeflate or PackBitsCompression or ThunderScan
+                or CcittRle or CcittGroup3 or CcittGroup4 or CcittRlew))
             {
                 throw new NotSupportedException($"The image is compressed with {CompressionName(image.Compression)}, which is not read.");
             }
@@ -156,6 +158,13 @@ public static class TiffFile
                 throw new NotSupportedException($"ThunderScan compression of {image.Samples} samples of {image.Depth} bits is not read (only 4-bit grey).");
             }
 
+            if (image.Compression is CcittRle or CcittGroup3 or CcittGroup4 or CcittRlew && (image.Depth != 1 || image.Samples != 1))
+            {
+                throw new NotSupportedException($"CCITT compression of {image.Samples} samples of {image.Depth} bits is not read (only bilevel).");
+            }
+
+            image.FaxOptions = One(T4Options, 0);
+            image.Reversed = One(FillOrder, 1) == 2;
             image.Predictor = One(PredictorTag, 1);
             if (image.Predictor == 2 && image.Depth is not (8 or 16 or 32) || image.Predictor > 2)
             {
@@ -240,6 +249,18 @@ public static class TiffFile
                 var start = unit.Offset;
                 var length = Math.Min(unit.Count, Math.Max(0, file.Length - start));
                 var packed = file.Slice(start, length);
+                if (Reversed)
+                {
+                    // FillOrder 2: each byte's bits stored least significant first.
+                    var reversed = packed.ToArray();
+                    for (var i = 0; i < reversed.Length; i++)
+                    {
+                        reversed[i] = (byte)(((reversed[i] * 0x0202020202UL) & 0x010884422010UL) % 1023);
+                    }
+
+                    packed = reversed;
+                }
+
                 var buffer = new byte[expected];
                 var written = Compression switch
                 {
@@ -247,6 +268,7 @@ public static class TiffFile
                     Deflate or AdobeDeflate => Inflate(packed, buffer),
                     PackBitsCompression => PackBits.Unpack(packed, buffer).Written,
                     ThunderScan => ThunderDecode(packed, buffer, unit.Width, unit.Height),
+                    CcittRle or CcittGroup3 or CcittGroup4 or CcittRlew => CcittFax.Decode(packed, buffer, unit.Width, unit.Height, Compression, FaxOptions),
                     _ => Copy(packed, buffer),
                 };
                 if (written < expected)
@@ -637,11 +659,8 @@ public static class TiffFile
 
     private static string CompressionName(uint compression) => compression switch
     {
-        2 => "CCITT modified Huffman",
-        3 => "CCITT Group 3",
-        4 => "CCITT Group 4",
         6 or 7 => "JPEG",
-        32771 => "NeXT",
+        32766 => "NeXT",
         34676 or 34677 => "SGILog",
         _ => $"scheme {compression}",
     };
