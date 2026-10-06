@@ -7,7 +7,7 @@ SkiaSharp are separate packages.
 
 | Package or namespace | What it is |
 |---|---|
-| `ClassicMac.Graphics` | The base: the RGBA `RgbaBitmap`, colours, PixMaps, standard colour tables, PackBits, MacPaint documents. |
+| `ClassicMac.Graphics` | The base: the RGBA `RgbaBitmap`, colours, PixMaps, standard colour tables, PackBits, MacPaint documents, TIFF images. |
 | `ClassicMac.Graphics.Fonts` | Bitmap strikes (`NFNT`/`FONT`), families (`FOND`), font colour tables, TrueType `sfnt` data ([bitmap-fonts.md](https://github.com/inexin/ClassicMac/blob/main/docs/formats/resources/bitmap-fonts.md), [font-families.md](https://github.com/inexin/ClassicMac/blob/main/docs/formats/resources/font-families.md), [outline-fonts.md](https://github.com/inexin/ClassicMac/blob/main/docs/formats/resources/outline-fonts.md)). |
 | `ClassicMac.Graphics.QuickTime` | QuickTime still images: the codecs, the codec hook, QTIF files. |
 | `ClassicMac.Graphics.QuickDraw` | The software QuickDraw that draws everything (Mac OS 9 or the 68k ROM), text, screen depths. |
@@ -60,6 +60,8 @@ port.CopyBits(PixMap.FromBitMap(icon, 4, new MacRect(0, 0, 32, 32)), new MacRect
 - **QuickTime images**: `raw `, `rle ` (Animation), `rpza` (Road Pizza), `smc ` (Graphics), `cvid` (Cinepak), `8BPS`,
   `yuv2`, `YVU9`, `tga ` and `PNTG` are decoded by the core; others go to an `IPictImageCodec`. A decoded image skips
   the picture's "QuickTime is required" fallback.
+- **TIFF images**: `TiffFile` decodes baseline TIFF 6.0 files (either byte order; uncompressed, PackBits and LZW
+  strips; bilevel, grey, palette, RGB with alpha and CMYK) ([tiff.md](https://github.com/inexin/ClassicMac/blob/main/docs/formats/graphics/tiff.md)).
 - **QuickTime image files and MacPaint documents**: `QuickTimeImageFile` decodes standalone QTIF files (with their
   resolution and ICC profile) and `MacPaintFile` decodes MacPaint (PNTG) documents, MacBinary-wrapped or not. The
   ImageSharp plugin registers both formats for loading.

@@ -10,8 +10,8 @@ QuickDraw.Pict (formerly <https://github.com/inexin/QuickDraw.Pict>) moved into 
 **exactly the pixels a Macintosh draws**. The public drawing API is `QuickDrawPort`, whose members carry QuickDraw's names.
 
 - The specs: `docs/formats/graphics/pict.md` (the picture format and playback), `docs/formats/graphics/quickdraw.md`
-  (the drawing rules), `graphics/quicktime.md`, `graphics/macpaint.md`, and `resources/icons.md`, `icon-families.md`,
-  `cursors.md`, `patterns.md`. Update the matching section in the same change as any behaviour change (each has a "Not
+  (the drawing rules), `graphics/quicktime.md`, `graphics/macpaint.md`, `graphics/tiff.md`, and `resources/icons.md`,
+  `icon-families.md`, `cursors.md`, `patterns.md`. Update the matching section in the same change as any behaviour change (each has a "Not
   covered" section (§8) and a "Variants" section (§4) with the Mac OS 9 differences; screen depths are
   `docs/formats/graphics/quickdraw.md` §4.6–§4.11).
 - **Two QuickDraws:** `PictDecodeOptions.QuickDraw` selects `MacOS9` (default) or `MacRom` (the 68k ROM $077D). Any
@@ -32,7 +32,7 @@ and may use only the layers below it, which `LayeringTests` checks. The adapters
 
 | Folder (namespace) | Contains | Uses |
 | --- | --- | --- |
-| root, `MacPaint/` (`ClassicMac.Graphics`) | `RgbaBitmap`, `RgbaColor`, `PixMap` records, standard colour tables, `MacPaintFile` (also QuickTime's `PNTG` codec) | Core (`PackBits`, shared with StuffIt's method 6) |
+| root, `MacPaint/`, `Tiff/` (`ClassicMac.Graphics`) | `RgbaBitmap`, `RgbaColor`, `PixMap` records, standard colour tables, `MacPaintFile` (also QuickTime's `PNTG` codec), `TiffFile` | Core (`PackBits`, shared with StuffIt's method 6) |
 | `Fonts/` (`.Fonts`) | The Font Manager's resources: `BitmapFont` (`NFNT`/`FONT`), `FontFamily` (`FOND`), `fctb`, `OutlineFont` (`sfnt`) | base |
 | `QuickTime/` (`.QuickTime`) | Image descriptions, the codecs, `IPictImageCodec`, QTIF files | base |
 | `QuickDraw/` (`.QuickDraw`) | The renderer: the public `QuickDrawPort` (state and verbs) over `Engine/`, `Regions/`, `Text/`; `QuickDrawPattern`, `Region`, `FontLibrary`, `QuickDrawOptions` | base, Fonts |
@@ -83,4 +83,5 @@ correct.
   codecs go through `IPictImageCodec`.
 - `ClassicMac.Resources.Decoders/Images/QuickDrawResources`: icons, cursors and patterns from resource bytes.
 - `ClassicMac.Graphics/MacPaint/MacPaintFile`: MacPaint documents.
+- `ClassicMac.Graphics/Tiff/TiffFile`: TIFF images.
 - `ClassicMac.Graphics/Pict/PictWriter`: the encoder.

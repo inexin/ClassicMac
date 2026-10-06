@@ -11,9 +11,9 @@ using SkiaSharp;
 namespace ClassicMac.App.ViewModels;
 
 /// <summary>
-/// Picture files previewed as their image: MacPaint documents and QuickTime image files by ClassicMac's decoders,
-/// JPEG, PNG, GIF, BMP and WebP files by the platform's (SkiaSharp). A file is taken by its type or its name's
-/// extension, or, with no type of its own, by its signature; the bytes must then decode.
+/// Picture files previewed as their image: MacPaint documents, TIFF images and QuickTime image files by ClassicMac's
+/// decoders, JPEG, PNG, GIF, BMP and WebP files by the platform's (SkiaSharp). A file is taken by its type or its
+/// name's extension, or, with no type of its own, by its signature; the bytes must then decode.
 /// </summary>
 internal static class FilePictures
 {
@@ -59,6 +59,11 @@ internal static class FilePictures
             }
 
             var untyped = file.FinderInfo.Type == default || type == "????";
+            if ((type == "TIFF" || extension is "tif" or "tiff" || untyped) && TiffFile.IsTiffFile(file.DataFork.ReadPrefix(4)))
+            {
+                return Encode(TiffFile.Decode(file.DataFork.ToArray()), "TIFF");
+            }
+
             if (!CommonTypes.Contains(type) && !(extension is not null && CommonExtensions.Contains(extension)) && !untyped)
             {
                 return null;

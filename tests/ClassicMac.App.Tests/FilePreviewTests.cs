@@ -58,6 +58,27 @@ public class FilePreviewTests : IDisposable
         return [.. Atom("idsc", description), .. Atom("idat", pixels)];
     }
 
+    // A big-endian TIFF, as Mac programs wrote them: 2 × 1 uncompressed RGB.
+    private static byte[] Tiff()
+    {
+        byte[] Entry(ushort tag, ushort type, uint value) =>
+            [(byte)(tag >> 8), (byte)tag, 0, (byte)type, 0, 0, 0, 1, .. type == 3 ? new byte[] { (byte)(value >> 8), (byte)value, 0, 0 }
+                : [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value]];
+        const uint data = 8 + 2 + 9 * 12 + 4 + 6;   // after the IFD and BitsPerSample's three values
+        const uint bitsAt = 8 + 2 + 9 * 12 + 4;
+        byte[] bits = [0, 8, 0, 8, 0, 8];
+        byte[] ifd =
+        [
+            0, 9,
+            .. Entry(256, 4, 2), .. Entry(257, 4, 1),
+            0x01, 0x02, 0, 3, 0, 0, 0, 3, (byte)(bitsAt >> 24), (byte)(bitsAt >> 16), (byte)(bitsAt >> 8), (byte)bitsAt,
+            .. Entry(259, 3, 1), .. Entry(262, 3, 2), .. Entry(273, 4, data), .. Entry(277, 3, 3), .. Entry(278, 4, 1),
+            .. Entry(279, 4, 6),
+            0, 0, 0, 0,
+        ];
+        return [.. "MM"u8, 0, 42, 0, 0, 0, 8, .. ifd, .. bits, 255, 0, 0, 0, 0, 255];
+    }
+
     // The files the tests read, each on a disk of its own.
     private static readonly Dictionary<string, (byte[] Data, string Type, string Creator)> Files = new()
     {
@@ -66,6 +87,8 @@ public class FilePreviewTests : IDisposable
         ["Not a picture.jpg"] = ("hello"u8.ToArray(), NoCode, NoCode),
         ["Painting"] = (MacPaint(), "PNTG", "MPNT"),
         ["Still"] = (QuickTimeImage(), "qtif", "ogle"),
+        ["Scan"] = (Tiff(), "TIFF", "8BIM"),
+        ["scan.tif"] = (Tiff(), NoCode, NoCode),
         ["readme.txt"] = (Encoding.UTF8.GetBytes("Café au lait\n"), NoCode, NoCode),
         ["notes.txt"] = ([(byte)'C', (byte)'a', (byte)'f', 0x8E], "????", "????"),
     };
@@ -91,6 +114,8 @@ public class FilePreviewTests : IDisposable
     [InlineData("photo.jpg", 4, 3, "JPEG")]
     [InlineData("Painting", 576, 720, "MacPaint")]
     [InlineData("Still", 2, 1, "QuickTime image")]
+    [InlineData("Scan", 2, 1, "TIFF")]
+    [InlineData("scan.tif", 2, 1, "TIFF")]
     public async Task A_picture_file_previews_as_its_image(string name, int width, int height, string format)
     {
         var preview = await Preview(name);

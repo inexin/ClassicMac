@@ -2,15 +2,16 @@ using System.Text.RegularExpressions;
 
 namespace ClassicMac.Graphics.Tests;
 
-// ClassicMac.Graphics is one package in layers, a folder and namespace each: the base (the project's root and MacPaint/,
-// namespace ClassicMac.Graphics), then Fonts, QuickTime and QuickDraw, then Pict. A layer may use only the ones below
-// it; a sibling or higher layer can only be reached by naming its namespace, which this test looks for.
+// ClassicMac.Graphics is one package in layers, a folder and namespace each: the base (the project's root, MacPaint/
+// and Tiff/, namespace ClassicMac.Graphics), then Fonts, QuickTime and QuickDraw, then Pict. A layer may use only the
+// ones below it; a sibling or higher layer can only be reached by naming its namespace, which this test looks for.
 public class LayeringTests
 {
     private static readonly Dictionary<string, string[]> Allowed = new()
     {
         [""] = [],
         ["MacPaint"] = [],
+        ["Tiff"] = [],
         ["Fonts"] = [],
         ["QuickTime"] = [],
         ["QuickDraw"] = ["Fonts"],
