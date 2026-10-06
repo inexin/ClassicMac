@@ -10,6 +10,7 @@
     <Project Path="src/ClassicMac.Graphics/ClassicMac.Graphics.csproj" />
     <Project Path="src/ClassicMac.Graphics.ImageSharp/ClassicMac.Graphics.ImageSharp.csproj" />
     <Project Path="src/ClassicMac.Graphics.SkiaSharp/ClassicMac.Graphics.SkiaSharp.csproj" />
+    <Project Path="src/ClassicMac/ClassicMac.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ClassicMac.App.Tests/ClassicMac.App.Tests.csproj" />

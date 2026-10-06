@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>ClassicMac.Resources</PackageId>
+    <!-- Packed inside the ClassicMac package (src/ClassicMac), not on its own. -->
+    <IsPackable>false</IsPackable>
+    <!-- Its symbols travel inside the DLL: a package that carries other projects' assemblies has no symbol package. -->
+    <DebugType>embedded</DebugType>
     <Description>Dependency-free reader and writer for classic Mac OS resource forks, as the Resource Manager reads and compacts them: the System's compressed-resource decompressors (dcmp 0-3), edits with undo, export to files with a JSON manifest and back, and Rez and DeRez.</Description>
-    <PackageTags>macintosh;classic-mac;resource-fork;rsrc;dcmp</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

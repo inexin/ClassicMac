@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The ClassicMac package: no code of its own. It carries the Resources, Files, Code and Resources.Decoders
+       assemblies, which stay separate projects (LayeringTests keeps their layers), and depends on the ClassicMac.Core
+       and ClassicMac.Graphics packages (docs/PLAN.md, "Packages"). The carried assemblies embed their symbols, so
+       there is no symbol package. -->
+  <PropertyGroup>
+    <PackageId>ClassicMac</PackageId>
+    <Description>Classic Mac OS files in .NET: resource forks (read, edited, written, dcmp, Rez), every container they travel in (MacBinary, BinHex, AppleSingle/Double, StuffIt, Compact Pro, DiskDoubler, PackIt, LHA, zip, tar; Disk Copy, NDIF, DART and UDIF images, partition maps, CDs; HFS, HFS Plus, MFS, ISO 9660 and FAT), HFS writing and First Aid, the resource decoders (pictures, icons, sounds, text, fonts, dialogs and menus, Finder windows, documents to HTML) and classic code (PEF, 68k, disassemblers).</Description>
+    <PackageTags>macintosh;classic-mac;resource-fork;hfs;disk-image;macbinary;binhex;stuffit;pict;disassembler</PackageTags>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);BundledAssemblies</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Package dependencies. -->
+    <ProjectReference Include="..\ClassicMac.Core\ClassicMac.Core.csproj" />
+    <ProjectReference Include="..\ClassicMac.Graphics\ClassicMac.Graphics.csproj" />
+    <!-- Carried inside the package. -->
+    <ProjectReference Include="..\ClassicMac.Resources\ClassicMac.Resources.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\ClassicMac.Files\ClassicMac.Files.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\ClassicMac.Code\ClassicMac.Code.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\ClassicMac.Resources.Decoders\ClassicMac.Resources.Decoders.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- The carried assemblies and their XML docs, from what their references copy here, into lib/. -->
+  <Target Name="BundledAssemblies" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <_BundledAssembly Include="@(ReferenceCopyLocalPaths)"
+                        Condition="'%(Extension)' == '.dll' and ('%(Filename)' == 'ClassicMac.Resources' or '%(Filename)' == 'ClassicMac.Files' or '%(Filename)' == 'ClassicMac.Code' or '%(Filename)' == 'ClassicMac.Resources.Decoders')" />
+      <TfmSpecificPackageFile Include="@(_BundledAssembly)" PackagePath="lib/$(TargetFramework)" />
+      <TfmSpecificPackageFile Include="@(_BundledAssembly->'%(RootDir)%(Directory)%(Filename).xml')" PackagePath="lib/$(TargetFramework)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

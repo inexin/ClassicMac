@@ -27,7 +27,7 @@ publishes nothing, and the tag can be deleted and pushed again.
 | `ClassicMac-<version>-osx-arm64.zip`, `-osx-x64.zip` | `ClassicMac.app` for Apple silicon and Intel Macs, with its icon |
 | `ClassicMac-<version>-linux-x64.tar.gz` | The app, its icons and a `.desktop` file; `install.sh` installs it for the user (`--uninstall` removes it) |
 | `ClassicMac-CLI-<version>-<runtime>.zip` / `.tar.gz` | The command line as one file, `classicmac` (`classicmac.exe` on Windows) |
-| `*.nupkg`, `*.snupkg` | The library packages and the `classicmac` .NET tool, with symbols |
+| `*.nupkg`, `*.snupkg` | The five library packages (`ClassicMac`, `.Core`, `.Graphics`, `.Graphics.ImageSharp`, `.Graphics.SkiaSharp`) and the `classicmac` .NET tool, with symbols (`ClassicMac`'s are embedded in its assemblies) |
 
 Everything is self-contained: users need no .NET install. The NuGet packages are also pushed to nuget.org when the
 repository has a `NUGET_API_KEY` secret (Settings ▸ Secrets and variables ▸ Actions); without it they are only attached.

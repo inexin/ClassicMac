@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>ClassicMac.Resources.Decoders</PackageId>
+    <!-- Packed inside the ClassicMac package (src/ClassicMac), not on its own. -->
+    <IsPackable>false</IsPackable>
+    <!-- Its symbols travel inside the DLL: a package that carries other projects' assemblies has no symbol package. -->
+    <DebugType>embedded</DebugType>
     <Description>Decoders that turn classic Mac OS resources and documents into modern files for ClassicMac's exporter: pictures, icons, cursors and patterns (PNG or WebP), sounds (WAV), text and styled text (UTF-8, RTF, JSON), fonts (PNG strikes, TrueType), dialogs, menus and Finder windows drawn as the Mac drew them, DOCMaker, SimpleText and Word documents (HTML), code listings, and resource templates.</Description>
-    <PackageTags>macintosh;classic-mac;resource-fork;styl;rtf;decoder</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

@@ -21,18 +21,16 @@ dotnet run --project src/ClassicMac.Cli -- extract "App.rsrc" -o out
 
 ## Libraries
 
-Each is a NuGet package; the arrows in [the plan's architecture](docs/PLAN.md#architecture) show what uses what.
+Five NuGet packages, plus the command line as a .NET tool (`ClassicMac.Cli`). The arrows in
+[the plan's architecture](docs/PLAN.md#architecture) show what uses what.
 
 | Package | What it is |
 | --- | --- |
+| [ClassicMac](src/ClassicMac/README.md) | Most people want this one. It carries four assemblies: [Resources](src/ClassicMac.Resources/README.md) (resource forks, `dcmp`, export, Rez), [Files](src/ClassicMac.Files/README.md) (containers, disk images, file systems, HFS writing, First Aid), [Code](src/ClassicMac.Code/README.md) (PEF, 68k, disassemblers) and [Resources.Decoders](src/ClassicMac.Resources.Decoders/README.md) (resources and documents to modern files) |
 | [ClassicMac.Core](src/ClassicMac.Core/README.md) | Shared types: four-character codes, Mac strings and dates, Mac text encodings, big-endian reading and writing, diagnostics |
-| [ClassicMac.Resources](src/ClassicMac.Resources/README.md) | Resource forks: read, edit, write, `dcmp` decompression, export with a manifest, Rez and DeRez |
-| [ClassicMac.Files](src/ClassicMac.Files/README.md) | Mac files and their containers: wrappers, archives, disk images and file systems, HFS writing and First Aid |
-| [ClassicMac.Graphics](src/ClassicMac.Graphics/README.md) | QuickDraw, drawing exactly what a Mac draws: PICT read and write, QuickTime images, MacPaint, fonts |
+| [ClassicMac.Graphics](src/ClassicMac.Graphics/README.md) | QuickDraw, drawing exactly what a Mac draws: PICT read and write, QuickTime images, MacPaint, fonts; usable on its own |
 | [ClassicMac.Graphics.ImageSharp](src/ClassicMac.Graphics.ImageSharp/README.md) | PICT, QTIF and MacPaint as an ImageSharp format |
 | [ClassicMac.Graphics.SkiaSharp](src/ClassicMac.Graphics.SkiaSharp/README.md) | PICT, QTIF and MacPaint to and from SkiaSharp bitmaps |
-| [ClassicMac.Code](src/ClassicMac.Code/README.md) | Classic Mac code: PEF, `cfrg`, 68k applications and code resources, 68k and PowerPC disassemblers |
-| [ClassicMac.Resources.Decoders](src/ClassicMac.Resources.Decoders/README.md) | Resources and documents to modern files: images, sound, text, fonts, UI resources, documents to HTML, code listings |
 
 ## Building and testing
 

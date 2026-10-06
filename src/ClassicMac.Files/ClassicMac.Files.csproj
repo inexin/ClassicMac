@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>ClassicMac.Files</PackageId>
+    <!-- Packed inside the ClassicMac package (src/ClassicMac), not on its own. -->
+    <IsPackable>false</IsPackable>
+    <!-- Its symbols travel inside the DLL: a package that carries other projects' assemblies has no symbol package. -->
+    <DebugType>embedded</DebugType>
     <Description>Classic Mac OS files as the Mac saw them (name, Finder info, dates, data and resource forks) and every container that carries them, through any nesting: AppleSingle, AppleDouble, MacBinary, BinHex, Basilisk II folders; StuffIt, Compact Pro, DiskDoubler, PackIt, LHA, zip and tar archives; Disk Copy, NDIF, DART and UDIF images, partition maps and CDs; HFS, HFS Plus, MFS, ISO 9660 and FAT file systems. Writes the wrappers and HFS volumes, and checks and repairs HFS and HFS Plus volumes (First Aid).</Description>
-    <PackageTags>macintosh;classic-mac;finder-info;macbinary;binhex;stuffit;zip;tar;appledouble;applesingle</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

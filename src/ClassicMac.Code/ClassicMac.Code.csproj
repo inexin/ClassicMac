@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>ClassicMac.Code</PackageId>
+    <!-- Packed inside the ClassicMac package (src/ClassicMac), not on its own. -->
+    <IsPackable>false</IsPackable>
+    <!-- Its symbols travel inside the DLL: a package that carries other projects' assemblies has no symbol package. -->
+    <DebugType>embedded</DebugType>
     <Description>Readers for classic Mac OS executable code: PowerPC PEF containers and code fragment resources (cfrg) with the loader's imports, exports and relocations; 68k applications (CODE segments, jump table, data initialisers) and code resources; 68k and PowerPC disassemblers producing annotated listings.</Description>
-    <PackageTags>macintosh;classic-mac;pef;cfrg;powerpc;code-fragment</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
