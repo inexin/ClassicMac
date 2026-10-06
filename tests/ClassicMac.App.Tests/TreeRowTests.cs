@@ -19,7 +19,7 @@ public class TreeRowTests : IDisposable
         node.Children.OfType<T>().Single(c => c.Title == title);
 
     // An ICN# whose icon is all black (full mask); an ics# whose icon is black in its left half.
-    private static byte[] Icn() => Enumerable.Repeat((byte)0xFF, 256).ToArray();
+    internal static byte[] Icn() => Enumerable.Repeat((byte)0xFF, 256).ToArray();
 
     private static byte[] IcsLeftHalf() => [.. Enumerable.Range(0, 16).SelectMany(_ => new byte[] { 0xFF, 0 }), .. Enumerable.Repeat((byte)0xFF, 32)];
 
@@ -35,7 +35,7 @@ public class TreeRowTests : IDisposable
         return stream.ToArray();
     }
 
-    private static FinderInfo Info(string type, string creator, FinderFlags flags = FinderFlags.None) =>
+    internal static FinderInfo Info(string type, string creator, FinderFlags flags = FinderFlags.None) =>
         new() { Type = FourCC.FromString(type), Creator = FourCC.FromString(creator), Flags = flags };
 
     // A disk: an application, a document with icon resources (ICN# 128 alone, ICN# and ics# 129, a cicn and a CURS),
@@ -239,25 +239,18 @@ public class TreeRowTests : IDisposable
     }
 
     [Fact]
-    public async Task Files_show_their_Finder_icon_and_folders_never_do()
+    public async Task Files_and_folders_show_their_kind_icon_in_the_tree()
     {
         var model = new MainViewModel();
         var input = (await model.OpenAsync(Disk(folder)))!;
-        var custom = Child<FileNode>(input, "Custom");
         var containers = Child<FolderNode>(input, "Containers");
 
-        await custom.RequestIconAsync();
-        var icon = Decode(custom.IconPng!);
-        Assert.Equal((16, 16), (icon.Width, icon.Height));
-        Assert.Equal(Black, icon[8, 8]);
-
-        // Without the System's generic icons, a plain document keeps the kind icon; a folder never asks.
-        var app = Child<FileNode>(input, "App");
-        await app.RequestIconAsync();
-        Assert.Null(app.IconPng);
-        await containers.RequestIconAsync();
-        Assert.Null(containers.IconPng);
-        Assert.Equal(2, NodeImages.ResolvedIcons(custom));
+        // A file's own Finder icon is for the inspector's header (FileTypeIconTests); the tree shows its type's icon.
+        foreach (var node in new NodeViewModel[] { Child<FileNode>(input, "Custom"), Child<FileNode>(input, "App"), containers })
+        {
+            await node.RequestIconAsync();
+            Assert.Null(node.IconPng);
+        }
     }
 
     [Fact]
@@ -265,10 +258,13 @@ public class TreeRowTests : IDisposable
     {
         var model = new MainViewModel();
         var input = (await model.OpenAsync(Disk(folder)))!;
-        var custom = Child<FileNode>(input, "Custom");
-        await Task.WhenAll(custom.RequestIconAsync(), custom.RequestIconAsync());
-        await custom.RequestIconAsync();
-        Assert.Equal(1, NodeImages.ResolvedIcons(custom));
-        Assert.NotNull(custom.IconPng);
+        var icons = Child<FileNode>(input, "Icons");
+        await icons.EnsureLoadedAsync();
+        var icon = Child<ResourceTypeNode>(icons, "'ICN#' (2)").Children[0];
+        await Task.WhenAll(icon.RequestIconAsync(), icon.RequestIconAsync());
+        var first = icon.IconPng;
+        await icon.RequestIconAsync();
+        Assert.NotNull(first);
+        Assert.Same(first, icon.IconPng);
     }
 }

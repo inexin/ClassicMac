@@ -27,6 +27,20 @@ public enum TreeIconKind
 
     /// <summary>A "No name" group: two stacked documents (design/boards/tree-no-name.md).</summary>
     NoNameGroup,
+
+    // Files by what they are (FileTypeIcons): a page with an emblem, or a shape of their own.
+    Picture,
+    Sound,
+    Movie,
+    Pdf,
+    WebPage,
+    WordProcessor,
+    Spreadsheet,
+    Font,
+    Extension,
+    ControlPanel,
+    Preferences,
+    SystemFile,
 }
 
 // Text a tree row and the Details tab show for a node: its type and creator, a size, its host size.
@@ -82,8 +96,8 @@ public static class NodeImages
 {
     internal static readonly HashSet<string> SuiteTypes = ["ICN#", "icl4", "icl8", "ics#", "ics4", "ics8", "icm#", "icm4", "icm8"];
 
-    /// <summary>How many file icons the volume holding <paramref name="node"/> has resolved (for tests).</summary>
-    internal static int ResolvedIcons(NodeViewModel node) => FolderPreviews.ResolvedTreeIcons(node);
+    /// <summary>How many rows of <paramref name="node"/>'s input have asked for their icon (for tests).</summary>
+    internal static int ResolvedIcons(NodeViewModel node) => node.Input.IconRequests;
 
     internal static bool IsIconResource(string type) => SuiteTypes.Contains(type) || type is "icns" or "cicn" or "CURS";
 
@@ -93,15 +107,15 @@ public static class NodeImages
 
     /// <summary>
     /// The node's large icon for the inspector's header, as PNG: an icon resource's family at 32 × 32 (at 16 when it
-    /// has only small members), a cicn fitted into 32, a cursor as it is; a file's Finder icon at 32. Null for the
-    /// others (the header shows the kind icon).
+    /// has only small members), a cicn fitted into 32, a cursor as it is; a file's own Finder icon at 32. Null for the
+    /// others (the header shows the kind icon, a file's by its type).
     /// </summary>
     internal static byte[]? LargeIcon(NodeViewModel node) => node switch
     {
         ResourceNode resource when IsIconResource(resource.Resource.Type.ToString()) => ResourceIcon(resource, large: true),
         ResourceNode { Resource.Type: var type } resource when type.ToString() == "PICT" => Thumbnail(resource),
         ResourceNode { Resource.Type: var type } resource when type.ToString() == "FOND" => FamilyTile(resource),
-        FileNode file => FolderPreviews.FinderIcon(file, 32),
+        FileNode file => FolderPreviews.OwnIcon(file, 32),
         _ => null,
     };
 

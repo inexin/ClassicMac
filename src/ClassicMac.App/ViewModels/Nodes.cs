@@ -166,8 +166,6 @@ public abstract partial class NodeViewModel : ObservableObject
     // What a browse-tree row shows besides its title (design/boards/browse-tree.md): its icon, its own icon once
     // resolved, the right-aligned meta, the unsaved mark, the "not read" chip and the drag-source outline.
 
-    private static readonly HashSet<string> ApplicationTypes = ["APPL", "APPC", "APPD", "appe"];
-
     private const string UnsavedMark = " â€¢";
 
     private Task? iconLoading;
@@ -185,7 +183,7 @@ public abstract partial class NodeViewModel : ObservableObject
     {
         InputNode => TreeIconKind.HardDisk,
         ContainerFileNode container => IsArchive(container.ContentFormat) ? TreeIconKind.Parcel : TreeIconKind.Floppy,
-        FileNode file => ApplicationTypes.Contains(file.File.FinderInfo.Type.ToString()) ? TreeIconKind.Application : TreeIconKind.Document,
+        FileNode file => FileTypeIcons.For(file.File.FinderInfo.Type, file.Title),
         ResourceTypeNode => TreeIconKind.ResourceType,
         NoNameGroupNode => TreeIconKind.NoNameGroup,
         ResourceNode => TreeIconKind.Resource,
@@ -258,8 +256,9 @@ public abstract partial class NodeViewModel : ObservableObject
     internal void OnMetaChanged() => OnPropertyChanged(nameof(Meta));
 
     /// <summary>
-    /// Resolves the node's own icon (once), off the UI thread: a file's Finder icon, an icon resource's small icon.
-    /// The tree asks only for rows on screen; nodes without one of their own complete at once.
+    /// Resolves the node's own icon (once), off the UI thread: an icon resource's small icon (a file's row shows its
+    /// type's icon; its own Finder icon is the inspector's). The tree asks only for rows on screen; an alias row learns
+    /// its state here too.
     /// </summary>
     public Task RequestIconAsync() => iconLoading ??= LoadIconAsync();
 
@@ -276,6 +275,8 @@ public abstract partial class NodeViewModel : ObservableObject
 
     private async Task LoadIconAsync()
     {
+        System.Threading.Interlocked.Increment(ref Input.IconRequests);
+
         if (IsAliasFile && Input is { } input)
         {
             var inputs = input.Display.Inputs().ToList();
@@ -284,7 +285,6 @@ public abstract partial class NodeViewModel : ObservableObject
 
         Func<byte[]?>? load = this switch
         {
-            FileNode file => () => FolderPreviews.TreeIcon(file),
             ResourceNode resource when IsIconResource(resource.Resource.Type.ToString()) => () => ResourceIcon(resource),
             _ => null,
         };
@@ -347,6 +347,9 @@ public sealed class LoadingNode(NodeViewModel parent) : NodeViewModel("Loadingâ€
 /// <summary>An opened host file: its layout, companions and the diagnostics of reading it.</summary>
 public sealed class InputNode : NodeViewModel
 {
+    // How many of its rows have asked for their icon (NodeImages.ResolvedIcons, for tests).
+    internal int IconRequests;
+
     internal InputNode(string path, HostFile host, ContainerNode root, ContainerReadOptions containerOptions, ReadOptions options,
         Action<DiagnosticEntry> report, TreeDisplayOptions? display = null)
         : base(System.IO.Path.GetFileName(path), NodeKind.Input, null)

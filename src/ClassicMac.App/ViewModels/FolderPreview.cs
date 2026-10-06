@@ -64,19 +64,12 @@ internal static class FolderPreviews
     }
 
     /// <summary>
-    /// A file's Finder icon at 16 × 16 for its tree row (design/boards/browse-tree.md, T4), as PNG: the same
-    /// resolution as the folder preview's (custom icon, the application's bundle, the generic icon), cached per
-    /// volume; null when nothing was found (the row keeps its kind icon).
+    /// A file's own icon at <paramref name="size"/> square, as PNG, for the inspector's header: its custom icon or the
+    /// one its application's bundle gives its type, found as the folder preview finds them, cached per volume; null when
+    /// it has neither (the header shows its type's icon, as the tree does: design/boards/browse-tree.md, T4).
     /// </summary>
-    public static byte[]? TreeIcon(FileNode node) => FinderIcon(node, 16);
-
-    /// <summary>A file's Finder icon at <paramref name="size"/> square (16 for its tree row, 32 for the inspector's header), as for <see cref="TreeIcon"/>.</summary>
-    public static byte[]? FinderIcon(FileNode node, int size) =>
-        Holder(node) is { } holder ? Volumes.GetValue(holder, h => new Volume(h, node.Input.Options)).TreeIcon(node.File, size) : null;
-
-    /// <summary>How many file icons the volume holding <paramref name="node"/> has resolved for the tree.</summary>
-    public static int ResolvedTreeIcons(NodeViewModel node) =>
-        Holder(node) is { } holder && Volumes.TryGetValue(holder, out var volume) ? volume.ResolvedTreeIcons : 0;
+    public static byte[]? OwnIcon(FileNode node, int size) =>
+        Holder(node) is { } holder ? Volumes.GetValue(holder, h => new Volume(h, node.Input.Options)).OwnIcon(node.File, size) : null;
 
     // The container whose contents hold a file node: its input's or its container file's.
     private static ContainerNode? Holder(NodeViewModel node)
@@ -201,11 +194,9 @@ internal static class FolderPreviews
             public int GetHashCode((MacFile File, int Size) key) => HashCode.Combine(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(key.File), key.Size);
         }
 
-        public int ResolvedTreeIcons { get; private set; }
-
-        // A file's icon for the tree, once per file; with the resolver the folder preview last made, or one with
-        // the volume's own System files.
-        public byte[]? TreeIcon(MacFile file, int size)
+        // A file's own icon (custom, or its application's), once per file; with the resolver the folder preview last
+        // made, or one with the volume's own System files. A generic icon is not the file's own.
+        public byte[]? OwnIcon(MacFile file, int size)
         {
             lock (systemForks)
             {
@@ -214,14 +205,9 @@ internal static class FolderPreviews
                     return cached;
                 }
 
-                // Counted for the tree's rows (the header's large icons are asked one selection at a time).
-                if (size == 16)
-                {
-                    ResolvedTreeIcons++;
-                }
-
-                var suite = FileIcon(resolver ?? Resolver(DialogSources.None), file, () => Fork(file)).Suite;
-                return treeIcons[(file, size)] = suite is null ? null : NodeImages.Plot(suite, size);
+                var icon = FileIcon(resolver ?? Resolver(DialogSources.None), file, () => Fork(file));
+                var own = icon.Source is FinderIconSource.Custom or FinderIconSource.Application ? icon.Suite : null;
+                return treeIcons[(file, size)] = own is null ? null : NodeImages.Plot(own, size);
             }
         }
 
