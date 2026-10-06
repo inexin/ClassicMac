@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Fixed: on a disk with one HFS partition (as Drive Setup leaves it), the disk's top level is the volume's for writes
+  too (`mkdir disk.img:New` was refused), and the volume answers to its own name as well as its partition's
+  (`disk.img:Macintosh HD:File` when the partition is "untitled").
+- Fixed: the expanded-bytes limit counts only bytes a reader makes (decompressed, decoded); partitions, volumes' files
+  and wrappers' forks read where they lie do not, so a 4 GB raw disk or a large CD no longer stops at 1 GiB
+  (`container.too-large`), nor counts as a `check` error.
+
 - CLI: `classicmac help [<command>]` shows the list of commands or one command's help, and every help ends with
   examples (docs/cli.md §6).
 

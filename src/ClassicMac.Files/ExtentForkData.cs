@@ -13,6 +13,8 @@ internal sealed class ExtentForkData : ForkData
     private readonly (long Offset, long Length)[] ranges;
     private readonly long length;
 
+    internal override ForkData? Underlying => parent;
+
     public ExtentForkData(ForkData parent, IEnumerable<(long Offset, long Length)> ranges, long length)
     {
         this.parent = parent;

@@ -42,7 +42,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
 
     private readonly Option<long> maxExpandedBytes = new("--max-expanded-bytes")
     {
-        Description = "Most bytes decompression and unwrapping may produce from one input (bytes, or KiB/MiB/GiB)",
+        Description = "Most bytes decompression and decoding may make from one input; partitions and files read where they lie do not count (bytes, or KiB/MiB/GiB)",
         DefaultValueFactory = _ => ContainerReadOptions.Default.MaxExpandedBytesPerInput,
         CustomParser = ParseSize,
         Recursive = true,

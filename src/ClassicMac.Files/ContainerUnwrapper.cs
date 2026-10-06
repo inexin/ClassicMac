@@ -285,7 +285,9 @@ public sealed class ContainerUnwrapper
         {
             var inner = contents[index];
             probed?[index].Error?.Throw();
-            expanded += inner.DataFork.Length + inner.ResourceFork.Length;
+            // Only bytes the reader made count (decompressed, decoded): a fork read where it lies in this container (a
+            // partition, a volume's file, a wrapper's fork) adds nothing to what the input already holds.
+            expanded += Made(inner.DataFork, file.DataFork) + Made(inner.ResourceFork, file.DataFork);
             if (expanded > context.Options.MaxExpandedBytesPerInput)
             {
                 context.Report(DiagnosticSeverity.Error, "container.too-large",
@@ -303,6 +305,8 @@ public sealed class ContainerUnwrapper
         }
         return new ContainerNode(format, file, children) { Volume = (reader as IVolumeReader)?.ReadVolumeInfo(file.DataFork) };
     }
+
+    private static long Made(ForkData fork, ForkData container) => fork.IsWindowOnto(container) ? 0 : fork.Length;
 
     // Adds a location to the diagnostics that have none.
     private sealed class LocatedDiagnostics(ICollection<Diagnostic> inner, string location) : ICollection<Diagnostic>

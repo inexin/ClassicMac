@@ -38,6 +38,9 @@ file…) is a container, and its contents are its children, as the app's tree sh
 by their folder paths. A container is read only when a path goes into it, one level at a time. A container that holds
 only one container (a MacBinary file of a disk image, a disk image's disk) shows that container's contents in its
 place; the name of the container it holds may be given or left out (`disk.bin:File` and `disk.bin:Disk Image:File`).
+When that container is a volume, its volume name may be given too: a disk whose one HFS partition is named "untitled"
+holding the volume "Macintosh HD" is entered as `disk.img:File`, `disk.img:untitled:File` or
+`disk.img:Macintosh HD:File`, and its top level is the volume's, for writes too (`mkdir disk.img:New`).
 
 ### 1.4 Resources
 

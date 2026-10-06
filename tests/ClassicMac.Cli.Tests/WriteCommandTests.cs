@@ -124,6 +124,47 @@ public sealed class WriteCommandTests : IDisposable
         Assert.Contains("partition 3 \"Macintosh HD\": passes the writer's checks\n", output.Replace("\r\n", "\n"));
     }
 
+    // A disk as Drive Setup leaves it: drivers, one HFS partition whose name ("untitled") is not its volume's ("Disk"),
+    // and free space. The disk's top level is the volume's.
+    private string DriveSetupDisk()
+    {
+        var volume = File.ReadAllBytes(Disk());
+        var disk = Path.Combine(folder, "drive-setup.img");
+        File.WriteAllBytes(disk, Fixtures.PartitionMap(("Macintosh", "Apple_Driver43", new byte[1024]), ("Macintosh", "Apple_Driver_ATA", new byte[1024]),
+            ("untitled", "Apple_HFS", volume), ("Extra", "Apple_Free", new byte[1024])));
+        return disk;
+    }
+
+    [Theory]
+    [InlineData(":New")]
+    [InlineData(":untitled:New")]
+    [InlineData(":Disk:New")]
+    public void A_folder_is_made_at_the_top_of_a_disk_s_only_volume(string path)
+    {
+        var disk = DriveSetupDisk();
+
+        var (code, _, error) = Run("mkdir", disk + path, "-o", Out);
+
+        Assert.True(code == ExitCodes.Success, error);
+        var (_, listing, _) = Run("ls", Out);
+        Assert.Contains("New", listing, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_disk_s_only_volume_is_named_by_its_partition_or_its_volume_name()
+    {
+        var disk = DriveSetupDisk();
+        var top = Run("ls", disk).Output;
+
+        Assert.Contains("Read Me", top, StringComparison.Ordinal);
+        Assert.Equal(top, Run("ls", disk + ":untitled").Output);
+        Assert.Equal(top, Run("ls", disk + ":Disk").Output);
+        Assert.Equal("hello", Run("cat", disk + ":Disk:Read Me").Output.TrimEnd());
+        var (code, _, error) = Run("rm", disk + ":Disk:Read Me", "-o", Out);
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.DoesNotContain("Read Me", Run("ls", Out).Output, StringComparison.Ordinal);
+    }
+
     // A disk with several HFS partitions: a path names the partition first (partition-map.md §5).
     [Fact]
     public void A_disk_with_two_HFS_partitions_is_written_by_partition_name()

@@ -69,12 +69,57 @@ public class UnwrapTests
     [Fact]
     public void Expansion_stops_at_the_limit()
     {
-        var bytes = MacBinary(2, "Big", new byte[2000], []);
+        // BinHex decodes: its file's bytes are made, not read where they lie. Two files on a volume, each within the
+        // limit (and the volume's B-tree files within it), together past it.
+        var builder = new HfsBuilder();
+        builder.File(HfsBuilder.Root, "One.hqx", Encoding.ASCII.GetBytes(BinHex("One", new byte[2000], [])), []);
+        builder.File(HfsBuilder.Root, "Two.hqx", Encoding.ASCII.GetBytes(BinHex("Two", new byte[2000], [])), []);
+        var bytes = builder.Build("Vol");
         var diagnostics = new List<Diagnostic>();
 
-        Unwrap(bytes, diagnostics, ContainerReadOptions.Default with { MaxExpandedBytesPerInput = 1000 });
+        Unwrap(bytes, diagnostics, ContainerReadOptions.Default with { MaxExpandedBytesPerInput = 3000 });
 
-        Assert.Equal("container.too-large", Assert.Single(diagnostics).Code);
+        Assert.True(diagnostics.Count == 1 && diagnostics[0].Code == "container.too-large", string.Join("; ", diagnostics));
+    }
+
+    [Fact]
+    public void Bytes_read_where_they_lie_in_the_input_are_no_expansion()
+    {
+        // A MacBinary file's forks are windows onto it, so they make nothing however large.
+        var bytes = MacBinary(2, "Big", new byte[2000], new byte[3000]);
+        var diagnostics = new List<Diagnostic>();
+
+        var root = Unwrap(bytes, diagnostics, ContainerReadOptions.Default with { MaxExpandedBytesPerInput = 1000 });
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(2000, Assert.Single(root.Children).File.DataFork.Length);
+    }
+
+    [Fact]
+    public void A_partitioned_disk_s_volume_and_files_are_no_expansion()
+    {
+        // As a raw disk image: the partition is a window onto the disk, the volume's files windows onto the partition.
+        var builder = new HfsBuilder();
+        builder.File(HfsBuilder.Root, "Big", new byte[70_000], new byte[30_000]);
+        var disk = PartitionMap(("Macintosh", "Apple_Driver43", new byte[1024]), ("untitled", "Apple_HFS", builder.Build("Vol")));
+        var diagnostics = new List<Diagnostic>();
+
+        var root = Unwrap(disk, diagnostics, ContainerReadOptions.Default with { MaxExpandedBytesPerInput = 16_384 });
+
+        Assert.DoesNotContain(diagnostics, d => d.Code == "container.too-large");
+        Assert.Contains(root.Leaves(), n => n.File.MacPath == "Big" && n.File.DataFork.Length == 70_000);
+    }
+
+    [Fact]
+    public void A_window_counts_only_onto_the_container_being_read()
+    {
+        var input = ForkData.FromBytes(new byte[100]);
+        var made = ForkData.FromBytes(new byte[100]);
+
+        Assert.True(input.Slice(10, 20).Slice(5, 5).IsWindowOnto(input));
+        Assert.True(input.IsWindowOnto(input));
+        Assert.False(made.Slice(10, 20).IsWindowOnto(input));
+        Assert.False(ForkData.FromBytes(input.ToArray()).IsWindowOnto(input));
     }
 
     // A volume: Docs:Note.hqx (BinHex with a bad data CRC), Docs:Wrap.bin (MacBinary holding the same BinHex file) and

@@ -191,6 +191,9 @@ public sealed class RawCdReader : IContainerReader
     {
         public override long Length { get; } = raw.Length / sectorSize * Block;
 
+        // Each block is read out of its raw sector, none made.
+        internal override ForkData? Underlying => raw;
+
         public override Stream Open() => new CookedStream(raw.Open(), sectorSize, Length);
 
         private sealed class CookedStream(Stream inner, int sectorSize, long length) : Stream

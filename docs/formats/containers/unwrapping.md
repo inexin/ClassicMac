@@ -144,11 +144,14 @@ For each file, starting with the input at depth 0 [ClassicMac]:
    (Error); the remaining readers are not tried. Each format's file says when its input is unusable. Readers report
    damage as diagnostics and keep going; only an input they cannot read at all fails, by finding its structures wrong
    or its data shorter than they say (a truncated image).
-5. For each file the container yielded, in order: add its data and resource fork lengths to a running total kept for
-   the whole tree. When the total passes the expanded-bytes limit (§5), that file and the rest of this container's
-   files are dropped, with `container.too-large` (Error). The total is not reset, so each container still to be read
-   reports the same error for its first file. This guards against inputs that expand without bound, such as nested
-   disk images or a BinHex file of long runs.
+5. For each file the container yielded, in order: add the lengths of the forks the reader made (decompressed or
+   decoded) to a running total kept for the whole tree. A fork that is a window onto this container's data, read where
+   it lies (a partition of a disk, a volume's file, a wrapper's fork, a CD's cooked sectors), makes nothing and adds
+   nothing, so a large plain disk or CD is not limited by its size; bytes a reader made and then cut up still count.
+   When the total passes the expanded-bytes limit (§5), that file and the rest of this container's files are dropped,
+   with `container.too-large` (Error). The total is not reset, so each container still to be read reports the same
+   error for its first file. This guards against inputs that expand without bound, such as nested compressed disk
+   images or a BinHex file of long runs. [ClassicMac]
 6. Otherwise unwrap the yielded file at depth + 1, from step 1.
 
 ### 2.3 What a reader is given
@@ -227,7 +230,7 @@ The single-file containers' own codes are in their files. Offsets, where given, 
 | Code | Severity | When | ClassicMac does | The Mac does |
 | --- | --- | --- | --- | --- |
 | `container.too-deep` | Warning | a container nested at or past the nesting limit | the file becomes a leaf | no Mac counterpart |
-| `container.too-large` | Error | unwrapping produced more than the expanded-bytes limit | drops the rest of that container's files | no Mac counterpart |
+| `container.too-large` | Error | unwrapping made more than the expanded-bytes limit (windows onto the input do not count, §2.2) | drops the rest of that container's files | no Mac counterpart |
 | `container.unreadable` | Error | a reader accepted the file but cannot read it, its structures wrong or its data short (each format's §2 says when) | the file becomes a leaf; other readers are not tried | no Mac counterpart |
 | `container.reader-fault` | Error | a reader failed on the file's data with an arithmetic or index exception (a ClassicMac bug, found by mutation testing) | the file becomes a leaf; the unwrap goes on | no Mac counterpart |
 

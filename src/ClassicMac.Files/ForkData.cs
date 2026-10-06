@@ -81,6 +81,26 @@ public abstract class ForkData
         return new SplicedForkData(whole, offset, part);
     }
 
+    /// <summary>The fork this one reads its bytes out of where they lie (a slice's, an extent list's), or null.</summary>
+    internal virtual ForkData? Underlying => null;
+
+    /// <summary>
+    /// Whether this fork is <paramref name="whole"/> or a window onto it, through any windows: its bytes are read where
+    /// they lie in it, none made. The unwrapper counts only other bytes against its expansion limit.
+    /// </summary>
+    internal bool IsWindowOnto(ForkData whole)
+    {
+        for (var at = this; at is not null; at = at.Underlying)
+        {
+            if (ReferenceEquals(at, whole))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>A fork of zeros, held as nothing (the base of a volume being made).</summary>
     internal static ForkData Zeros(long length) => new ZeroForkData(length);
 
@@ -214,9 +234,11 @@ public abstract class ForkData
         }
     }
 
-    private sealed class BytesForkData(ReadOnlyMemory<byte> bytes) : ForkData
+    private sealed class BytesForkData(ReadOnlyMemory<byte> bytes, ForkData? underlying = null) : ForkData
     {
         public override long Length => bytes.Length;
+
+        internal override ForkData? Underlying => underlying;
 
         // Over the bytes themselves when they are an array's, without copying.
         public override Stream Open() => MemoryMarshal.TryGetArray(bytes, out var array)
@@ -233,7 +255,7 @@ public abstract class ForkData
                 throw new ArgumentOutOfRangeException(nameof(offset), $"{offset}+{length} lies outside the {Length}-byte fork.");
             }
 
-            return new BytesForkData(bytes.Slice((int)offset, (int)length));
+            return new BytesForkData(bytes.Slice((int)offset, (int)length), this);
         }
     }
 
@@ -399,6 +421,8 @@ public abstract class ForkData
     private sealed class SliceForkData(ForkData parent, long offset, long length) : ForkData
     {
         public override long Length => length;
+
+        internal override ForkData? Underlying => parent;
 
         public override Stream Open() => new SubStream(parent.Open(), offset, length);
 

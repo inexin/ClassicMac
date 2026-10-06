@@ -194,8 +194,8 @@ public sealed class MacPathEntry
     /// <summary>For a folder, the volume's record of it (its dates and Finder info), when the volume keeps folder records.</summary>
     public MacFolder? Folder { get; internal init; }
 
-    // The name of the container a wrapper holds, which a path may give or leave out.
-    internal string? WrappedName { get; set; }
+    // The names of the containers a wrapper holds, and of the volume it ends at, which a path may give or leave out.
+    internal List<string> WrappedNames { get; } = [];
 
     /// <summary>Its path.</summary>
     public override string ToString() => Path;
@@ -542,7 +542,7 @@ public sealed class MacPathTree : IDisposable
             return found;
         }
 
-        if (entry.Kind == MacPathKind.Container && entry.WrappedName is { } wrapped && MacPaths.NamesEqual(wrapped, name))
+        if (entry.Kind == MacPathKind.Container && entry.WrappedNames.Any(wrapped => MacPaths.NamesEqual(wrapped, name)))
         {
             return entry;
         }
@@ -563,8 +563,14 @@ public sealed class MacPathTree : IDisposable
         container.Node = node;
         while (node.Children is [var only] && only.File.FolderPath.Count == 0 && IsContainer(only))
         {
-            container.WrappedName ??= NameOf(only.File);
+            container.WrappedNames.Add(NameOf(only.File));
             node = only.UnreadFormat is not null ? unwrapper.Expand(only, context.For(null, () => []), levels: 1) : only;
+        }
+
+        // A volume passed on to also answers to its own name, which a partition's need not be (Drive Setup's "untitled").
+        if (container.WrappedNames.Count > 0 && node.Volume?.Name is { } volumeName)
+        {
+            container.WrappedNames.Add(volumeName);
         }
 
         container.Format = ContentFormat(node) ?? container.Format;

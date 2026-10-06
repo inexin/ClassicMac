@@ -190,8 +190,13 @@ internal static class MacEdits
         return entry.Name;
     }
 
-    // Whether the input is a disk with several partitions, each a container under it named by its partition.
-    private static bool Partitioned(MacPathTree tree) => tree.Root.Format == PartitionMapReader.Instance.FormatName;
+    // Whether the input is a disk with several partitions, each a container under it named by its partition. Its top
+    // level is read first: a disk with one volume passes on to it and is that volume's top level.
+    private static bool Partitioned(MacPathTree tree)
+    {
+        tree.Children(tree.Root);
+        return tree.Root.Format == PartitionMapReader.Instance.FormatName;
+    }
 
     // The entry an item's volume is: the input itself, or on a disk with several partitions the partition the item is in;
     // null when the item is in a container inside the volume, or is a partitioned disk's own top level.

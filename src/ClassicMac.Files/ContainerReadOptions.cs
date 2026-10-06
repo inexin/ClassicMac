@@ -14,7 +14,10 @@ public sealed record ContainerReadOptions
     /// <summary>How deep containers may nest (a BinHex file holding a disk image is depth 2). Default 8.</summary>
     public int MaxNestingDepth { get; init; } = 8;
 
-    /// <summary>The most bytes unwrapping and decompression may produce from one input. Default 1 GiB.</summary>
+    /// <summary>
+    /// The most bytes unwrapping may make (decompress or decode) from one input; forks read where they lie in their
+    /// container (partitions, volumes' files, wrappers' forks) do not count. Default 1 GiB.
+    /// </summary>
     public long MaxExpandedBytesPerInput { get; init; } = 1024L * 1024 * 1024;
 
     /// <summary>The most files and folders read from one volume, a guard against damaged catalogs. Default 1,000,000.</summary>
