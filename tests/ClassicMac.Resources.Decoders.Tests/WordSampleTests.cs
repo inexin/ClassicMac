@@ -7,8 +7,8 @@ using ClassicMac.Resources.Export;
 
 namespace ClassicMac.Resources.Decoders.Tests;
 
-// Documents Word 4.0 and Word 5.1a wrote, with known content (Word/CONTENTS.txt; made in SheepShaver for ClassicMac, our
-// own text): the reader against what Word itself saved (docs/formats/documents/word-mac.md §7).
+// Documents Word 4.0, 5.1a, 6.0 and 98 wrote, with known content (Word/CONTENTS.txt; made in SheepShaver and QEMU for
+// ClassicMac, our own text): the reader against what Word itself saved (word-mac.md §7, word-binary.md §7).
 public class WordSampleTests
 {
     private static string Folder([CallerFilePath] string source = "") => Path.Combine(Path.GetDirectoryName(source)!, "Word");
@@ -147,7 +147,8 @@ public class WordSampleTests
         Assert.True(RunAt(Read(version + "-formats-fast"), " FAST MIDc").Italic);
     }
 
-    // Word 6.0 for the Macintosh ('W6BN'): a compound file whose FIB starts $A5DC, nFib 104 (word-binary.md §4.1).
+    // Word 6.0 for the Macintosh ('W6BN'): a compound file whose FIB starts $A5DC, nFib 104; Word 98 ('W8BN'): $A5EC,
+    // nFib 193, the Word 97 format (word-binary.md §4.1).
     private static StyledDocument ReadWord6(string name, List<Diagnostic>? diagnostics = null)
     {
         var document = WordBinaryDocuments.Read(DataFork(name), name, diagnostics: diagnostics ?? []);
@@ -155,22 +156,26 @@ public class WordSampleTests
         return document!;
     }
 
-    [Fact]
-    public void Word_6_plain_text_reads()
+    [Theory]
+    [InlineData("w6")]
+    [InlineData("w98")]
+    public void Word_6_and_98_plain_text_reads(string version)
     {
         var diagnostics = new List<Diagnostic>();
-        var document = ReadWord6("w6-plain", diagnostics);
+        var document = ReadWord6(version + "-plain", diagnostics);
 
         Assert.Equal(["Plain text test document.", "The quick brown fox jumps over the lazy dog 0123456789.",
             "Mac Roman: é ü ß • ™ © “quoted” – en — em.", "Tab:\tafter tab. Line one\u2028line two."], Paragraphs(document));
         Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
-        Assert.Equal("FAST START Plain text test document.", Paragraphs(ReadWord6("w6-plain-fast"))[0]);
+        Assert.Equal("FAST START Plain text test document.", Paragraphs(ReadWord6(version + "-plain-fast"))[0]);
     }
 
-    [Fact]
-    public void Word_6_character_and_paragraph_formats_read()
+    [Theory]
+    [InlineData("w6")]
+    [InlineData("w98")]
+    public void Word_6_and_98_character_and_paragraph_formats_read(string version)
     {
-        var formats = ReadWord6("w6-formats");
+        var formats = ReadWord6(version + "-formats");
         Assert.True(RunAt(formats, "Bold run").Bold);
         Assert.True(RunAt(formats, "Italic run").Italic);
         Assert.True(RunAt(formats, "Underline run").Underline);
@@ -184,9 +189,9 @@ public class WordSampleTests
         Assert.False(RunAt(formats, "Format: Normal").Bold);
         Assert.True(RunAt(formats, "Small caps run").SmallCaps);
         var red = RunAt(formats, "Red run");
-        Assert.Equal(((byte)0xFF, (byte)0x00, (byte)0x00), (red.Red, red.Green, red.Blue));     // Word 6's colour 6, red
+        Assert.Equal(((byte)0xFF, (byte)0x00, (byte)0x00), (red.Red, red.Green, red.Blue));     // colour 6, red
 
-        var paragraphs = ReadWord6("w6-paragraphs");
+        var paragraphs = ReadWord6(version + "-paragraphs");
         Assert.Equal(Justification.Center, FormatAt(paragraphs, "Centered paragraph").Justification);
         Assert.Equal(Justification.Right, FormatAt(paragraphs, "Right aligned").Justification);
         Assert.Equal(36.0, FormatAt(paragraphs, "Left indent 0.5").LeftIndent);
@@ -195,13 +200,44 @@ public class WordSampleTests
         Assert.Equal((0.0, 0.0), (FormatAt(paragraphs, "Normal paragraph after").SpaceBefore, FormatAt(paragraphs, "Normal paragraph after").SpaceAfter));
     }
 
-    [Fact]
-    public void Word_6_table_reads_as_rows_of_cells()
+    [Theory]
+    [InlineData("w6")]
+    [InlineData("w98")]
+    public void Word_6_and_98_table_reads_as_rows_of_cells(string version)
     {
-        var document = ReadWord6("w6-table");
+        var document = ReadWord6(version + "-table");
         var table = Assert.Single(document.Chapters[0].Tables);
         Assert.Equal([-5.4, 144.0, 288.0, 432.0], table.CellEdges);
         Assert.Equal(["Table follows.", "A1\tB1\tC1\t", "A2\tB2\tC2\t", "A3\tB3\tC3\t", "Text after table."], Paragraphs(document));
+    }
+
+    // Word 98's fast saves (fComplex 1, cQuickSaves 1): the text through the piece table, each insertion with the
+    // formatting of the character before it.
+    [Fact]
+    public void Word_98_fast_saved_documents_read_with_their_edits()
+    {
+        var diagnostics = new List<Diagnostic>();
+        var plain = ReadWord6("w98-plain-fast", diagnostics);
+        Assert.Equal(["FAST START Plain text test document.", "The quick brown fox jumps over the lazy dog 0123456789.",
+            "Mac Roman: FAST MID é ü ß • ™ © “quoted” – en — em.", "Tab:\tafter tab. Line one\u2028line two."], Paragraphs(plain));
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+
+        var formats = ReadWord6("w98-formats-fast");
+        Assert.Equal("FAST START Format: Normal run.", Paragraphs(formats)[0]);
+        Assert.True(RunAt(formats, " FAST MIDc").Italic);
+        Assert.True(RunAt(formats, "Bold run").Bold);
+        Assert.DoesNotContain("Hidden run", formats.Chapters[0].Text.Text);
+
+        var paragraphs = ReadWord6("w98-paragraphs-fast");
+        Assert.Equal("FAST START Heading One", Paragraphs(paragraphs)[0]);
+        Assert.Equal(Justification.Center, FormatAt(paragraphs, " FAST MIDCentered").Justification);
+        Assert.Equal((36.0, -36.0), (FormatAt(paragraphs, "Hanging indent").LeftIndent, FormatAt(paragraphs, "Hanging indent").FirstLineIndent));
+
+        var table = ReadWord6("w98-table-fast");
+        Assert.Single(table.Chapters[0].Tables);
+        Assert.Equal(["FAST START Table follows.", "A1\tB1\tC1\t", "A2 FAST MID\tB2\tC2\t", "A3\tB3\tC3\t", "Text after table."], Paragraphs(table));
+
+        Assert.Contains("Text with a f FAST MIDootnote", ReadWord6("w98-picture-footnote-fast").Chapters[0].Text.Text, StringComparison.Ordinal);
     }
 
     [Fact]

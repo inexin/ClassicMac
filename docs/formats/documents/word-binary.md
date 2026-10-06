@@ -12,7 +12,7 @@ into a styled document, which the viewer shows and `convert` and `extract` write
 | --- | --- |
 | Identified by | Type `'W8BN'` or `'W6BN'`; a compound file with a WordDocument stream that starts `$A5EC` (Word 97, nFib `$00C1` or more) or `$A5DC` (Word 6 and 95, nFib `$0065`–`$0068`) |
 | ClassicMac | Reads; `ClassicMac.Resources.Decoders.Documents` (`WordBinaryDocuments`) |
-| Verified against | Word 6.0 for the Macintosh documents with known content (§7); no Word 98 document yet |
+| Verified against | Word 6.0 and Word 98 for the Macintosh documents with known content, Word 98's fast saved too (§7) |
 | Sources | Microsoft's [MS-DOC] (the format's author); for Word 6, other readers' behaviour (LibreOffice, Apache POI, wv), no published specification |
 
 Contents
@@ -218,11 +218,15 @@ The compound file's own diagnostics are in [compound-file.md §6](../containers/
   Macintosh wrote in SheepShaver for ClassicMac (our own content, listed in `Word/CONTENTS.txt`): text, every character
   format (small caps, red), the paragraph formats, a 3 × 3 table with its cell edges, and edited documents. Word saved
   them in full.
-- No Word 97 or Word 98 document has been read yet.
+- The same tests on `Word/w98-*.bin`: 10 documents Word 98 for the Macintosh (8.0) wrote on Mac OS 9.2.2 for
+  ClassicMac, the same content saved in full (nFib 193), and five fast saved (fComplex 1, cQuickSaves 1, one edit
+  each): the text, formats and table read as Word showed them, the fast saves through their piece tables with each
+  insertion in the formatting of the character before it. None of the five pieces carries a Prm.
 
 ## 8. Not covered
 
-- Fast-saved Word 6 documents (none was made: Word saved every sample in full); Word 95's East Asian and Unicode text.
+- Fast-saved Word 6 documents (none was made: Word 6 saved every sample in full); Word 95's East Asian and Unicode text.
+- A fast save whose pieces carry a Prm (none of Word 98's samples has one).
 - Pieces' Prm (fast saves' property changes), character styles (`sprmCIstd`), list numbering, tabs, borders, line
   spacing, sections, headers, footnotes, pictures and East Asian text.
 - Decrypting password-protected documents.

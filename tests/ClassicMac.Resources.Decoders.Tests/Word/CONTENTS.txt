@@ -36,7 +36,8 @@ HOW THE DOCUMENTS WERE MADE (read this)
   - a separate 64 KB test document behaved the same, so it is not a small-document threshold.
 - Probable cause: something in this environment (SheepShaver plus the hfsutils-formatted work volume). Unverified.
 
-Word 98: not made yet. Office 98 First Run needs about 10 MB free on the System disk, and the Mac OS 9 copy has less.
+Word 98: files w98-* (made 2026-10-06; see the WORD 98 section at the end). SheepShaver could not be used (it crashes
+whenever Word 98 opens a document), so they were made in QEMU 11.1 (mac99) with Mac OS 9.2.2.
 Word 3.01: launches, then hangs Mac OS 9 on startup, so no files.
 
 --------------------------------------------------------------------------------
@@ -152,3 +153,29 @@ w6-paragraphs-fast:       "FAST START Heading One" / " FAST MIDCentered paragrap
 w6-table-fast:            "FAST START Table follows." / cell A2 = "A2 FAST MID"
 w6-picture-footnote-fast: "FAST START Picture follows:" / "Text with a f FAST MIDootnote<REF 1> here."
 Everything else is as in the base documents. Note: in Word 6 the hidden run "Hidden run." is present but not displayed.
+
+--------------------------------------------------------------------------------
+WORD 98 (w98-*.bin), made 2026-10-06
+--------------------------------------------------------------------------------
+- Microsoft Word 98 Macintosh Edition ('vers' 8.0), in QEMU 11.1 (mac99) running Mac OS 9.2.2.
+- Format: MacBinary III. Type W8BN, creator MSWD. The data fork is an OLE2 compound file (D0CF11E0, wIdent A5EC,
+  nFib 193). There is a 286-byte resource fork.
+- The User Information name was "Fixture" before any of these files were opened. Summary info Author and Last saved by
+  are both "Fixture". No other personal name is in the files (checked for "Lars" in ASCII and UTF-16).
+- Base files: the same source RTFs (source-rtf/*.rtf) opened in Word 98 and saved with Save As > "Word Document".
+  They are full saves: FIB fComplex=0, cQuickSaves=0. Content is as in BASE DOCUMENTS above.
+- The Mac file name of w98-picture-footnote(-fast) inside the MacBinary is "w98-picture_footnote(-fast)", with an
+  underscore.
+
+"-fast" FILES ARE REAL FAST SAVES (unlike w4/w51/w6)
+- Allow Fast Saves was ON (Tools > Preferences > Save).
+- Each -fast file is a Finder duplicate of the base file. It was opened in Word 98, edited once, then saved with Cmd-S.
+  Edits: "FAST START " typed at the very start; then down-arrow twice and " FAST MID" typed.
+- Every -fast file has FIB fComplex=1 and cQuickSaves=1. The file grew by about 9-10 KB (the appended fast-save data).
+- Final text (as on screen before saving):
+  w98-plain-fast:            "FAST START Plain text test document." / "Mac Roman: FAST MID é ü ß …" (3rd paragraph)
+  w98-formats-fast:          "FAST START Format: Normal run." / "Format: Itali FAST MIDc run." (" FAST MID" italic)
+  w98-paragraphs-fast:       "FAST START Heading One" / " FAST MIDCentered paragraph." (centred)
+  w98-table-fast:            "FAST START Table follows." / cell A2 = "A2 FAST MID"
+  w98-picture-footnote-fast: "FAST START Picture follows:" / "Text with a f FAST MIDootnote<REF 1> here."
+- Everything else is as in the base documents. The hidden run "Hidden run." is present but not displayed.
