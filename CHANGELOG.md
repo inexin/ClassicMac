@@ -54,6 +54,32 @@ First release of ClassicMac: libraries, a command line and a desktop app for cla
   (resource forks, containers, file systems, decoders, code), `ClassicMac.Core`, `ClassicMac.Graphics` and its
   ImageSharp and SkiaSharp adapters, and the `ClassicMac.Cli` tool.
 
+## 0.1.0-beta.2
+
+Since 0.1.0-beta.1:
+
+**Previews and icons**
+- PDF documents previewed in the app on Windows and macOS (Linux shows their bytes).
+- Previews for picture files (JPEG, PNG, GIF, BMP, WebP, MacPaint, QuickTime images, TIFF), plain text files, WAV and
+  `sfil` sounds, font suitcases and TrueType or OpenType samples.
+- File icons by type in the tree; the inspector shows a file's own Finder icon when it has one.
+
+**Formats**
+- TIFF images: every compression and colour model (CCITT fax, LZW, Deflate, PackBits, JPEG, YCbCr, CMYK, Lab, float,
+  SGILog), checked against libtiff's sample images and TIFFs made on Mac OS 9.
+- Word: Word 98 documents verified, fast saves' formatting changes applied, and pictures, footnotes and endnotes in
+  every version (HTML notes linked both ways).
+
+**Fixes**
+- Found by fuzzing (now 15 targets, the volume tools and the app's edit session among them): resizing HFS volumes
+  small or large kept them valid for Disk First Aid; First Aid, resource forks, PICT patterns and TIFF no longer crash
+  on damaged data; the edit session keeps resource edits across a lock or a rename to the same name.
+- Huge PICT polygons and lines on small pictures draw in a fraction of the time.
+
+**Packages**
+- Six NuGet packages, each with a suffix: `ClassicMac.Formats`, `.Core`, `.Graphics`, `.Graphics.ImageSharp`,
+  `.Graphics.SkiaSharp`, and the `ClassicMac.Cli` tool.
+
 ## QuickDraw.Pict (before it moved here)
 
 ClassicMac.Graphics was QuickDraw.Pict until 2026-09-29; its history came along with it.
