@@ -348,4 +348,31 @@ public sealed class PathCommandTests : IDisposable
         Assert.Equal(ExitCodes.NotFound, code);
         Assert.Contains("an alias whose original is not found (Aliases: Old: Gone)", error);
     }
+
+    // HFS Plus symbolic links: stat shows the target and where it leads; --follow follows them as it follows aliases.
+    [Fact]
+    public void Stat_shows_a_symbolic_link_and_follow_follows_it()
+    {
+        var builder = new HfsPlusBuilder();
+        uint etc = builder.Folder(builder.Folder(HfsPlusBuilder.Root, "private"), "etc");
+        builder.File(etc, "hosts", "127.0.0.1"u8.ToArray(), []);
+        builder.Symlink(HfsPlusBuilder.Root, "etc", "private/etc");
+        builder.Symlink(HfsPlusBuilder.Root, "Hosts", "/etc/hosts");
+        builder.Symlink(HfsPlusBuilder.Root, "Gone", "private/nowhere");
+        var image = Path.Combine(folder, "links.img");
+        File.WriteAllBytes(image, builder.Build("Links"));
+
+        Assert.Equal("127.0.0.1\n", Run("cat", image + ":Hosts", "--follow").Output);
+        Assert.EndsWith("hosts\n", Run("ls", image + ":etc", "--follow").Output);
+        Assert.Equal("127.0.0.1\n", Run("cat", image + ":etc:hosts", "--follow").Output);       // through a link
+        var stat = Run("stat", image + ":Hosts").Output;
+        Assert.Contains("Symbolic link: /etc/hosts", stat);
+        Assert.Contains("Leads to: ", stat);
+        Assert.Contains("private:etc:hosts", stat);
+        var json = Json(Run("stat", image + ":Gone", "--json").Output).GetProperty("symbolicLink");
+        Assert.Equal(("private/nowhere", false), (json.GetProperty("target").GetString(), json.GetProperty("found").GetBoolean()));
+        var (code, _, error, _) = Run("cat", image + ":Gone", "--follow");
+        Assert.Equal(ExitCodes.NotFound, code);
+        Assert.Contains("a symbolic link whose target is not found (private/nowhere)", error);
+    }
 }

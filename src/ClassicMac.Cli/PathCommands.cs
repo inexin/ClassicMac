@@ -21,7 +21,7 @@ namespace ClassicMac.Cli;
 internal sealed class PathCommands(TextWriter output, TextWriter error, Stream binary, ContainerReadOptions options, ReadOptions readOptions,
     bool strict, bool quiet, MacPathTree? sessionTree = null, string? sessionInput = null)
 {
-    /// <summary>--follow: an alias file stands for its original (through aliases of aliases), docs/cli.md §2.</summary>
+    /// <summary>--follow: an alias file stands for its original, a symbolic link for its target (through either), docs/cli.md §2.</summary>
     public bool Follow { get; init; }
 
     /// <summary>--encoding: the Mac encoding text is read in (docs/cli.md §1).</summary>
@@ -36,7 +36,7 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
         if (sessionTree is not null)
         {
             input = sessionInput!;
-            return sessionTree.Resolve(path) is { } found ? Run(path, sessionTree, found, action) : NotFound(path);
+            return sessionTree.Resolve(path, Follow) is { } found ? Run(path, sessionTree, found, action) : NotFound(path);
         }
 
         var reporter = new Reporter(error, strict, quiet);
@@ -45,7 +45,7 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
         MacPathEntry? entry;
         try
         {
-            tree = MacPathTree.OpenPath(path, out entry, options, readOptions, diagnostics);
+            tree = MacPathTree.OpenPath(path, out entry, Follow, options, readOptions, diagnostics);
         }
         catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
@@ -76,16 +76,24 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
 
     private int Run(string path, MacPathTree tree, MacPathEntry entry, Func<MacPathTree, MacPathEntry, int> action)
     {
-        if (Follow && tree.FollowAlias(entry) is not { } original)
+        if (Follow && tree.Follow(entry) is not { } original)
         {
-            var stored = tree.ResolveAlias(entry)?.StoredPath;
-            error.WriteLine($"{path}: an alias whose original is not found{(stored is null ? "" : $" ({stored})")}.");
+            if (entry.File?.SymbolicLinkTarget is { } target && tree.ResolveAlias(entry) is null)
+            {
+                error.WriteLine($"{path}: a symbolic link whose target is not found ({target}).");
+            }
+            else
+            {
+                var stored = tree.ResolveAlias(entry)?.StoredPath;
+                error.WriteLine($"{path}: an alias whose original is not found{(stored is null ? "" : $" ({stored})")}.");
+            }
+
             return ExitCodes.NotFound;
         }
 
         try
         {
-            return action(tree, Follow ? tree.FollowAlias(entry)! : entry);
+            return action(tree, Follow ? tree.Follow(entry)! : entry);
         }
         catch (InvalidOperationException e)
         {
@@ -147,6 +155,12 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
         if (kind is not null)
         {
             output.WriteLine($"Finder kind: {kind.Text} ({KnownKinds.Describe(kind)})");
+        }
+
+        if (info.SymbolicLink is { } link)
+        {
+            output.WriteLine($"Symbolic link: {link.Target}");
+            output.WriteLine(link.ResolvedPath is { } leads ? $"Leads to: {leads}" : "Leads to: nothing on this volume");
         }
 
         if (info.Alias is { } original)

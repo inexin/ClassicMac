@@ -300,7 +300,14 @@ public sealed class MacPathTree : IDisposable
     /// nothing); null when the path starts with no host file.
     /// </summary>
     public static MacPathTree? OpenPath(string path, out MacPathEntry? entry, ContainerReadOptions? options = null, ReadOptions? readOptions = null,
-        ICollection<Diagnostic>? diagnostics = null)
+        ICollection<Diagnostic>? diagnostics = null) => OpenPath(path, out entry, follow: false, options, readOptions, diagnostics);
+
+    /// <summary>
+    /// As <see cref="OpenPath(string, out MacPathEntry?, ContainerReadOptions?, ReadOptions?, ICollection{Diagnostic}?)"/>;
+    /// with <paramref name="follow"/>, the names before the last lead on from an alias's original or a link's target.
+    /// </summary>
+    public static MacPathTree? OpenPath(string path, out MacPathEntry? entry, bool follow, ContainerReadOptions? options = null,
+        ReadOptions? readOptions = null, ICollection<Diagnostic>? diagnostics = null)
     {
         entry = null;
         if (MacPaths.SplitHost(path) is not var (host, rest))
@@ -309,20 +316,35 @@ public sealed class MacPathTree : IDisposable
         }
 
         var tree = Open(host, options, readOptions, diagnostics);
-        entry = tree.Resolve(rest);
+        entry = tree.Resolve(rest, follow);
         return tree;
     }
 
-    /// <summary>The entry a path after the host file names (the root for an empty path); null when it names nothing.</summary>
-    public MacPathEntry? Resolve(string path)
+    /// <summary>
+    /// The entry a path after the host file names (the root for an empty path); null when it names nothing. With
+    /// <paramref name="follow"/>, a name before the last that is an alias file or a symbolic link leads on from its
+    /// original or target (<see cref="Follow"/>); the last is left as it is.
+    /// </summary>
+    public MacPathEntry? Resolve(string path, bool follow = false)
     {
         ArgumentNullException.ThrowIfNull(path);
         var at = Root;
-        foreach (var name in MacPaths.Split(path))
+        var names = MacPaths.Split(path).ToList();
+        for (var i = 0; i < names.Count; i++)
         {
-            if (Child(at, name) is not { } next)
+            if (Child(at, names[i]) is not { } next)
             {
                 return null;
+            }
+
+            if (follow && i < names.Count - 1)
+            {
+                if (Follow(next) is not { } through)
+                {
+                    return null;
+                }
+
+                next = through;
             }
 
             at = next;
@@ -488,6 +510,114 @@ public sealed class MacPathTree : IDisposable
         }
 
         return ResolveAlias(at) is null ? at : null;
+    }
+
+    /// <summary>
+    /// The entry an alias file or a symbolic link leads to, through aliases and links of each other (at most 32, BSD's
+    /// MAXSYMLINKS; an alias chain stops at ten, as ResolveAliasFile does); the entry itself when it is neither; null when
+    /// an original or a target is not found, or the links loop.
+    /// </summary>
+    public MacPathEntry? Follow(MacPathEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        var at = entry;
+        var hops = 0;
+        while (true)
+        {
+            if (ResolveAlias(at) is not null)
+            {
+                if (FollowAlias(at) is not { } original)
+                {
+                    return null;
+                }
+
+                at = original;
+            }
+            else if (at.File?.SymbolicLinkTarget is not null)
+            {
+                if (++hops > MaxSymbolicLinks || LinkTarget(at, ref hops) is not { } target)
+                {
+                    return null;
+                }
+
+                at = target;
+            }
+            else
+            {
+                return at;
+            }
+
+            if (++hops > MaxSymbolicLinks)
+            {
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The entry a symbolic link's target path names on the volume holding it (hfs-plus.md §2.8), links along the way
+    /// followed, the last not; null when the entry is no symbolic link or its target is not found there.
+    /// </summary>
+    public MacPathEntry? SymbolicLinkTargetOf(MacPathEntry link)
+    {
+        ArgumentNullException.ThrowIfNull(link);
+        var hops = 0;
+        return link.File?.SymbolicLinkTarget is null ? null : LinkTarget(link, ref hops);
+    }
+
+    // BSD's MAXSYMLINKS: the links one lookup may pass through.
+    private const int MaxSymbolicLinks = 32;
+
+    // A link's target, by its POSIX path: '/' starts at the volume's root, otherwise at the link's folder; "." stays,
+    // ".." goes up (not past the root); a ':' in a component is the '/' HFS Plus keeps in names. A name is matched
+    // exactly first, then as the catalog compares names (a case-sensitive volume keeps both). A link along the way is
+    // followed [ClassicMac: as the BSD layer looks a path up].
+    private MacPathEntry? LinkTarget(MacPathEntry link, ref int hops)
+    {
+        if (link.Holder is not { } root || link.File?.SymbolicLinkTarget is not { } target || link.Parent is not { } parent)
+        {
+            return null;
+        }
+
+        var at = target.StartsWith('/') ? root : parent;
+        var parts = target.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < parts.Length; i++)
+        {
+            var part = parts[i];
+            if (part == ".")
+            {
+                continue;
+            }
+
+            if (part == "..")
+            {
+                at = at == root || at.Parent is not { } up ? root : up;
+                continue;
+            }
+
+            var name = part.Replace(':', '/');
+            var children = Children(at).Where(c => c.Kind is MacPathKind.Folder or MacPathKind.File or MacPathKind.Container).ToList();
+            var next = children.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.Ordinal))
+                ?? children.FirstOrDefault(c => MacPaths.NamesEqual(c.Name, name));
+            if (next is null)
+            {
+                return null;
+            }
+
+            if (i < parts.Length - 1 && next.File?.SymbolicLinkTarget is not null)
+            {
+                if (++hops > MaxSymbolicLinks || LinkTarget(next, ref hops) is not { } through)
+                {
+                    return null;
+                }
+
+                next = through;
+            }
+
+            at = next;
+        }
+
+        return at;
     }
 
     // The volume a container holds, for aliases (read once): its files, folder records and creation date.

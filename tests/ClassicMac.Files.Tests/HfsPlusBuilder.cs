@@ -15,6 +15,7 @@ internal sealed class HfsPlusBuilder
     private readonly List<(uint Parent, string Name, uint Id)> folders = [];
     private readonly List<(uint Parent, string Name, uint Id, byte[] Data, byte[] Resource, int Fragments, FourCC Type, FourCC Creator)> files = [];
     private readonly Dictionary<uint, (ushort Flags, ushort FinderFlags, uint Special)> fileLinks = [];
+    private readonly HashSet<uint> symbolicLinks = [];
     private readonly Dictionary<uint, (ushort Flags, uint Special)> folderLinks = [];
     private uint nextId = 16;
     private uint? privateFiles, privateFolders;
@@ -42,6 +43,14 @@ internal sealed class HfsPlusBuilder
     {
         files.Add((parent, name, nextId, data, resource, fragments, FourCC.FromString(type), FourCC.FromString(creator)));
         return nextId++;
+    }
+
+    /// <summary>A symbolic link (TN1150): an slnk/rhap file whose data fork is the target path in UTF-8, its BSD mode $A1ED.</summary>
+    public uint Symlink(uint parent, string name, string target)
+    {
+        var id = File(parent, name, System.Text.Encoding.UTF8.GetBytes(target), [], type: "slnk", creator: "rhap");
+        symbolicLinks.Add(id);
+        return id;
     }
 
     /// <summary>Sets a file's text encoding hint (the catalog record's textEncoding, TN1150).</summary>
@@ -389,6 +398,11 @@ internal sealed class HfsPlusBuilder
             if (HasAttributes(file.Id))
             {
                 data[3] |= 0x04;
+            }
+
+            if (symbolicLinks.Contains(file.Id))
+            {
+                w.WriteUInt16At(42, 0xA1ED);                                         // fileMode: a symbolic link, rwxr-xr-x
             }
 
             ForkData(w, 88, file.Data.Length, forks[(file.Id, 0)]);

@@ -484,7 +484,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         TextEncoding = result.GetValue(encoding),
     };
 
-    private static Option<bool> FollowOption() => new("--follow") { Description = "An alias file stands for its original (through aliases of aliases)" };
+    private static Option<bool> FollowOption() => new("--follow") { Description = "An alias file stands for its original, a symbolic link for its target (through aliases and links of each other)" };
 
     private Command LsCommand()
     {

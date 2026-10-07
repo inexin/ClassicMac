@@ -192,6 +192,15 @@ internal static class MacPathJson
             w.WriteEndObject();
         }
 
+        if (info.SymbolicLink is { } link)
+        {
+            w.WriteStartObject("symbolicLink");
+            w.WriteString("target", link.Target);
+            w.WriteBoolean("found", link.Found);
+            Optional(w, "resolvedPath", link.ResolvedPath is { } resolved ? Inside(tree, resolved) : null);
+            w.WriteEndObject();
+        }
+
         if (info.Alias is { } alias)
         {
             w.WriteStartObject("alias");

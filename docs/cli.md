@@ -80,7 +80,11 @@ new name is stored as its bytes in it.
 
 `ls`, `cat` and `get` take `--follow`: an alias file (the Finder's isAlias flag) stands for its original, resolved on
 the volume holding it ([aliases.md §2](formats/resources/aliases.md#2-reading)), through aliases of aliases (at most
-ten). An original that is not found is an error naming the path the alias recorded (exit 5).
+ten); an HFS Plus symbolic link stands for its target, its POSIX path followed on its volume
+([hfs-plus.md §2.8](formats/file-systems/hfs-plus.md#28-files-and-links)), through aliases and links of each other
+(at most 32). A name along the path that is an alias or a link leads on from its original or target too
+(`disk.iso:etc:hosts --follow`, where `etc` links to `private/etc`). An original that is not found is an error naming
+the path the alias recorded, a target that is not found one naming the link's path (exit 5).
 
 | Exit code | When |
 | --- | --- |
@@ -113,7 +117,9 @@ free space in bytes and allocation blocks, file and folder counts, an HFS volume
 files in more than one extent; free space in 5 runs, the largest 1,204 blocks`, and `Smallest size: <n> bytes now, <n>
 bytes defragmented`, [hfs.md §5.7](formats/file-systems/hfs.md#57-fragmentation-and-layout)), its own dates, its blessed System Folder and whether it is locked
 ([hfs.md §5.2](formats/file-systems/hfs.md#52-what-comes-out)). For an alias file, where it points as the Finder's Get Info shows it ("Original:"), and
-whether that resolves on the volume, how, and to which entry:
+whether that resolves on the volume, how, and to which entry. For a symbolic link, its target path ("Symbolic link:")
+and the entry it leads to ("Leads to:"), or that it leads to nothing on the volume; JSON's `symbolicLink` has
+`target`, `found` and `resolvedPath`:
 
 ```
 $ classicmac stat "Mac OS 9.hfv:Late Breaking News"

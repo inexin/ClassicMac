@@ -117,6 +117,9 @@ public sealed record MacEntryInfo
     /// <summary>For an alias file, where it points and whether that resolves (stat).</summary>
     public MacAliasInfo? Alias { get; init; }
 
+    /// <summary>For a symbolic link, its target path and where it leads (stat).</summary>
+    public MacSymbolicLinkInfo? SymbolicLink { get; init; }
+
     /// <summary>For a volume (a container that is an HFS, HFS Plus or MFS volume), its name, space, counts and locks (stat).</summary>
     public VolumeInfo? Volume { get; init; }
 
@@ -141,6 +144,12 @@ public sealed record MacAliasInfo(string StoredPath, bool Found, string How, str
     /// <summary>The state in a sentence (<see cref="AliasResolution.Explanation"/>).</summary>
     public string Explanation { get; init; } = "";
 }
+
+/// <summary>A symbolic link's target (docs/formats/file-systems/hfs-plus.md §2.8) and where it leads.</summary>
+/// <param name="Target">The POSIX path it holds.</param>
+/// <param name="Found">Whether the path leads to an entry on the link's volume.</param>
+/// <param name="ResolvedPath">That entry's full path in the tree, when found.</param>
+public sealed record MacSymbolicLinkInfo(string Target, bool Found, string? ResolvedPath);
 
 /// <summary>What <see cref="MacCommands.Find"/> looks for; every given criterion must hold.</summary>
 public sealed record MacFindQuery
@@ -208,6 +217,11 @@ public static class MacCommands
             ResourceForkSource = entry.Kind == MacPathKind.ResourceFork ? entry.ResourcesSource?.ToString() : null,
             ResourceAttributes = entry.Resource is { } resource ? resource.Attributes.ToString() : null,
             Alias = AliasOf(tree, entry),
+            SymbolicLink = entry.File?.SymbolicLinkTarget is { } target && entry.Kind is MacPathKind.File or MacPathKind.Container
+                ? tree.SymbolicLinkTargetOf(entry) is { } found
+                    ? new MacSymbolicLinkInfo(target, true, found.Path)
+                    : new MacSymbolicLinkInfo(target, false, null)
+                : null,
             Volume = tree.VolumeInfoOf(entry),
             BlessedFolder = tree.VolumeInfoOf(entry)?.BlessedFolderId is { } blessed ? tree.FolderPathOf(entry, blessed) : null,
             Layout = tree.LayoutOf(entry),

@@ -404,7 +404,12 @@ When the journaled bit is set [Doc: TN1150 Journal Info Block, Journal Header]:
    private folders with the link-chain flag but neither link signature is a stray flag [Code: Apple fsck_hfs
    `CatalogCheck.c`]. An ordinary regular file (not a link, not in the private file-link folder, not a journal file)
    with a link count above 1 is inconsistent [Code: Apple fsck_hfs `CatalogCheck.c`].
-5. A symbolic link's target is its data fork as UTF-8; targets are paths, not resolved [Doc].
+5. A symbolic link's target is its data fork as UTF-8, a POSIX path [Doc]. ClassicMac's path tree follows it
+   (`MacPathTree.Follow`, `SymbolicLinkTargetOf`) as the BSD layer looks a path up [ClassicMac]: an absolute path from
+   the root of the volume holding the link (as if it were the startup disk), a relative one from the link's folder;
+   `.` stays and `..` goes up, not past the root; a `:` in a component is the `/` HFS Plus keeps in a name; a name
+   is matched exactly first, then as the catalog compares names; a link along the way is followed, at most 32 in all
+   (BSD's MAXSYMLINKS). A path that leaves the volume (`/Volumes/…`), a missing name or a loop is not found.
 
 ## 3. Writing
 
