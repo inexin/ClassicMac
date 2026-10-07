@@ -206,6 +206,52 @@ public class RegionTests
             Mask(RegionShapes.Line(3, 0, 0, 3, 1, 1), 4, 4));
     }
 
+    // Lines and polygons scan-converted only over the rows that can be seen (a fuzzed picture framed and painted a
+    // 1,600-point polygon with coordinates near ±32,000 on a 2×2 canvas, a second and a half each): within the window,
+    // exactly the shape's pixels; outside it, nothing. Random shapes, slopes of every size, windows anywhere.
+    public static TheoryData<int> Seeds() => [.. Enumerable.Range(1, 8)];
+
+    private static Region Window(int top, int bottom) => Region.FromRect(new PictRect(top, -40000, bottom, 40000));
+
+    private static void AssertSameInWindow(Region full, Region windowed, int top, int bottom)
+    {
+        Assert.Equal(full.Intersect(Window(top, bottom)).ToRgnData(), windowed.Intersect(Window(top, bottom)).ToRgnData());
+        Assert.True(windowed.IsEmpty || (windowed.BoundingBox.Top >= top && windowed.BoundingBox.Bottom <= bottom),
+            $"the windowed shape reaches {windowed.BoundingBox}, outside rows {top} to {bottom}");
+    }
+
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void Line_InAWindow_IsTheLineCutToIt(int seed)
+    {
+        var random = new Random(seed);
+        int Coordinate() => random.Next(10) == 0 ? random.Next(-32000, 32000) : random.Next(-60, 60);
+        for (var i = 0; i < 30; i++)
+        {
+            var (h1, v1, h2, v2) = (Coordinate(), Coordinate(), Coordinate(), Coordinate());
+            var (penH, penV) = (random.Next(1, 4), random.Next(1, 4));
+            var top = random.Next(-80, 60);
+            var bottom = top + random.Next(0, 40);
+            AssertSameInWindow(RegionShapes.Line(h1, v1, h2, v2, penH, penV),
+                RegionShapes.Line(h1, v1, h2, v2, penH, penV, top, bottom), top, bottom);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void Polygon_InAWindow_IsThePolygonCutToIt(int seed)
+    {
+        var random = new Random(seed);
+        int Coordinate() => random.Next(10) == 0 ? random.Next(-32000, 32000) : random.Next(-60, 60);
+        for (var i = 0; i < 20; i++)
+        {
+            var points = Enumerable.Range(0, random.Next(2, 12)).Select(_ => (Coordinate(), Coordinate())).ToArray();
+            var top = random.Next(-80, 60);
+            var bottom = top + random.Next(0, 40);
+            AssertSameInWindow(RegionShapes.Polygon(points), RegionShapes.Polygon(points, top, bottom), top, bottom);
+        }
+    }
+
     [Fact]
     public void Read_ParsesPictRegionOperand()
     {

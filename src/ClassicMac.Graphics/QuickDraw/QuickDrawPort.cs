@@ -965,7 +965,25 @@ public sealed class QuickDrawPort
             Done();
             return;
         }
-        Shape(verb, () => RegionShapes.Polygon(points), () => new[] { Region.Empty }, true);
+        var (top, bottom) = VisibleRows();
+        Shape(verb, () => RegionShapes.Polygon(points, top, bottom), () => new[] { Region.Empty }, true);
+    }
+
+    // The canvas rows the clip leaves: lines and polygons are scan-converted only over them, as nothing outside can be
+    // drawn (Painter.FillRegion draws the shape within the canvas and the clip) [ClassicMac: a speed-up].
+    private (int Top, int Bottom) VisibleRows()
+    {
+        if (ClipRegion is not { } clip)
+        {
+            return (0, canvas.Height);
+        }
+
+        if (clip.IsEmpty)
+        {
+            return (0, 0);
+        }
+
+        return (Math.Max(0, clip.Bounds.Top), Math.Min(canvas.Height, clip.Bounds.Bottom));
     }
 
     internal void RgnShape(Region region, int verb) =>
@@ -1031,7 +1049,8 @@ public sealed class QuickDrawPort
             return;
         }
 
-        var region = RegionShapes.Line(x1, y1, x2, y2, PenWidth, PenHeight);
+        var (top, bottom) = VisibleRows();
+        var region = RegionShapes.Line(x1, y1, x2, y2, PenWidth, PenHeight, top, bottom);
         int mode = Mode < TransferModes.Blend ? (Mode % 0x40) | 8 : Mode;
         Painter.FillRegion(canvas, region, ClipRegion, PnPat, Align, mode, HilitePending, Colors, x1 == x2 || y1 == y2, OriginV);
     }

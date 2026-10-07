@@ -588,6 +588,8 @@ Picture recording (§3.3) differs [Code: 68k ROM $077D] [Code: Mac OS 9.0 QuickD
   reads them; what the last row would read past the pixel data is zeros, where the Mac reads whatever memory follows.
   A pixel pattern whose pixel map has empty bounds has no pixel data but still tiles one pixel, read the same way:
   zeros, so pixel value 0. Both modes. [ClassicMac]
+- **Speed:** lines and polygons are scan-converted only over the canvas rows the clip leaves, so a picture with huge
+  shapes on a small canvas does not walk their whole length; the pixels are the same. [ClassicMac]
 - **Size limit:** a picture whose canvas (§2.2) has more than `PictDecodeOptions.MaxPixels` pixels (64 Mi by
   default) is refused with `InvalidDataException` before anything is allocated; the Mac has no such limit, as
   DrawPicture draws into the port, clipped to it. `ClassicMac.Resources.Decoders` passes `DecodeOptions.MaxImagePixels`.

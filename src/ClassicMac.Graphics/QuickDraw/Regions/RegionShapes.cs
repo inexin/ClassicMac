@@ -353,8 +353,10 @@ internal static class RegionShapes
     // The pen (penH x penV, hanging below and right of the path) swept from (h1, v1) to (h2, v2), end points
     // included. Horizontal and vertical lines are the rectangle spanning both pen positions; slanted lines are one
     // pen-wide run per scan line whose ends follow the slope, with the first and last rows trimmed so the pen
-    // covers exactly the path.
-    public static Region Line(int h1, int v1, int h2, int v2, int penH, int penV)
+    // covers exactly the path. Only the rows from windowTop to windowBottom are made (the rows that can be seen): the
+    // run's ends at the first are its start plus the slope times the rows skipped, which 32-bit addition makes exactly
+    // what stepping there would [ClassicMac: a speed-up; the pixels in the window are the same].
+    public static Region Line(int h1, int v1, int h2, int v2, int penH, int penV, int windowTop = int.MinValue, int windowBottom = int.MaxValue)
     {
         int top = Math.Min(v1, v2), bottom = Math.Max(v1, v2) + penV;
         int left = Math.Min(h1, h2), right = Math.Max(h1, h2) + penH;
@@ -365,7 +367,8 @@ internal static class RegionShapes
 
         if (h1 == h2 || v1 == v2)
         {
-            return Region.FromRect(new PictRect(top, left, bottom, right));
+            int shownTop = Math.Max(top, windowTop), shownBottom = Math.Min(bottom, windowBottom);
+            return shownTop < shownBottom ? Region.FromRect(new PictRect(shownTop, left, shownBottom, right)) : Region.Empty;
         }
 
         if (penH <= 0 || penV <= 0)
@@ -408,7 +411,14 @@ internal static class RegionShapes
         }
 
         var rows = new Scanlines(left, right);
-        for (int row = top; row < bottom; row++)
+        int first = Math.Max(top, windowTop), last = Math.Min(bottom, windowBottom);
+        if (first > top)
+        {
+            runLeft = unchecked(runLeft + slope * (first - top));
+            runRight = unchecked(runRight + slope * (first - top));
+        }
+
+        for (int row = first; row < last; row++)
         {
             rows.Add(row, (short)(runLeft >> 16), (short)(runRight >> 16));
             runLeft += slope;
@@ -419,10 +429,11 @@ internal static class RegionShapes
 
     // ---- polygons ----
 
-    // The region an open region records for the polygon's edges, closed from the last point to the first.
-    public static Region Polygon(IReadOnlyList<(int h, int v)> points)
+    // The region an open region records for the polygon's edges, closed from the last point to the first; only over
+    // the rows from windowTop to windowBottom when given (see EdgeInversions).
+    public static Region Polygon(IReadOnlyList<(int h, int v)> points, int windowTop = int.MinValue, int windowBottom = int.MaxValue)
     {
-        if (points.Count < 2)
+        if (points.Count < 2 || windowTop >= windowBottom)
         {
             return Region.Empty;
         }
@@ -430,10 +441,15 @@ internal static class RegionShapes
         var inversions = new Dictionary<int, List<int>>();
         for (int i = 1; i < points.Count; i++)
         {
-            EdgeInversions(inversions, points[i - 1].h, points[i - 1].v, points[i].h, points[i].v);
+            EdgeInversions(inversions, points[i - 1].h, points[i - 1].v, points[i].h, points[i].v, windowTop, windowBottom);
         }
 
-        EdgeInversions(inversions, points[^1].h, points[^1].v, points[0].h, points[0].v);
+        EdgeInversions(inversions, points[^1].h, points[^1].v, points[0].h, points[0].v, windowTop, windowBottom);
+        if (windowBottom != int.MaxValue && inversions.Count > 0)
+        {
+            inversions.TryAdd(windowBottom, []);                                       // the last band ends at the window
+        }
+
         var rows = new List<(int y, List<int> xs)>();
         foreach (var (y, xs) in inversions)
         {
@@ -445,7 +461,13 @@ internal static class RegionShapes
 
     // An edge's inversion points: wherever the edge's rounded h changes between scan lines, a pair of points
     // bounding the change. Vertical edges add none (their neighbours' points already bound them).
-    internal static void EdgeInversions(Dictionary<int, List<int>> points, int h1, int v1, int h2, int v2)
+    //
+    // In a window of rows, a point counts for every row at or below it, so the points above the window move to its
+    // first row, and those below it are left out. An edge's points above the window are pairs chaining h1 to its h
+    // just above the window, so they come to one pair, from h1 to that h, which is the start plus the slope times the
+    // rows (32-bit addition, as stepping) [ClassicMac: a speed-up; the region in the window is the same].
+    internal static void EdgeInversions(Dictionary<int, List<int>> points, int h1, int v1, int h2, int v2,
+        int windowTop = int.MinValue, int windowBottom = int.MaxValue)
     {
         void Toggle(int v, int a, int b)
         {
@@ -465,7 +487,11 @@ internal static class RegionShapes
 
         if (v1 == v2)
         {
-            Toggle(v1, h1, h2);
+            if (v1 < windowBottom)
+            {
+                Toggle(Math.Max(v1, windowTop), h1, h2);
+            }
+
             return;
         }
         if (v2 < v1)
@@ -473,6 +499,18 @@ internal static class RegionShapes
             (v1, v2) = (v2, v1);
             (h1, h2) = (h2, h1);
         }
+
+        if (v1 >= windowBottom)
+        {
+            return;
+        }
+
+        if (v2 < windowTop)
+        {
+            Toggle(windowTop, h1, h2);
+            return;
+        }
+
         int slope = FixedMath.FixRatio((short)(h2 - h1), (short)(v2 - v1));
         int h = (h1 << 16) + 0x8000 + (slope >> 1);
         if (slope >= 0)
@@ -488,7 +526,19 @@ internal static class RegionShapes
         }
 
         int previous = h1, v = v1;
-        do
+        if (windowTop > v1)
+        {
+            previous = (short)(unchecked(h + slope * (windowTop - 1 - v1)) >> 16);
+            if (previous != h1)
+            {
+                Toggle(windowTop, h1, previous);
+            }
+
+            h = unchecked(h + slope * (windowTop - v1));
+            v = windowTop;
+        }
+
+        for (; v != v2 && v < windowBottom; v++, h += slope)
         {
             int current = (short)(h >> 16);
             if (current != previous)
@@ -496,12 +546,11 @@ internal static class RegionShapes
                 Toggle(v, previous, current);
                 previous = current;
             }
-            v++;
-            h += slope;
-        } while (v != v2);
-        if (previous != h2)
+        }
+
+        if (v2 < windowBottom && previous != h2)
         {
-            Toggle(v, previous, h2);
+            Toggle(v2, previous, h2);
         }
     }
 

@@ -267,6 +267,42 @@ public class DrawingTests
         }
     }
 
+    // Found by fuzzing (pict): a polygon of far more rows than the canvas (coordinates near ±30,000) is scan-converted
+    // only over the canvas's rows, framed and painted with exactly the full shape's pixels there.
+    [Theory]
+    [InlineData(0x0070)]
+    [InlineData(0x0071)]
+    public void HugePolygon_OnATinyCanvas_DrawsTheShapesPixels(int opcode)
+    {
+        var random = new Random(5);
+        // A triangle over the canvas, one corner inside it, then 196 points zigzagging in a strip far to the left.
+        (int h, int v)[] points = [(-30000, -30000), (30000, -30000), (30000, 30000), (2, 1),
+            .. Enumerable.Range(0, 196).Select(_ => (random.Next(-30000, -29000), random.Next(-30000, 30000)))];
+        var bmp = Draw(4, 4, b =>
+        {
+            b.U16(opcode).U16(10 + 4 * points.Length).Rect(-30000, -30000, 30000, 30000);
+            foreach (var (h, v) in points)
+            {
+                b.Point(v, h);
+            }
+        });
+
+        // The full shapes, made once (each over all its rows).
+        var shapes = opcode == 0x0071
+            ? [RegionShapes.Polygon(points)]
+            : Enumerable.Range(1, points.Length - 1)
+                .Select(i => RegionShapes.Line(points[i - 1].h, points[i - 1].v, points[i].h, points[i].v, 1, 1)).ToArray();
+        bool Inside(int x, int y) => shapes.Any(s => s.Contains(x, y));
+        Assert.Contains(true, from y in Enumerable.Range(0, 4) from x in Enumerable.Range(0, 4) select Inside(x, y));
+        for (var y = 0; y < 4; y++)
+        {
+            for (var x = 0; x < 4; x++)
+            {
+                Assert.Equal(Inside(x, y) ? new RgbaColor(0, 0, 0) : default, bmp[x, y]);           // undrawn: transparent
+            }
+        }
+    }
+
     // Found by fuzzing (pict): a pixel pattern whose pixmap bounds are empty has no pixel data; QuickDraw reads whatever
     // memory follows, here zeros, so index 0 (black in an empty colour table) on both QuickDraws.
     [Theory]
