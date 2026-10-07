@@ -137,6 +137,20 @@ public class MacWordTests
         Assert.Equal(["word.not-shown"], diagnostics.Select(d => d.Code));
     }
 
+    // A picture's character ($01) whose properties point past the file: reported, and left out (word-mac.md §1.11).
+    [Fact]
+    public void A_picture_whose_record_is_missing_is_reported_and_left_out()
+    {
+        var data = Builder().Text("a" + (char)1 + "b\r").Chp(1, 2, 0, 0x40, 0, 0, 0, 0, 0, 0, 0x02, 0x7F, 0xFF, 0x00).Build();
+        var diagnostics = new List<Diagnostic>();
+
+        var chapter = Assert.Single(Read(data, diagnostics).Chapters);
+
+        Assert.Equal("ab\r", chapter.Text.Text);
+        Assert.Empty(chapter.Pictures);
+        Assert.Equal(["word.bad-picture"], diagnostics.Select(d => d.Code));
+    }
+
     // A fast-saved document is one with a piece table (zone 18); the flag byte's $04 is set in every Word 5.1a document,
     // fast saved or not, and $08 when it has a picture [Verified: Word 5.1a and 4.0 documents made for ClassicMac].
     [Theory]

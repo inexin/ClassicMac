@@ -44,11 +44,12 @@ The WordDocument stream starts with the FIB ([MS-DOC] §2.5.1): FibBase (32 byte
 | +$02 | 2 | nFib | `$00C1` from Word 97 on; less for Word 6 and 95 |
 | +$0A | 2 | Flags | `$0004` fComplex (fast saved), `$0100` fEncrypted, `$0200` fWhichTblStm (the table stream is 1Table, else 0Table), `$8000` fObfuscated |
 | +$4C | 4 | ccpText | The main text's length in CPs (FibRgLw97 + 12) |
+| +$50 to +$6B | 4 each | ccpFtn, ccpHdd, ccpMcr, ccpAtn, ccpEdn, ccpTxbx, ccpHdrTxbx | Each part's length in CPs; the parts' text follows the main text in this order (§1.7) |
 | +$98 | 2 | cbRgFcLcb | How many pairs follow (`$005D` for Word 97) |
 | +$9A | 8 each | FibRgFcLcb97 | An FC and a length in the table stream per structure |
 
-The pairs read, by index from 0: 1 `Stshf` (the style sheet), 12 `PlcfBteChpx`, 13 `PlcfBtePapx`, 15 `SttbfFfn`,
-33 `Clx`. [Author: [MS-DOC] §2.5.6]
+The pairs read, by index from 0: 1 `Stshf` (the style sheet), 2 `PlcffndRef`, 3 `PlcffndTxt`, 12 `PlcfBteChpx`,
+13 `PlcfBtePapx`, 15 `SttbfFfn`, 33 `Clx`, 46 `PlcfendRef`, 47 `PlcfendTxt`. [Author: [MS-DOC] §2.5.6]
 
 ### 1.2 Piece table
 
@@ -106,6 +107,8 @@ one; sprmPChgTabs `$C615`: a size byte, 255 meaning it must be worked out). The 
 | `$2416` | In a table |
 | `$2417` | The row's end mark |
 | `$D608` | sprmTDefTable, on the row's end mark: after its size word, the cell count, then the row's left edge and each cell's right edge (`i16` twips) |
+| `$0855` | sprmCFSpec: the character is special (a picture, a note's mark) |
+| `$6A03` | sprmCPicLocation: a picture's PICF, by its offset in the Data stream (§1.8) |
 
 A ToggleOperand ([MS-DOC] §2.9.327) is 0 off, 1 on, `$80` the style's value, `$81` its opposite. [Author]
 
@@ -131,9 +134,47 @@ A ToggleOperand ([MS-DOC] §2.9.327) is 0 off, 1 on, `$80` the style's value, `$
 | `$0E` | Column break |
 | `$13`, `$14`, `$15` | A field's start, the separator between its instructions and its result, its end |
 | `$1E`, `$1F` | Non-breaking hyphen, optional hyphen |
-| `$01`, `$02`, `$05`, `$08` | A picture, an automatic footnote reference, an annotation mark, a drawing |
+| `$01`, `$02`, `$05`, `$08` | With sprmCFSpec: a picture (§1.8), an auto-numbered note's mark (§1.7), an annotation mark, a drawing |
 
 [Author: [MS-DOC]]
+
+### 1.7 Footnotes and endnotes
+
+Each part's text follows the main text, in the order of §1.1's counts: the footnotes from ccpText, the endnotes after
+the footnotes, headers, macros and annotations. Footnotes and endnotes are listed alike [Author: [MS-DOC] PlcffndRef,
+PlcffndTxt, PlcfendRef, PlcfendTxt]:
+
+- The references (`PlcffndRef`, `PlcfendRef`): *n* + 1 CPs in the main text, then an FRD (`i16`) per note, more than 0
+  when it is auto-numbered.
+- The texts (`PlcffndTxt`, `PlcfendTxt`): *n* + 2 CPs in the part's text, each note's first, then the end.
+- An auto-numbered note's mark is `$02` with sprmCFSpec, at its reference and at the start of its text [Verified: Word
+  6.0 and 98 documents].
+
+### 1.8 Pictures
+
+A picture is a `$01` with sprmCFSpec; its sprmCPicLocation is the offset of its PICFAndOfficeArtData in the Data stream
+[Author: [MS-DOC] PICFAndOfficeArtData, PICF, PICMID]:
+
+| Offset | Size | Field | Notes |
+| --- | --- | --- | --- |
+| +$00 | 4 | lcb | The structure's bytes |
+| +$04 | 2 | cbHeader | The PICF's bytes (`$44`) |
+| +$06 | 2 | mfpf.mm | `$64` (MM_SHAPE): an Office Art shape follows; `$66` (MM_SHAPEFILE): a name (a length byte and the characters), then the shape |
+| +$1C, +$1E | 2 each | dxaGoal, dyaGoal | The picture's size in twips |
+| +$20, +$22 | 2 each | mx, my | The scale, in thousandths |
+
+The shape's records ([MS-ODRAW] OfficeArtRecordHeader: a version in the low 4 bits and an instance in the high 12, a
+type, a length) hold the picture in a blip, inside containers (version `$F`) and an FBSE (36 bytes, a name of the
+length at its +33, then the blip) [Author: [MS-ODRAW] OfficeArtFBSE, OfficeArtBlip]:
+
+| Type | Blip | After the record header |
+| --- | --- | --- |
+| `$F01C` | PICT | A UID (two for instance `$543`), a 34-byte metafile header (cbSize, rcBounds, ptSize, cbSave, compression: 0 deflated (zlib), `$FE` stored; filter), then the `PICT` without its 512-byte header |
+| `$F01E` | PNG | A UID (two for instance `$6E1`), a tag byte, the PNG file |
+| `$F01D`, `$F02A` | JPEG | A UID (two for instances `$46B`, `$6E3`), a tag byte, the JPEG file |
+
+Word 98 for the Macintosh stored its sample's picture, made from RTF's `\macpict`, as a PNG blip [Verified: Word 98
+documents].
 
 ## 2. Reading
 
@@ -177,6 +218,8 @@ text, character and paragraph formats, line breaks and tables read as below. Non
 | Pieces | A Clx as §1.2 when fast saved, its FCs plain byte offsets; else the text is ccpText bytes from fcMin | [Reference: Apache POI] |
 | Bin tables | Page numbers of 2 bytes | [Reference: Apache POI] |
 | PAPX FKP | BXs of 7 bytes (the offset byte, 6 bytes of line data); a PAPX is a count of words and that many words: the `istd` (2 bytes) and the grpprl | [ClassicMac]: assumed, as Word 97's forerunner |
+| Notes | The footnotes' tables as §1.1's pairs 2 and 3; the endnotes' at +$1D2 (references) and +$1DA (texts), outside the pairs' order; the parts' lengths from +$34 in §1.1's order | [Verified: Word 6.0 documents] |
+| Pictures | Sprm 68 (sprmCPicLocation, after a size byte) is the PICF's offset in the WordDocument stream, 117 sprmCFSpec; the PICF as §1.8, its mm 8: a stand-in Windows metafile (an 18-byte header, whose size field undercounts, then records up to the one of function 0), followed by the `PICT` itself | [Verified: Word 6.0 documents] |
 | Sprms | One-byte codes with sizes by code; the ones read: 5 alignment, 16 right, 17 left and 19 first-line indents, 21 and 22 space before and after, 24 in a table, 25 the row's end, 83 back to the style's character properties, 85 bold, 86 italic, 88 outline, 89 shadow, 90 small caps, 91 caps, 92 hidden, 93 font, 94 underline, 98 colour (an Ico, 6 red), 99 size, 190 the table's cell definitions (as `$D608`) | [Reference: LibreOffice; Verified: Word 6.0 documents] |
 | Fonts | The table's size in bytes, then per font a size byte (less one), ffid, a weight word, a charset, the alternate name's index, and the name, 8-bit and null-terminated | [Reference: Apache POI] |
 | Styles | As §1.5, with a 14-byte STSHI (the default font at +12) and the name as a length byte, the characters and a null, the UPXs from the next even offset | [ClassicMac]: assumed, as Word 97's forerunner |
@@ -189,8 +232,14 @@ text, character and paragraph formats, line breaks and tables read as below. Non
   cell's end becomes a tab and a row's end a CR, and the rows are a `DocumentTable` with the cell edges in points,
   written as an HTML table. Small caps and the colour are carried on the runs. [ClassicMac]
 - A field shows its result; its instructions are left out. [ClassicMac]
-- Pictures, footnote references, annotation marks and drawings are left out; non-breaking and optional hyphens become
-  U+2011 and U+00AD. Hidden text is left out and all-caps text upper-cased. [ClassicMac]
+- A note's mark shows its number, footnotes and endnotes each numbered from 1 (Word's own numbering formats are not
+  read); the notes' text follows the main text in the chapter, each a `DocumentNote`, written as an HTML section of
+  notes linked both ways. [ClassicMac]
+- A picture is an option space (U+00A0) its `DocumentPicture` is anchored at, at its goal size scaled, placed by its
+  paragraph's alignment: a `PICT` drawn, a PNG or JPEG file kept as it is. One that cannot be found or read is
+  reported and left out. [ClassicMac]
+- Annotation marks and drawings are left out; non-breaking and optional hyphens become U+2011 and U+00AD. Hidden text
+  is left out and all-caps text upper-cased. [ClassicMac]
 - A fast-saved document is read through its piece table as [MS-DOC] specifies, each piece's Prm applied over its
   characters' properties, and over a paragraph's from the piece that holds its mark (§1.2). A Prm1 naming a Prc the
   Clx lacks is reported and left out. [ClassicMac]
@@ -207,7 +256,9 @@ text, character and paragraph formats, line breaks and tables read as below. Non
 | `word.bad-styles` | Warning | The style sheet's header is damaged | Reads without styles | Not traced |
 | `word.bad-zone` | Warning | A table-stream structure or a formatting page lies past its stream's end | Leaves it out | Not traced |
 | `word.encrypted` | Error | fEncrypted is set (encrypted or obfuscated) | Reads nothing | Word asks for the password |
-| `word.not-shown` | Info | The text has pictures, footnote references or other special characters | Leaves them out | Word shows them |
+| `word.not-shown` | Info | The text has special characters other than pictures and note marks | Leaves them out | Word shows them |
+| `word.bad-picture` | Warning | A picture's PICF is outside its stream, or holds no picture this reader reads (an EMF, WMF, DIB or TIFF blip) | Leaves the picture out | Not traced |
+| `word.bad-notes` | Warning | A note's text cannot be found in its part's list | Leaves the note out | Not traced |
 | `word.piece-properties` | Warning | A piece's Prm1 names a Prc the Clx does not have | Reads the text without those changes | Not traced |
 | `word.unsupported-version` | Error | nFib below `$0065` (older than Word 6) | Reads nothing | Not traced |
 
@@ -218,8 +269,8 @@ The compound file's own diagnostics are in [compound-file.md §6](../containers/
 - `tests/ClassicMac.Resources.Decoders.Tests/WordBinaryTests.cs` builds documents byte by byte from [MS-DOC]
   (`WordBinaryFixtures.cs`, in a compound file from `CompoundFileBuilder.cs`): character sprms, a compressed and a
   UTF-16 piece, paragraph sprms, styles through their base, toggles, hidden and all-caps text, fields, tables,
-  special characters, encryption and obfuscation, the 0Table stream, a Prm, an older nFib, other compound files, and
-  the HTML output.
+  special characters, encryption and obfuscation, the 0Table stream, a Prm, an older nFib, other compound files, a
+  footnote and an endnote, a deflated PICT blip, PNG and JPEG blips, a missing picture, and the HTML output.
 - `tests/ClassicMac.Resources.Decoders.Tests/WordSixTests.cs` builds Word 6 documents byte by byte as §4.1 lays them
   out (`WordSixFixtures.cs`): Mac OS Roman and Windows text, character and paragraph sprms, styles and `sprmCPlain`,
   tables and fields, a piece table, an unknown sprm, encryption.
@@ -230,7 +281,9 @@ The compound file's own diagnostics are in [compound-file.md §6](../containers/
 - The same tests on `Word/w98-*.bin`: 10 documents Word 98 for the Macintosh (8.0) wrote on Mac OS 9.2.2 for
   ClassicMac, the same content saved in full (nFib 193), and five fast saved (fComplex 1, cQuickSaves 1, one edit
   each): the text, formats and table read as Word showed them, the fast saves through their piece tables with each
-  insertion in the formatting of the character before it. None of the five pieces carries a Prm; `w98-prm-fast`, a
+  insertion in the formatting of the character before it, and a picture and a note, full and edited: Word 6 and 98
+  made the RTF's footnote an endnote, Word 6 kept the `PICT` after a stand-in metafile and Word 98 made it a PNG, both
+  shown at 64 × 64; and the HTML's linked note and picture. None of the five pieces carries a Prm; `w98-prm-fast`, a
   fast save that only centred a paragraph, does (Prm0 `$010A` on that paragraph's mark), and reads with only that
   paragraph centred.
 
@@ -238,8 +291,9 @@ The compound file's own diagnostics are in [compound-file.md §6](../containers/
 
 - Fast-saved Word 6 documents (none was made: Word 6 saved every sample in full); Word 95's East Asian and Unicode text.
 - A Prm1 from a real document (only built ones are tested), and Prm0s for properties this reader does not apply.
-- Character styles (`sprmCIstd`), list numbering, tabs, borders, line
-  spacing, sections, headers, footnotes, pictures and East Asian text.
+- Character styles (`sprmCIstd`), list numbering, tabs, borders, line spacing, sections, headers and East Asian text.
+- Notes' numbering formats (the DOP's) and custom marks; a picture's cropping; EMF, WMF, DIB and TIFF blips, and
+  Word 97's pictures stored as metafiles.
 - Decrypting password-protected documents.
 
 ## 9. References
@@ -250,3 +304,5 @@ The compound file's own diagnostics are in [compound-file.md §6](../containers/
 3. Apache POI, HWPF's Word 6 and 95 support (Apache 2.0): the FIB's offsets, the font table, the bin tables, documents
    with no piece table. Behaviour only.
 4. wv, its notes on the FIB (GPL): the meaning of chse. Behaviour only; no code is taken from it.
+5. Microsoft, *[MS-ODRAW]: Office Drawing Binary File Format*: OfficeArtRecordHeader, OfficeArtFBSE, OfficeArtBlipPICT,
+   OfficeArtBlipPNG, OfficeArtBlipJPEG, OfficeArtMetafileHeader.

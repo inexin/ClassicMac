@@ -160,12 +160,30 @@ public static class HtmlDocuments
             return html;
         }
 
-        // The chapter's text with its pictures reflowed (DocumentFlow).
+        // The chapter's text with its pictures reflowed (DocumentFlow); its notes after it, in a section of their own, each
+        // starting with an anchor its reference links to [ClassicMac].
         private void Body(StringBuilder html, DocumentChapter chapter)
         {
             nextTarget = 0;
+            var notesStart = chapter.Notes.Count > 0 ? chapter.Notes.Min(n => n.Start) : int.MaxValue;
+            var inNotes = false;
             foreach (var block in DocumentFlow.Blocks(chapter))
             {
+                if (block is DocumentLine { Start: var at } && at >= notesStart)
+                {
+                    if (!inNotes)
+                    {
+                        html.Append("<section class=\"notes\">\n<hr>\n");
+                        inNotes = true;
+                    }
+
+                    var index = chapter.Notes.ToList().FindIndex(n => n.Start == at);
+                    if (index >= 0)
+                    {
+                        html.Append(CultureInfo.InvariantCulture, $"<a id=\"note-{index + 1}\"></a>\n");
+                    }
+                }
+
                 Targets(html, chapter, block.Paragraph);
                 if (block is DocumentLine line && chapter.Tables.FirstOrDefault(t => t.Start <= line.Start && line.Start < t.End) is { } table)
                 {
@@ -181,6 +199,10 @@ public static class HtmlDocuments
                 }
             }
             Targets(html, chapter, int.MaxValue);
+            if (inNotes)
+            {
+                html.Append("</section>\n");
+            }
         }
 
         // The link anchors of the paragraphs up to this one, including those dropped with the whitespace.
@@ -227,9 +249,34 @@ public static class HtmlDocuments
                 }
 
                 var style = Style(run);
-                var content = Escape(chapter.Text.Text[from..to]);
+                var content = Marked(chapter, from, to);
                 html.Append(run == first ? content : $"<span class=\"{style}\">{content}</span>");
             }
+        }
+
+        // The text from start to end, escaped, each note's mark in it a superscript link: at its reference to the note, at
+        // the note to the reference.
+        private static string Marked(DocumentChapter chapter, int start, int end)
+        {
+            var text = chapter.Text.Text;
+            var marks = chapter.Notes.SelectMany((note, i) => new[]
+                {
+                    (At: note.Reference, note.Mark, Link: $"<sup><a href=\"#note-{i + 1}\" id=\"ref-{i + 1}\">{Escape(note.Mark)}</a></sup>"),
+                    (At: note.Start, note.Mark, Link: $"<sup><a href=\"#ref-{i + 1}\">{Escape(note.Mark)}</a></sup>"),
+                })
+                .Where(m => m.Mark.Length > 0 && m.At >= start && m.At + m.Mark.Length <= end
+                    && string.CompareOrdinal(text, m.At, m.Mark, 0, m.Mark.Length) == 0)
+                .OrderBy(m => m.At)
+                .ToList();
+            var html = new StringBuilder();
+            var at = start;
+            foreach (var mark in marks)
+            {
+                html.Append(Escape(text[at..mark.At])).Append(mark.Link);
+                at = mark.At + mark.Mark.Length;
+            }
+
+            return html.Append(Escape(text[at..end])).ToString();
         }
 
         // A table's row: a line whose cells each end with a tab. The table opens at its first row (its columns as wide as
@@ -356,7 +403,7 @@ public static class HtmlDocuments
             }
             var size = string.Create(CultureInfo.InvariantCulture, $"width=\"{width}\" height=\"{height}\"");
             var file = Image(chapter, picture);
-            var alt = $"PICT {picture.PictureId}";
+            var alt = picture.Format == PictureFormat.Pict ? $"PICT {picture.PictureId}" : $"Picture {picture.PictureId}";
             var element = file is null
                 ? $"<span class=\"missing\" style=\"width:{width}px;height:{height}px\" title=\"{alt} (not drawn)\"></span>"
                 : $"<img src=\"{file}\" {size} alt=\"{alt}\">";
@@ -403,7 +450,13 @@ public static class HtmlDocuments
             if (DocumentPictures.Draw(chapter, picture, options, diagnostics) is { } image)
             {
                 var id = picture.PictureId < 0 ? $"m{-picture.PictureId}" : picture.PictureId.ToString(CultureInfo.InvariantCulture);
-                file = $"images/pict-{id}{options.ImageEncoder.Extension}";
+                var extension = picture.Format switch
+                {
+                    PictureFormat.Png => ".png",
+                    PictureFormat.Jpeg => ".jpg",
+                    _ => options.ImageEncoder.Extension,
+                };
+                file = $"images/pict-{id}{extension}";
                 imageFiles.Add(new DocumentFile(file, image));
             }
             images[picture.PictureId] = file;
@@ -544,7 +597,8 @@ public static class DocumentPictures
 {
     /// <summary>
     /// The picture drawn by the options' image encoder at their screen depth, or null when it is missing or cannot be
-    /// drawn (reported as <c>document.undrawable-picture</c>, as is a frame over the pixel limit).
+    /// drawn (reported as <c>document.undrawable-picture</c>, as is a frame over the pixel limit); a PNG or JPEG file a
+    /// Word document stored is that file.
     /// </summary>
     public static byte[]? Draw(DocumentChapter chapter, DocumentPicture picture, DecodeOptions options, ICollection<Diagnostic> diagnostics)
     {
@@ -555,6 +609,11 @@ public static class DocumentPictures
         if (picture.Picture is not { } data)
         {
             return null;
+        }
+
+        if (picture.Format != PictureFormat.Pict)
+        {
+            return data.ToArray();
         }
 
         try

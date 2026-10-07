@@ -33,7 +33,7 @@ Contents
 | `index.html` | DOCMaker: the title and a list of the chapters, each with its `'cnt#'` entries. SimpleText and Word: the text |
 | `chapter-NN.html` | DOCMaker: one page per chapter, `NN` the chapter number with at least two digits |
 | `style.css` | The layout and one class per distinct text style (`s0`, `s1`, …) |
-| `images/pict-ID.png` | Each picture, drawn once per `'PICT'` ID (`pict-m5` for ID −5) |
+| `images/pict-ID.png` | Each picture, drawn once per `'PICT'` ID (`pict-m5` for ID −5); a Word document's PNG or JPEG picture as it is stored (`.png`, `.jpg`), its pictures numbered from 1 |
 
 The files are listed pages first (`index.html`, the chapters in order), then `style.css`, then the pictures by path.
 All text files are UTF-8 with LF line ends, and the same document always gives the same bytes. [ClassicMac]
@@ -103,6 +103,14 @@ the text flow at its anchor [ClassicMac]:
 5. **Missing or undrawable pictures** are an empty dashed box of the frame's size, titled `PICT <id> (not drawn)`.
 6. A `$CA` with no picture stays in the text as a no-break space.
 
+### 3.5 Notes
+
+A Word document's footnotes and endnotes ([word-mac.md §1.10](../documents/word-mac.md#110-footnotes),
+[word-binary.md §1.7](../documents/word-binary.md#17-footnotes-and-endnotes)) follow the main text in a
+`<section class="notes">` after a rule, each note's paragraphs after an `<a id="note-N">`. A note's mark is a
+superscript link: at its reference `<sup><a href="#note-N" id="ref-N">`, at the note `<sup><a href="#ref-N">`,
+N counting the chapter's notes from 1. [ClassicMac]
+
 ### 3.3 Links
 
 A picture with an action is wrapped in a link, or gets a tooltip [ClassicMac]:
@@ -151,11 +159,13 @@ when the paragraph was dropped with a picture's whitespace. Paragraphs are count
 
 ## 5. ClassicMac
 
-- The converter `document.html` is version 1, raised when its output changes. It reads the data fork only for a
-  `TEXT` or `ttro` file (a SimpleText document's text). [ClassicMac]
+- The converter `document.html` is version 2 (2: Word documents' pictures and notes), raised when its output
+  changes. It reads the data fork only for a `TEXT` or `ttro` file (a SimpleText document's text) and a Word document.
+  [ClassicMac]
 - Pictures are drawn through `DecodeOptions.ImageEncoder` (PNG by default; the extension follows the encoder) at
   `DecodeOptions.ScreenDepth`; a frame over `DecodeOptions.MaxImagePixels` is not drawn
-  ([export-manifest.md §5.2](export-manifest.md#52-decodeoptions)). [ClassicMac]
+  ([export-manifest.md §5.2](export-manifest.md#52-decodeoptions)). A Word document's PNG or JPEG picture is written
+  as stored, whatever the encoder. [ClassicMac]
 
 ## 6. Diagnostics
 
@@ -176,6 +186,8 @@ The codes the HTML converter raises. The reader's codes (`document.*`) are in
   link to a missing chapter left out) and `SimpleText_documents_convert_to_their_golden_HTML`, compared with
   `Golden/Documents/DocMaker` and `Golden/Documents/SimpleText` (pages and `style.css` as files, pictures as SHA-256
   in `images.txt`; `CLASSICMAC_UPDATE_GOLDEN=1` rewrites them).
+- `tests/ClassicMac.Resources.Decoders.Tests/WordSampleTests.cs`: `The_HTML_links_a_note_s_reference_and_text_and_shows_the_picture`
+  (Word 98's endnote linked both ways, its PNG picture written as stored).
 - `tests/ClassicMac.Cli.Tests/ConvertTests.cs`: `convert` writes every document on a disk in a folder each,
   one document straight into the output folder; `extract` adds the document beside the resources.
 

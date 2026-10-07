@@ -135,7 +135,7 @@ public class ConvertTests : IDisposable
         var manifest = Manifest(target);
         Assert.Equal("1.2", manifest.FormatVersion);
         var document = manifest.Document!;
-        Assert.Equal(("document.html", 1, "document/index.html"), (document.Converter, document.ConverterVersion, document.Path));
+        Assert.Equal(("document.html", 2, "document/index.html"), (document.Converter, document.ConverterVersion, document.Path));
         Assert.Contains(document.Files, f => f.Path == "document/images/pict-1001.png");
         Assert.All(document.Files, f => Assert.True(File.Exists(Path.Combine([target, .. f.Path.Split('/')])), f.Path));
         Assert.Contains(manifest.Diagnostics, d => d.Code == "document.bad-link");

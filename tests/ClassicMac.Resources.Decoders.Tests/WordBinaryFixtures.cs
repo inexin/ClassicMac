@@ -35,6 +35,18 @@ internal sealed class WordBinaryBuilder
     /// <summary>The default font's index (rgftcStandardChp).</summary>
     public ushort DefaultFont { get; set; }
 
+    /// <summary>The footnote text's length (ccpFtn): that many characters after the main text are footnotes.</summary>
+    public int FootnoteLength { get; set; }
+
+    /// <summary>The endnote text's length (ccpEdn), after the footnotes.</summary>
+    public int EndnoteLength { get; set; }
+
+    /// <summary>More FibRgFcLcb97 pairs, by index: their bytes go in the table stream.</summary>
+    public Dictionary<int, byte[]> Tables { get; } = [];
+
+    /// <summary>The Data stream (pictures), when the document has one.</summary>
+    public byte[]? Data { get; set; }
+
     public WordBinaryBuilder Text(string value)
     {
         text = value;
@@ -148,7 +160,9 @@ internal sealed class WordBinaryBuilder
         BinaryPrimitives.WriteUInt16LittleEndian(fib[0x0A..], Flags);
         BinaryPrimitives.WriteUInt16LittleEndian(fib[0x20..], 14);
         BinaryPrimitives.WriteUInt16LittleEndian(fib[0x3E..], 22);
-        BinaryPrimitives.WriteInt32LittleEndian(fib[0x4C..], text.Length);
+        BinaryPrimitives.WriteInt32LittleEndian(fib[0x4C..], text.Length - FootnoteLength - EndnoteLength);
+        BinaryPrimitives.WriteInt32LittleEndian(fib[0x50..], FootnoteLength);
+        BinaryPrimitives.WriteInt32LittleEndian(fib[0x60..], EndnoteLength);
         BinaryPrimitives.WriteUInt16LittleEndian(fib[0x98..], 0x5D);
         void Pair(int index, (int Fc, int Lcb) value)
         {
@@ -161,8 +175,13 @@ internal sealed class WordBinaryBuilder
         Pair(13, papBte);
         Pair(15, ffn);
         Pair(33, clx);
+        foreach (var (index, bytes) in Tables)
+        {
+            Pair(index, Add(bytes));
+        }
 
-        return new CompoundFileBuilder().Stream("WordDocument", document).Stream((Flags & 0x0200) != 0 ? "1Table" : "0Table", [.. table]).Build();
+        var file = new CompoundFileBuilder().Stream("WordDocument", document).Stream((Flags & 0x0200) != 0 ? "1Table" : "0Table", [.. table]);
+        return (Data is { } data ? file.Stream("Data", data) : file).Build();
     }
 
     // Windows-1252 for the compressed piece.

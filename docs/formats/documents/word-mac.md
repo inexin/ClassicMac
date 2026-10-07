@@ -44,7 +44,8 @@ an *FC*; FCs of the text run from the header's text start. Pages are 512 bytes, 
 | +$1C | 4 | Data end | FC after the last byte used; the fork is rounded up to a page [Fitted] |
 | +$20 | 4 | Reserved | [Fitted] |
 | +$24 | 4 | Main text length | Characters of the main text [Fitted] |
-| +$28 | 24 | Other text lengths | Zero in a document with no footnotes or headers [Fitted] |
+| +$28 | 4 | Footnote text length | Characters of the footnotes' text, which follows the main text (§1.10) [Verified: Word 5.1a and 4.0 documents] |
+| +$2C | 20 | Other text lengths | Zero in the documents seen (headers and the rest) [Fitted] |
 | +$40 | 120 | Zones 0–19 | 6 bytes each (§1.2) [Fitted] |
 | +$B8 | 2 | Character pages | How many pages the character bin table lists [Fitted] |
 | +$BA | 2 | Paragraph pages | How many pages the paragraph bin table lists [Fitted] |
@@ -59,7 +60,7 @@ uses, and the others' names [Reference: libmwaw]:
 | --- | --- | --- |
 | 0 | The style sheet (§1.5) [Fitted] | Yes |
 | 1 | The same FC and length as zone 0 in the document seen [Fitted] | No |
-| 2, 3 | Footnote positions and footnotes | No |
+| 2, 3 | Footnote references and footnote texts (§1.10) [Verified: Word 5.1a and 4.0 documents] | Yes |
 | 4 | Sections | No |
 | 5 | Page breaks | No |
 | 6, 7 | Field names and positions | No |
@@ -160,7 +161,9 @@ The text is Mac OS Roman [Fitted]. These bytes are not characters:
 | `$0C` | Page or section break, ending its paragraph [Fitted] |
 | `$0B` | Line break within a paragraph [Verified] |
 | `$1E`, `$1F` | Non-breaking hyphen, optional hyphen [Reference: libmwaw] |
-| `$01`, `$02`, other controls | A picture, a footnote reference and other special characters [Reference: libmwaw] |
+| `$01` | A picture (§1.11) [Verified: Word 5.1a and 4.0 documents] |
+| `$05` | An auto-numbered footnote's mark, at its reference and at the start of its text (§1.10) [Verified: Word 5.1a and 4.0 documents] |
+| Other controls | Other special characters [Reference: libmwaw] |
 
 ### 1.9 Tables and the piece table
 
@@ -179,6 +182,29 @@ A fast-saved document has a piece table in zone 18; full saves leave zone 18 emp
 
 The text is the pieces in order; text a fast save added lies after the old text end (FC `$64E7` onward in the
 document seen), and formatting pages cover it by FC like any other text [Fitted].
+
+### 1.10 Footnotes
+
+The footnotes' text follows the main text: the header's +$28 counts its characters, each footnote a paragraph or
+more [Verified: Word 5.1a and 4.0 documents].
+
+- Zone 2 lists the references: *n* + 1 `u32` character positions in the main text (the last past the text), then a
+  `u16` per footnote, 1 for an auto-numbered one [Fitted].
+- Zone 3 lists each footnote's first character in the footnote text: *n* + 1 `u32`s or more, the last past its end
+  [Fitted].
+- An auto-numbered footnote's mark is `$05` at its reference and again at the start of its text [Verified: Word 5.1a
+  and 4.0 documents], shown as its number.
+
+### 1.11 Pictures
+
+A picture is a `$01` character whose CHP is 12 bytes or more; the low 24 bits of the `u32` at its +8 are the FC of its
+record, which lies past the text [Verified: Word 5.1a and 4.0 documents, full and fast saved]:
+
+| Offset | Size | Field | Meaning |
+| --- | --- | --- | --- |
+| +$00 | 4 | Length | The record's bytes, from its start [Fitted] |
+| +$06 | 8 | Frame | The rectangle it is shown in: top, left, bottom, right, in points [Fitted] |
+| +$1E | Length − 30 | Picture | The `PICT` [Verified: Word 5.1a and 4.0 documents] |
 
 ## 2. Reading
 
@@ -215,8 +241,11 @@ Word 6 for the Macintosh (`'W6BN'`) and Word 98 (`'W8BN'`) saved the Word for Wi
 - Paragraph ends and page breaks become CR; a line break becomes U+2028 (a `<br>` in HTML). A cell's end becomes a tab
   and a row's end a CR, and the rows are a `DocumentTable` with the row's cell edges in points, written as an HTML
   table. [ClassicMac]
-- Non-breaking and optional hyphens become U+2011 and U+00AD; pictures, footnote references and other control
-  characters are left out. [ClassicMac]
+- Non-breaking and optional hyphens become U+2011 and U+00AD; other control characters are left out. [ClassicMac]
+- A footnote's mark shows its number, at its reference and at the start of its text; the footnotes' text follows the
+  main text in the chapter, each a `DocumentNote`, written as an HTML section of notes linked both ways. [ClassicMac]
+- A picture is an option space (U+00A0) its `DocumentPicture` is anchored at, its `PICT` drawn at the frame's size,
+  placed by its paragraph's alignment; a record that cannot be found is reported and left out. [ClassicMac]
 - Hidden text is left out, as Word shows and prints it by default; all-caps text is upper-cased. [ClassicMac]
 - The face shows bold, italic, underline (any kind), outline and shadow; small caps is `TextRun.SmallCaps`
   (`font-variant: small-caps` in HTML); the colour is one of QuickDraw's eight [Doc: Inside Macintosh: Imaging With
@@ -234,7 +263,9 @@ Word 6 for the Macintosh (`'W6BN'`) and Word 98 (`'W8BN'`) saved the Word for Wi
 | `word.bad-zone` | Warning | A zone or a formatting page lies past the end of the file | Leaves it out | Not traced |
 | `word.bad-pieces` | Error | A fast-saved document's piece table (§1.9) cannot be read | Reads nothing | Not traced |
 | `word.piece-properties` | Info | A piece has a property word (a fast save's formatting change) | Reads its text without it | Word applies it |
-| `word.not-shown` | Info | The text has pictures, footnote references or other special characters | Leaves them out | Word shows them |
+| `word.not-shown` | Info | The text has special characters other than pictures and footnote marks | Leaves them out | Word shows them |
+| `word.bad-picture` | Warning | A picture's record (§1.11) lies outside the file | Leaves the picture out | Not traced |
+| `word.bad-notes` | Warning | A footnote's reference or text lies outside the main or footnote text | Leaves the footnote out | Not traced |
 | `word.unknown-sprm` | Warning | A paragraph sprm not in §1.6 | Stops reading that paragraph's sprms | Not traced |
 | `word.unsupported-version` | Error | A Word for the Macintosh signature with a version other than Word 4 or 5 | Reads nothing | Not traced |
 
@@ -250,8 +281,9 @@ Word 6 for the Macintosh (`'W6BN'`) and Word 98 (`'W8BN'`) saved the Word for Wi
   format, listed in `Word/CONTENTS.txt`: their text (Mac OS Roman characters, a tab, a line break), every character
   format (bold, italic, underline, outline, shadow, small caps, all caps, hidden, Times and Geneva, 9, 12 and 24 point,
   red), every paragraph format (Heading 1, the four alignments, left, right, first-line and hanging indents, space
-  before and after), a 3 × 3 table with its cell edges, edited documents, and the HTML (a line break, small caps, the
-  colour, the table). Word saved them in full; none is fast saved.
+  before and after), a 3 × 3 table with its cell edges, edited documents, a picture (its `PICT` drawn at 64 × 64) and a
+  footnote, full and edited, and the HTML (a line break, small caps, the colour, the table). Word saved them in full;
+  none is fast saved.
 - `tests/ClassicMac.Resources.Decoders.Tests/WordCorpusTests.cs`, with `CLASSICMAC_WORD_CORPUS` set: a 132,608-byte
   Word 5 document from a game's CD-ROM, fast saved twice, reads as version 5 with a main text of 25,562 characters,
   39 fonts (Chicago, New York, Geneva and Times among them), 3 styles, 1,347 character runs (218 of them bold) and
@@ -262,8 +294,8 @@ Word 6 for the Macintosh (`'W6BN'`) and Word 98 (`'W8BN'`) saved the Word for Wi
 
 - A fast save's property changes (the `$01` blocks the pieces' property words refer to).
 - Word 1 and Word 3 documents.
-- Footnotes, headers and footers, sections, page layout, tabs, borders and line spacing.
-- Pictures (inline `$01` characters and their data).
+- Headers and footers, sections, page layout, tabs, borders and line spacing.
+- Footnotes with their own marks (not auto-numbered); a picture's cropping and scaling (the record's other fields).
 - Styles based on other styles: a style's own blocks apply to the defaults, not to its parent's.
 - Strike-through and raised or lowered text.
 - The document summary (zone 24).

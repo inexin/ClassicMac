@@ -11,7 +11,7 @@ namespace ClassicMac.Resources.Decoders.Tests;
 // ClassicMac, our own text): the reader against what Word itself saved (word-mac.md §7, word-binary.md §7).
 public class WordSampleTests
 {
-    private static string Folder([CallerFilePath] string source = "") => Path.Combine(Path.GetDirectoryName(source)!, "Word");
+    internal static string Folder([CallerFilePath] string source = "") => Path.Combine(Path.GetDirectoryName(source)!, "Word");
 
     // A sample's data fork (the files are MacBinary).
     internal static byte[] DataFork(string name)
@@ -238,6 +238,62 @@ public class WordSampleTests
         Assert.Equal(["FAST START Table follows.", "A1\tB1\tC1\t", "A2 FAST MID\tB2\tC2\t", "A3\tB3\tC3\t", "Text after table."], Paragraphs(table));
 
         Assert.Contains("Text with a f FAST MIDootnote", ReadWord6("w98-picture-footnote-fast").Chapters[0].Text.Text, StringComparison.Ordinal);
+    }
+
+    // Each version's picture and note (Word 4.0 and 5.1a kept the RTF's footnote a footnote; Word 6.0 and 98 made it an
+    // endnote): the picture where its character was, as Word stored it (Word 98 made it a PNG), and the note's number at
+    // its reference and at the start of its text, which follows the main text.
+    [Theory]
+    [InlineData("w4-picture-footnote", "Text with a footnote1 here.")]
+    [InlineData("w51-picture-footnote", "Text with a footnote1 here.")]
+    [InlineData("w6-picture-footnote", "Text with a footnote1 here.")]
+    [InlineData("w98-picture-footnote", "Text with a footnote1 here.")]
+    [InlineData("w4-picture-footnote-fast", "Text EDITED  FAST MIDMIDDLE with a footnote1 here.")]
+    [InlineData("w51-picture-footnote-fast", "Text EDITED  FAST MIDMIDDLE with a footnote1 here.")]
+    [InlineData("w6-picture-footnote-fast", "Text with a f FAST MIDootnote1 here.")]
+    [InlineData("w98-picture-footnote-fast", "Text with a f FAST MIDootnote1 here.")]
+    public void A_picture_and_a_note_read_where_Word_put_them(string name, string referenceLine)
+    {
+        var diagnostics = new List<Diagnostic>();
+        var document = name.StartsWith("w4", StringComparison.Ordinal) || name.StartsWith("w51", StringComparison.Ordinal)
+            ? Read(name, diagnostics) : ReadWord6(name, diagnostics);
+        var chapter = document.Chapters[0];
+        var text = chapter.Text.Text;
+
+        var note = Assert.Single(chapter.Notes);
+        var main = text[..note.Start].TrimEnd('\r').Split('\r');
+        Assert.Equal(4, main.Length);
+        Assert.EndsWith("Picture follows:", main[0], StringComparison.Ordinal);
+        Assert.Equal([" ", referenceLine], main[1..3]);
+        Assert.Equal((1, "1"), (note.Number, note.Mark));
+        Assert.Equal(text.IndexOf("1 here.", StringComparison.Ordinal), note.Reference);
+        Assert.Equal("1 This is the footnote.", text[note.Start..note.End].TrimEnd('\r'));
+
+        var picture = Assert.Single(chapter.Pictures);
+        Assert.Equal(text.IndexOf(' ', StringComparison.Ordinal), picture.Anchor);
+        Assert.Equal((64, 64), (picture.Width, picture.Height));
+        Assert.Equal(name.StartsWith("w98", StringComparison.Ordinal) ? PictureFormat.Png : PictureFormat.Pict, picture.Format);
+        var drawn = new List<Diagnostic>();
+        Assert.NotNull(DocumentPictures.Draw(chapter, picture, DecodeOptions.Default, drawn));
+        Assert.Empty(drawn);
+        Assert.DoesNotContain(diagnostics, d => d.Code is "word.not-shown" or "word.bad-picture");
+    }
+
+    [Fact]
+    public void The_HTML_links_a_note_s_reference_and_text_and_shows_the_picture()
+    {
+        var files = HtmlDocuments.Write(ReadWord6("w98-picture-footnote"));
+        var page = Encoding.UTF8.GetString(files.Single(f => f.Path == "index.html").Content.Span);
+
+        Assert.Contains("footnote<sup><a href=\"#note-1\" id=\"ref-1\">1</a></sup> here.", page);
+        Assert.Contains("<section class=\"notes\">", page);
+        Assert.Contains("<a id=\"note-1\"></a>", page);
+        Assert.Contains("<a id=\"note-1\"></a>\n<p class=\"s0\"><sup><a href=\"#ref-1\">1</a></sup>", page);
+        Assert.Contains(" This is the footnote.", page);
+        var image = Assert.Single(files, f => f.Path.StartsWith("images/", StringComparison.Ordinal));
+        Assert.EndsWith(".png", image.Path, StringComparison.Ordinal);
+        Assert.Contains($"<img src=\"{image.Path}\"", page);
+        Assert.Equal([0x89, (byte)'P', (byte)'N', (byte)'G'], image.Content.Span[..4].ToArray());
     }
 
     // A Word 98 fast save whose only change is a centred paragraph: piece 1, the 2nd paragraph's mark, carries Prm0

@@ -43,4 +43,31 @@ public sealed class DecoderMutationTests
 
         Assert.True(failures.Count == 0, $"{failures.Count} failures:\n" + string.Join("\n", failures.Take(60)));
     }
+
+    // Every Word sample (Word/, their pictures and notes among them) damaged, read and written as HTML.
+    [Fact]
+    public void Damaged_Word_documents_are_reported_or_refused_as_malformed()
+    {
+        var failures = new List<string>();
+        var samples = Directory.GetFiles(WordSampleTests.Folder(), "*.bin").Select(p => Path.GetFileNameWithoutExtension(p)).Order(StringComparer.Ordinal).ToList();
+        for (var k = 0; k < samples.Count; k++)
+        {
+            var data = WordSampleTests.DataFork(samples[k]);
+            for (var i = 0; i < Mutations.PerInput(20); i++)
+            {
+                var seed = k * 1000 + i;
+                var damaged = Mutations.Mutate(data, new Random(seed));
+                Mutations.Run($"{samples[k]} (seed {seed})", () =>
+                {
+                    var document = Documents.MacWordDocuments.Read(damaged, samples[k]) ?? Documents.WordBinaryDocuments.Read(damaged, samples[k]);
+                    if (document is not null)
+                    {
+                        _ = Documents.HtmlDocuments.Write(document);
+                    }
+                }, failures);
+            }
+        }
+
+        Assert.True(failures.Count == 0, $"{failures.Count} failures:\n" + string.Join("\n", failures.Take(60)));
+    }
 }

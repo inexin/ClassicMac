@@ -1,7 +1,9 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using ClassicMac.Core;
@@ -101,7 +103,7 @@ public static class WordBinaryDocuments
         if (nFib < Word97)
         {
             var mac = span.Length >= 0x16 && BinaryPrimitives.ReadUInt16LittleEndian(span[0x14..]) == 256;
-            return new Reader(document, document, title, diagnostics, word6: true, mac).Read();
+            return new Reader(document, document, document, title, diagnostics, word6: true, mac).Read();
         }
 
         var tableName = (flags & 0x0200) != 0 ? "1Table" : "0Table";
@@ -111,7 +113,9 @@ public static class WordBinaryDocuments
             return null;
         }
 
-        return new Reader(document, file.ReadStream(table), title, diagnostics).Read();
+        // Pictures are in the Data stream ([MS-DOC] PICFAndOfficeArtData).
+        var pictures = file.Find("Data") is { } dataEntry ? file.ReadStream(dataEntry) : ReadOnlyMemory<byte>.Empty;
+        return new Reader(document, file.ReadStream(table), pictures, title, diagnostics).Read();
     }
 
     /// <summary>One piece of the text ([MS-DOC] §2.9.177): characters from <paramref name="Cp"/> up to <paramref name="CpEnd"/>,
@@ -120,7 +124,13 @@ public static class WordBinaryDocuments
 
     // Character properties as far as ClassicMac shows them.
     internal readonly record struct Chp(bool Bold, bool Italic, bool Outline, bool Shadow, bool Caps, bool Hidden, bool Underline, int Font, int HalfPoints,
-        bool SmallCaps = false, int Ico = 0);
+        bool SmallCaps = false, int Ico = 0, bool Special = false, int PicLocation = -1);
+
+    // The character the HTML output and the viewer anchor a picture at (DocumentChapter's option space).
+    private const char Anchor = (char)0xA0;
+
+    // The most a deflated PICT blip may inflate to (64 MB).
+    private const long MaxPicture = 64L << 20;
 
     // The Ico colours ([MS-DOC] §2.9.119): 0 automatic, 1 black, 2 blue, 3 cyan, 4 green, 5 magenta, 6 red, 7 yellow,
     // 8 white, 9–16 the dark ones and grey [Doc; Verified: 6 is red in Word 6.0 for the Macintosh].
@@ -136,7 +146,7 @@ public static class WordBinaryDocuments
 
     private sealed record Style(int Base, int Type, byte[] Papx, byte[] Chpx);
 
-    private sealed class Reader(ReadOnlyMemory<byte> document, ReadOnlyMemory<byte> table, string title, ICollection<Diagnostic> diagnostics,
+    private sealed class Reader(ReadOnlyMemory<byte> document, ReadOnlyMemory<byte> table, ReadOnlyMemory<byte> data, string title, ICollection<Diagnostic> diagnostics,
         bool word6 = false, bool mac = false)
     {
         private readonly HashSet<string> reported = [];
@@ -161,7 +171,18 @@ public static class WordBinaryDocuments
         private ReadOnlyMemory<byte> Table(int index)
         {
             var at = word6 ? 0x58 + 8 * index : 154 + 8 * index;
-            if (!word6 && index >= BinaryPrimitives.ReadUInt16LittleEndian(Fib[152..]) || Fib.Length < at + 8)
+            if (!word6 && index >= BinaryPrimitives.ReadUInt16LittleEndian(Fib[152..]))
+            {
+                return ReadOnlyMemory<byte>.Empty;
+            }
+
+            return TableAt(at, index);
+        }
+
+        // The table structure whose FC and length are at +at in the FIB.
+        private ReadOnlyMemory<byte> TableAt(int at, int index)
+        {
+            if (Fib.Length < at + 8)
             {
                 return ReadOnlyMemory<byte>.Empty;
             }
@@ -184,14 +205,18 @@ public static class WordBinaryDocuments
 
         public StyledDocument? Read()
         {
+            // The character counts: the main text, footnotes, headers, macros, annotations, endnotes, text boxes, header text
+            // boxes, each part's text after the one before ([MS-DOC] FibRgLw97; Word 6's from +$34).
             var ccpAt = word6 ? 0x34 : 0x4C;
-            var ccpText = Fib.Length >= ccpAt + 4 ? BinaryPrimitives.ReadInt32LittleEndian(Fib[ccpAt..]) : 0;
+            int Ccp(int k) => Fib.Length >= ccpAt + 4 * k + 4 ? Math.Max(0, BinaryPrimitives.ReadInt32LittleEndian(Fib[(ccpAt + 4 * k)..])) : 0;
+            var ccpText = Ccp(0);
+            var allText = Enumerable.Range(0, 8).Sum(Ccp) + 1;
             var pieces = Pieces(Table(Clx));
             if (word6 && pieces.Count == 0 && Fib.Length >= 0x20)
             {
                 // A Word 6 document that was not fast saved has no piece table: its text is one run of bytes from fcMin
                 // [Reference: Apache POI].
-                pieces.Add(new Piece(0, ccpText, BinaryPrimitives.ReadUInt32LittleEndian(Fib[0x18..]), true, 0));
+                pieces.Add(new Piece(0, allText, BinaryPrimitives.ReadUInt32LittleEndian(Fib[0x18..]), true, 0));
             }
             if (pieces.Count == 0)
             {
@@ -204,11 +229,13 @@ public static class WordBinaryDocuments
             var characters = Bins(Table(PlcfBteChpx), paragraphs: false);
             var paragraphs = Bins(Table(PlcfBtePapx), paragraphs: true);
 
-            // The main text: CPs 0 up to ccpText ([MS-DOC] §2.4.1), with each character's FC.
+            // The main text: CPs 0 up to ccpText ([MS-DOC] §2.4.1), with each character's FC; then each note's text.
             var text = new List<(char Char, long Fc, ushort Prm)>();
+            void Add(int from, int to)
+            {
             foreach (var piece in pieces)
             {
-                for (var cp = Math.Max(piece.Cp, 0); cp < piece.CpEnd && cp < ccpText; cp++)
+                for (var cp = Math.Max(piece.Cp, from); cp < piece.CpEnd && cp < to; cp++)
                 {
                     var fc = piece.Fc + (cp - piece.Cp) * (piece.Compressed ? 1 : 2);
                     if (fc + (piece.Compressed ? 1 : 2) > document.Length)
@@ -222,8 +249,200 @@ public static class WordBinaryDocuments
                     text.Add((c, fc, piece.Prm));
                 }
             }
+            }
 
-            return Build(text, characters, paragraphs);
+            Add(0, ccpText);
+            var mainLength = text.Count;
+            var footnotes = Notes(Table(2), Table(3), ccpText, Ccp(1), "footnote");
+            var endnotes = Notes(word6 ? TableAt(0x1D2, 46) : Table(46), word6 ? TableAt(0x1DA, 47) : Table(47),
+                ccpText + Ccp(1) + Ccp(2) + Ccp(3) + Ccp(4), Ccp(5), "endnote");
+            var notes = new List<(int Reference, int Start, int End, int Number)>();
+            foreach (var (reference, from, to, number) in footnotes.Concat(endnotes))
+            {
+                var start = text.Count;
+                Add(from, to);
+                notes.Add((reference, start, text.Count, number));
+            }
+
+            return Build(text, characters, paragraphs, mainLength, notes);
+        }
+
+        // A part's notes ([MS-DOC] PlcffndRef and PlcffndTxt, PlcfendRef and PlcfendTxt; Word 6's endnotes' at FIB +$1D2 and
+        // +$1DA [Fitted: Word 6.0 for the Macintosh documents]): the references' CPs, n + 1, then a 2-byte FRD each; each
+        // note's first CP in the part's text, n + 2. Each is (its reference, its text's first CP and the one after its
+        // last, its number among the part's notes).
+        private List<(int Reference, int From, int To, int Number)> Notes(ReadOnlyMemory<byte> references, ReadOnlyMemory<byte> texts,
+            int partStart, int partLength, string kind)
+        {
+            var notes = new List<(int, int, int, int)>();
+            var count = references.Length >= 10 ? (references.Length - 4) / 6 : 0;
+            for (var k = 0; k < count; k++)
+            {
+                var reference = BinaryPrimitives.ReadInt32LittleEndian(references.Span[(4 * k)..]);
+                if (4 * (k + 2) > texts.Length)
+                {
+                    Report(DiagnosticSeverity.Warning, "word.bad-notes", $"{kind} {k + 1}'s text cannot be found; it is left out.");
+                    continue;
+                }
+
+                var from = Math.Clamp(BinaryPrimitives.ReadInt32LittleEndian(texts.Span[(4 * k)..]), 0, partLength);
+                var to = Math.Clamp(BinaryPrimitives.ReadInt32LittleEndian(texts.Span[(4 * (k + 1))..]), from, partLength);
+                notes.Add((reference, partStart + from, partStart + to, k + 1));
+            }
+
+            return notes;
+        }
+
+        // A picture ([MS-DOC] PICFAndOfficeArtData) at sprmCPicLocation in the Data stream (Word 6's in the WordDocument
+        // stream): lcb, cbHeader, the mfpf's mm at +6; the goal size in twips at +28 and +30, scaled by mx and my in
+        // thousandths at +32 and +34. An mm of $64 (or $66, after a name) is an Office Art shape, its picture a blip; another
+        // is a Windows metafile, which Word 6.0 for the Macintosh follows with the PICT itself. Null when it cannot be read.
+        private (ReadOnlyMemory<byte> Data, PictureFormat Format, int Width, int Height)? Picture(int location)
+        {
+            if (location < 0 || location > data.Length - 0x24)
+            {
+                return null;
+            }
+
+            var header = data.Span[location..];
+            long lcb = BinaryPrimitives.ReadUInt32LittleEndian(header);
+            int cbHeader = BinaryPrimitives.ReadUInt16LittleEndian(header[4..]);
+            if (cbHeader < 0x24 || lcb < cbHeader || lcb > data.Length - location)
+            {
+                return null;
+            }
+
+            int mm = BinaryPrimitives.ReadUInt16LittleEndian(header[6..]);
+            var picf = data.Slice(location, cbHeader);
+            int Size(int goal, int scale) => (int)Math.Round(BinaryPrimitives.ReadInt16LittleEndian(picf.Span[goal..])
+                * (BinaryPrimitives.ReadUInt16LittleEndian(picf.Span[scale..]) is var factor and > 0 ? factor : 1000) / 20000.0);
+            var body = data.Slice(location + cbHeader, (int)lcb - cbHeader);
+            if (mm == 0x66 && body.Length > 0)
+            {
+                body = body[Math.Min(body.Length, 1 + body.Span[0])..];
+            }
+
+            var found = mm is 0x64 or 0x66 ? Blip(body) : AfterMetafile(body);
+            return found is { } picture ? (picture.Data, picture.Format, Math.Max(0, Size(28, 32)), Math.Max(0, Size(30, 34))) : null;
+        }
+
+        // The first blip in Office Art records ([MS-ODRAW] OfficeArtRecordHeader: version and instance, type, length),
+        // looking into containers (version $F) and FBSEs (a 36-byte header, a name, then the blip).
+        private static (ReadOnlyMemory<byte> Data, PictureFormat Format)? Blip(ReadOnlyMemory<byte> records)
+        {
+            for (var at = 0; at + 8 <= records.Length;)
+            {
+                var span = records.Span[at..];
+                int versionAndInstance = BinaryPrimitives.ReadUInt16LittleEndian(span), type = BinaryPrimitives.ReadUInt16LittleEndian(span[2..]);
+                long length = BinaryPrimitives.ReadUInt32LittleEndian(span[4..]);
+                if (length > records.Length - at - 8)
+                {
+                    return null;
+                }
+
+                var body = records.Slice(at + 8, (int)length);
+                var found = (versionAndInstance & 0xF) == 0xF ? Blip(body)
+                    : type == 0xF007 && length >= 36 && 36 + body.Span[33] <= length ? Blip(body[(36 + body.Span[33])..])
+                    : type is >= 0xF018 and <= 0xF117 ? BlipData(type, versionAndInstance >> 4, body)
+                    : null;
+                if (found is not null)
+                {
+                    return found;
+                }
+
+                at += 8 + (int)length;
+            }
+
+            return null;
+        }
+
+        // A blip's picture ([MS-ODRAW] OfficeArtBlipPICT, OfficeArtBlipPNG, OfficeArtBlipJPEG): after one UID, or two for the
+        // instances that say so; a PICT after a 34-byte metafile header (cbSize, rcBounds, ptSize, cbSave, compression: 0
+        // deflated, $FE stored), a PNG or JPEG after a tag byte. Other kinds (EMF, WMF, DIB, TIFF) are not read.
+        private static (ReadOnlyMemory<byte> Data, PictureFormat Format)? BlipData(int type, int instance, ReadOnlyMemory<byte> body)
+        {
+            switch (type)
+            {
+                case 0xF01C:
+                    {
+                        var uids = instance == 0x543 ? 32 : 16;
+                        if (body.Length < uids + 34)
+                        {
+                            return null;
+                        }
+
+                        var header = body.Span[uids..];
+                        long size = BinaryPrimitives.ReadUInt32LittleEndian(header), saved = BinaryPrimitives.ReadUInt32LittleEndian(header[28..]);
+                        var stored = body[(uids + 34)..];
+                        stored = stored[..(int)Math.Min(saved, stored.Length)];
+                        if (header[32] == 0xFE)
+                        {
+                            return (stored, PictureFormat.Pict);
+                        }
+
+                        if (header[32] != 0 || size > MaxPicture)
+                        {
+                            return null;
+                        }
+
+                        try
+                        {
+                            using var inflater = new ZLibStream(new MemoryStream(stored.ToArray()), CompressionMode.Decompress);
+                            var pict = new byte[size];
+                            inflater.ReadAtLeast(pict, pict.Length, throwOnEndOfStream: false);
+                            return (pict, PictureFormat.Pict);
+                        }
+                        catch (InvalidDataException)
+                        {
+                            return null;
+                        }
+                    }
+
+                case 0xF01E:
+                    {
+                        var start = (instance == 0x6E1 ? 32 : 16) + 1;
+                        return body.Length > start ? (body[start..], PictureFormat.Png) : null;
+                    }
+
+                case 0xF01D or 0xF02A:
+                    {
+                        var start = (instance is 0x46B or 0x6E3 ? 32 : 16) + 1;
+                        return body.Length > start ? (body[start..], PictureFormat.Jpeg) : null;
+                    }
+
+                default:
+                    return null;
+            }
+        }
+
+        // The PICT after a Windows metafile [Fitted: Word 6.0 for the Macintosh documents]: the metafile's 18-byte header
+        // (type 1 or 2, header size 9; its size field undercounts), then records (a size in words, a function) up to the
+        // one of function 0 that ends it.
+        private static (ReadOnlyMemory<byte> Data, PictureFormat Format)? AfterMetafile(ReadOnlyMemory<byte> body)
+        {
+            var span = body.Span;
+            if (span.Length < 18 || BinaryPrimitives.ReadUInt16LittleEndian(span) is not (1 or 2) || BinaryPrimitives.ReadUInt16LittleEndian(span[2..]) != 9)
+            {
+                return null;
+            }
+
+            for (long at = 18; at <= span.Length - 6;)
+            {
+                long words = BinaryPrimitives.ReadUInt32LittleEndian(span[(int)at..]);
+                var function = BinaryPrimitives.ReadUInt16LittleEndian(span[(int)(at + 4)..]);
+                if (words < 3 || words > (span.Length - at) / 2)
+                {
+                    return null;
+                }
+
+                at += 2 * words;
+                if (function == 0)
+                {
+                    return at <= span.Length - 10 ? (body[(int)at..], PictureFormat.Pict) : null;
+                }
+            }
+
+            return null;
         }
 
         private static char Compressed(byte b) => b is >= 0x80 and <= 0x9F && Windows1252[b - 0x80] != '\0' ? Windows1252[b - 0x80] : (char)b;
@@ -237,7 +456,12 @@ public static class WordBinaryDocuments
             while (at < span.Length && span[at] == 0x01 && at + 3 <= span.Length)
             {
                 var size = BinaryPrimitives.ReadInt16LittleEndian(span[(at + 1)..]);
-                prcs.Add(span.Slice(at + 3, Math.Clamp((int)size, 0, span.Length - at - 3)).ToArray());
+                if (size < 0)
+                {
+                    return pieces;                                       // a damaged Prc: no piece table found
+                }
+
+                prcs.Add(span.Slice(at + 3, Math.Min(size, span.Length - at - 3)).ToArray());
                 at += 3 + size;
             }
 
@@ -247,7 +471,7 @@ public static class WordBinaryDocuments
             }
 
             var lcb = BinaryPrimitives.ReadInt32LittleEndian(span[(at + 1)..]);
-            var plc = span.Slice(at + 5, Math.Min(lcb, span.Length - at - 5));
+            var plc = span.Slice(at + 5, Math.Clamp(lcb, 0, span.Length - at - 5));
             var count = (plc.Length - 4) / 12;
             for (var i = 0; i < count; i++)
             {
@@ -541,8 +765,10 @@ public static class WordBinaryDocuments
             24 => (1, 0x2416),
             25 => (1, 0x2417),
             29 => (1, 0),
-            12 or 15 or 23 or 64 or 68 or 74 or 77 or 79 or 81 or 82 or 103 or 105 or 106 or 108 or >= 111 and <= 116 or 179 or 181 or 191 or 207 => (-1, 0),
-            65 or 66 or 67 or 71 or 75 or 100 or 102 or 104 or 117 or 118 or 119 => (1, 0),
+            68 => (-1, 0x6A03),
+            12 or 15 or 23 or 64 or 74 or 77 or 79 or 81 or 82 or 103 or 105 or 106 or 108 or >= 111 and <= 116 or 179 or 181 or 191 or 207 => (-1, 0),
+            117 => (1, 0x0855),
+            65 or 66 or 67 or 71 or 75 or 100 or 102 or 104 or 118 or 119 => (1, 0),
             90 => (1, 0x083A),
             69 or 72 or 80 or 96 or 97 or 101 or 107 or 109 or 110 or >= 121 and <= 124 => (2, 0),
             70 => (4, 0),
@@ -721,6 +947,9 @@ public static class WordBinaryDocuments
                     0x2A3E => chp with { Underline = operand[0] != 0 },
                     0x4A43 => chp with { HalfPoints = BinaryPrimitives.ReadUInt16LittleEndian(operand) },
                     0x4A4F => chp with { Font = BinaryPrimitives.ReadUInt16LittleEndian(operand) },
+                    0x0855 => chp with { Special = operand[0] != 0 },
+                    // sprmCPicLocation: 4 bytes (Word 6's after a size byte).
+                    0x6A03 when operand.Length >= 4 => chp with { PicLocation = BinaryPrimitives.ReadInt32LittleEndian(operand.AsSpan(operand.Length - 4)) },
                     _ => chp,
                 };
             }
@@ -800,9 +1029,23 @@ public static class WordBinaryDocuments
             return -1;
         }
 
+        // The main text's characters are text[..mainLength]; each note's follow, from Start to End (indexes in text), its
+        // mark ($02) at its reference (a main-text CP) and at its start.
         private StyledDocument Build(List<(char Char, long Fc, ushort Prm)> text, List<(long From, long To, byte[] Block)> characters,
-            List<(long From, long To, byte[] Block)> paragraphs)
+            List<(long From, long To, byte[] Block)> paragraphs, int mainLength, List<(int Reference, int Start, int End, int Number)> notes)
         {
+            var references = new Dictionary<int, int>();
+            var noteStarts = new Dictionary<int, int>();
+            var noteEnds = new Dictionary<int, int>();
+            for (var k = 0; k < notes.Count; k++)
+            {
+                references.TryAdd(notes[k].Reference, k);
+                noteStarts.TryAdd(notes[k].Start, k);
+                noteEnds.TryAdd(notes[k].End, k);
+            }
+
+            var notePlaces = new (int Reference, int Start, int End)[notes.Count];
+            var pictures = new List<DocumentPicture>();
             characters.Sort((a, b) => a.From.CompareTo(b.From));
             paragraphs.Sort((a, b) => a.From.CompareTo(b.From));
             var output = new StringBuilder(text.Count);
@@ -847,6 +1090,16 @@ public static class WordBinaryDocuments
                     pap.Before / 20.0, pap.After / 20.0));
                 for (var i = start; i <= end; i++)
                 {
+                    if (noteStarts.TryGetValue(i, out var starting))
+                    {
+                        notePlaces[starting].Start = output.Length;
+                    }
+
+                    if (noteEnds.TryGetValue(i, out var ended))
+                    {
+                        notePlaces[ended].End = output.Length;
+                    }
+
                     var (c, fc, prm) = text[i];
                     var chpRun = Find(characters, fc);
                     var chp = chpRun >= 0 ? ApplyChp(styleChp, characters[chpRun].Block, styleChp) : styleChp;
@@ -878,25 +1131,57 @@ public static class WordBinaryDocuments
                         continue;
                     }
 
-                    char? shown = c switch
+                    // A note's mark ($02 with sprmCFSpec): its number at its reference and at the start of its text.
+                    var note = c == (char)0x02 && chp.Special
+                        ? references.TryGetValue(i, out var referenced) ? referenced : noteStarts.TryGetValue(i, out var own) ? own : -1
+                        : -1;
+                    (ReadOnlyMemory<byte> Data, PictureFormat Format, int Width, int Height)? picture = null;
+                    if (c == (char)0x01 && chp.Special && !chp.Hidden)
                     {
-                        '\r' or '\f' or '\u000E' => '\r',
-                        '\v' => (char)0x2028,                                // a line break within the paragraph [Verified: Word 6.0]
-                        '\t' => '\t',
-                        '\a' => pap.RowEnd ? '\r' : '\t',
-                        '\u001E' => '‑',
-                        '\u001F' => '­',
+                        picture = Picture(chp.PicLocation);
+                        if (picture is null)
+                        {
+                            Report(DiagnosticSeverity.Warning, "word.bad-picture", "a picture's data cannot be found; it is left out.");
+                        }
+                    }
+
+                    var shown = c switch
+                    {
+                        '\r' or '\f' or (char)0x0E => "\r",
+                        '\v' => ((char)0x2028).ToString(),                     // a line break within the paragraph [Verified: Word 6.0]
+                        '\t' => "\t",
+                        '\a' => pap.RowEnd ? "\r" : "\t",
+                        (char)0x1E => "‑",
+                        (char)0x1F => "­",
+                        (char)0x02 when note >= 0 => notes[note].Number.ToString(CultureInfo.InvariantCulture),
+                        (char)0x01 when picture is not null => Anchor.ToString(),
                         < ' ' => null,
-                        _ => chp.Caps ? char.ToUpperInvariant(c) : c,
+                        _ => (chp.Caps ? char.ToUpperInvariant(c) : c).ToString(),
                     };
+                    if (note >= 0 && i < mainLength)
+                    {
+                        notePlaces[note].Reference = output.Length;
+                    }
+
+                    if (picture is { } found && shown is not null)
+                    {
+                        pictures.Add(new DocumentPicture(output.Length, (short)(pictures.Count + 1), found.Data, found.Width, found.Height,
+                            pap.Justification switch { Justification.Center => PictureAlignment.Center, Justification.Right => PictureAlignment.Right, _ => PictureAlignment.Left },
+                            NoScale: true, PictureAction.None) { Format = found.Format });
+                    }
                     if (chp.Hidden && c is not ('\r' or '\a' or '\f'))
                     {
                         continue;
                     }
 
+                    if (shown is null && c == (char)0x01 && chp.Special)
+                    {
+                        continue;                                            // a picture that cannot be read (reported)
+                    }
+
                     if (shown is null)
                     {
-                        Report(DiagnosticSeverity.Info, "word.not-shown", "pictures, footnote references and other special characters are left out.");
+                        Report(DiagnosticSeverity.Info, "word.not-shown", "special characters other than pictures and note marks are left out.");
                         continue;
                     }
 
@@ -905,17 +1190,17 @@ public static class WordBinaryDocuments
                         | (chp.Shadow ? 0x10 : 0));
                     var size = chp.HalfPoints / 2;
                     var (red, green, blue) = Icos[chp.Ico is >= 0 and < 17 ? chp.Ico : 0];
-                    var textRun = new TextRun(output.Length, 1, (short)chp.Font, name, size > 0 ? size : 10, face, red, green, blue) { SmallCaps = chp.SmallCaps };
-                    if (runs.Count > 0 && runs[^1] with { Start = textRun.Start, Length = 1 } == textRun && runs[^1].Start + runs[^1].Length == textRun.Start)
+                    var textRun = new TextRun(output.Length, shown.Length, (short)chp.Font, name, size > 0 ? size : 10, face, red, green, blue) { SmallCaps = chp.SmallCaps };
+                    if (runs.Count > 0 && runs[^1] with { Start = textRun.Start, Length = textRun.Length } == textRun && runs[^1].Start + runs[^1].Length == textRun.Start)
                     {
-                        runs[^1] = runs[^1] with { Length = runs[^1].Length + 1 };
+                        runs[^1] = runs[^1] with { Length = runs[^1].Length + textRun.Length };
                     }
                     else
                     {
                         runs.Add(textRun);
                     }
 
-                    output.Append(shown.Value);
+                    output.Append(shown);
                 }
 
                 start = end + 1;
@@ -926,10 +1211,16 @@ public static class WordBinaryDocuments
                 tables.Add(new DocumentTable(last, output.Length, tableEdges?.Select(e => e / 20.0).ToArray() ?? []));
             }
 
-            var chapter = new DocumentChapter(1, title, new StyledText(output.ToString(), runs, true), Justification.Left, null, [], 0)
+            foreach (var (_, k) in noteEnds.Where(e => e.Key >= text.Count))
+            {
+                notePlaces[k].End = output.Length;
+            }
+
+            var chapter = new DocumentChapter(1, title, new StyledText(output.ToString(), runs, true), Justification.Left, null, pictures, 0)
             {
                 Paragraphs = formats,
                 Tables = tables,
+                Notes = [.. notePlaces.Select((n, k) => new DocumentNote(notes[k].Number, notes[k].Number.ToString(CultureInfo.InvariantCulture), n.Reference, n.Start, n.End))],
             };
             return new StyledDocument(DocumentKind.Word, title, [chapter], []);
         }

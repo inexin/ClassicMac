@@ -51,6 +51,12 @@ public sealed record DocumentChapter(int Number, string Title, StyledText Text, 
     /// </summary>
     public IReadOnlyList<DocumentTable> Tables { get; init; } = [];
 
+    /// <summary>
+    /// The footnotes and endnotes, in order: each note's text is in <see cref="Text"/> after the main text (Word's
+    /// documents); empty for documents with none.
+    /// </summary>
+    public IReadOnlyList<DocumentNote> Notes { get; init; } = [];
+
     /// <summary>The format of the paragraph that character <paramref name="offset"/> is in, or null when there is none.</summary>
     public ParagraphFormat? ParagraphAt(int offset)
     {
@@ -92,6 +98,18 @@ public sealed record ParagraphFormat(int Start, Justification Justification, dou
 /// </summary>
 public sealed record DocumentTable(int Start, int End, IReadOnlyList<double> CellEdges);
 
+/// <summary>
+/// A footnote or endnote: its mark at <paramref name="Reference"/> in the main text, and its text from
+/// <paramref name="Start"/> up to <paramref name="End"/>, after the main text (starting with the same mark, as Word
+/// keeps it).
+/// </summary>
+/// <param name="Number">Its number among the chapter's notes of its kind, from 1.</param>
+/// <param name="Mark">The mark shown at the reference and at the note (its number).</param>
+/// <param name="Reference">Where the mark is in the main text.</param>
+/// <param name="Start">The note's first character.</param>
+/// <param name="End">The character after its last.</param>
+public sealed record DocumentNote(int Number, string Mark, int Reference, int Start, int End);
+
 /// <summary>A colour, 0–255 per component.</summary>
 public readonly record struct Rgb(byte Red, byte Green, byte Blue);
 
@@ -116,15 +134,32 @@ public enum Justification
 /// column, the text not wrapping around it.
 /// </summary>
 /// <param name="Anchor">The option-space character it is anchored at.</param>
-/// <param name="PictureId">Its <c>PICT</c> resource ID.</param>
-/// <param name="Picture">The <c>PICT</c> data, or null when the resource is missing.</param>
+/// <param name="PictureId">Its <c>PICT</c> resource ID (a Word document's pictures are numbered from 1).</param>
+/// <param name="Picture">The picture's data (see <see cref="DocumentPicture.Format"/>), or null when it is missing.</param>
 /// <param name="Width">Its frame's width in pixels (0 when missing).</param>
 /// <param name="Height">Its frame's height in pixels (0 when missing).</param>
 /// <param name="Alignment">Where it sits in the column.</param>
 /// <param name="NoScale">When false, a picture wider than the column is scaled down to fit it.</param>
 /// <param name="Action">What clicking it does.</param>
 public sealed record DocumentPicture(int Anchor, short PictureId, ReadOnlyMemory<byte>? Picture, int Width, int Height,
-    PictureAlignment Alignment, bool NoScale, PictureAction Action);
+    PictureAlignment Alignment, bool NoScale, PictureAction Action)
+{
+    /// <summary>What <see cref="Picture"/> holds: a <c>PICT</c> (DOCMaker's, SimpleText's, Word's), or a PNG or JPEG file a Word document stored instead.</summary>
+    public PictureFormat Format { get; init; } = PictureFormat.Pict;
+}
+
+/// <summary>The kind of data a document's picture is.</summary>
+public enum PictureFormat
+{
+    /// <summary>A QuickDraw picture.</summary>
+    Pict,
+
+    /// <summary>A PNG file.</summary>
+    Png,
+
+    /// <summary>A JPEG file.</summary>
+    Jpeg,
+}
 
 /// <summary>Where a picture sits in the text column.</summary>
 public enum PictureAlignment

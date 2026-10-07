@@ -143,13 +143,15 @@ public static class MacWordDocuments
             }
 
             var textLength = (int)Math.Min(ccpText == 0 ? fcMac - fcMin : ccpText, fcMac - fcMin);
+            // The footnotes' text follows the main text (§1.10).
+            var noteLength = (int)Math.Min(file.ReadUInt32At(0x28), Math.Max(0, fcMac - fcMin - textLength));
             // A fast save leaves a piece table (zone 18): the text is its pieces, in order (§1.9). The flag byte's $04
             // is set in Word 5.1a's full saves too [Verified: Word 5.1a documents], so it says nothing about it.
             var pieceZone = Zone(PieceTable);
-            List<(long Fc, int Length)> pieces = [(fcMin, textLength)];
+            List<(long Fc, int Length)> pieces = [(fcMin, textLength + noteLength)];
             if (pieceZone.Length > 0)
             {
-                if (Pieces(pieceZone, (int)Math.Max(ccpText, 0)) is not { } read)
+                if (Pieces(pieceZone, textLength + noteLength) is not { } read)
                 {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "word.bad-pieces",
                         $"\"{title}\" was saved with Fast Save, and its piece table (the list of where its text is) cannot be read."));
@@ -163,7 +165,68 @@ public static class MacWordDocuments
             styles = ReadStyles(Zone(StyleZone));
             var characters = Bins(CharacterBins, words: false);
             var paragraphs = Bins(ParagraphBins, words: true);
-            return Build(pieces, characters, paragraphs);
+            return Build(pieces, characters, paragraphs, textLength, Notes(textLength, noteLength));
+        }
+
+        // The footnotes (§1.10) [Fitted: Word 4.0 and 5.1a documents]: zone 2 lists the references' character positions,
+        // n + 1 u32s, then a u16 each (1 when auto-numbered); zone 3 each footnote's first character in the footnote
+        // text, n + 1 u32s or more. Each is (its reference, its text's first character and the one after its last).
+        private List<(int Reference, int Start, int End)> Notes(int mainLength, int noteLength)
+        {
+            var references = Zone(2);
+            var texts = Zone(3);
+            var notes = new List<(int, int, int)>();
+            if (references.Length < 10 || texts.Length < 8)
+            {
+                return notes;
+            }
+
+            var count = (references.Length - 4) / 6;
+            var referenceReader = new BigEndianReader(references);
+            var textReader = new BigEndianReader(texts);
+            for (var k = 0; k < count && 4 * (k + 2) <= texts.Length; k++)
+            {
+                long reference = referenceReader.ReadUInt32At(4 * k);
+                long start = Math.Min(textReader.ReadUInt32At(4 * k), noteLength), end = Math.Min(textReader.ReadUInt32At(4 * (k + 1)), noteLength);
+                if (reference < mainLength && start < end)
+                {
+                    notes.Add(((int)reference, mainLength + (int)start, mainLength + (int)end));
+                }
+                else
+                {
+                    Report(DiagnosticSeverity.Warning, "word.bad-notes", $"\"{title}\": footnote {k + 1}'s place cannot be found; it is left out.");
+                }
+            }
+
+            return notes;
+        }
+
+        // A picture's record (§1.11) [Fitted: Word 4.0 and 5.1a documents]: at the FC its character's properties end with
+        // (their low 24 bits from +8), a u32 length, the frame it is shown in at +6 (top, left, bottom, right), and from +30
+        // the PICT; null when it lies outside the file.
+        private (ReadOnlyMemory<byte> Pict, int Width, int Height)? Picture(byte[] chpx)
+        {
+            if (chpx.Length < 12)
+            {
+                return null;
+            }
+
+            var properties = new BigEndianReader(chpx);
+            long fc = properties.ReadUInt32At(8) & 0xFFFFFF;
+            if (fc + 40 > file.Source.Length)
+            {
+                return null;
+            }
+
+            long length = file.ReadUInt32At((int)fc);
+            if (length < 40 || fc + length > file.Source.Length)
+            {
+                return null;
+            }
+
+            var frame = file.ReadSubReaderAt((int)fc + 6, 8);
+            int width = frame.ReadInt16At(6) - frame.ReadInt16At(2), height = frame.ReadInt16At(4) - frame.ReadInt16At(0);
+            return (file.Source.Slice((int)fc + 30, (int)length - 30), Math.Max(width, 0), Math.Max(height, 0));
         }
 
         // The piece table (§1.9) [Fitted: a Word 5 document Word fast saved twice; Reference: [MS-DOC] Clx, which it
@@ -527,8 +590,11 @@ public static class MacWordDocuments
             return -1;
         }
 
+        // The main text, then each footnote's text after it (its own paragraphs); a footnote's mark ($05, auto-numbered)
+        // shows its number at its reference and at the start of its text, and a picture ($01) is an option space its
+        // picture is anchored at.
         private StyledDocument Build(List<(long Fc, int Length)> pieces, List<(long From, long To, byte[] Block)> characters,
-            List<(long From, long To, byte[] Block)> paragraphs)
+            List<(long From, long To, byte[] Block)> paragraphs, int mainLength, List<(int Reference, int Start, int End)> notes)
         {
             var all = file.Source.Span;
             var text = new List<(byte Byte, long Fc)>(pieces.Sum(p => p.Length));
@@ -540,6 +606,16 @@ public static class MacWordDocuments
                 }
             }
 
+            // The characters in order: the main text, then the notes'.
+            var order = Enumerable.Range(0, Math.Min(mainLength, text.Count))
+                .Concat(notes.SelectMany(n => Enumerable.Range(n.Start, Math.Max(0, Math.Min(n.End, text.Count) - n.Start))))
+                .ToList();
+            var references = notes.Select((n, k) => (n.Reference, k)).ToDictionary(n => n.Reference, n => n.k);
+            var noteStarts = notes.Select((n, k) => (n.Start, k)).ToDictionary(n => n.Start, n => n.k);
+            var noteEnds = notes.Select((n, k) => (End: Math.Min(n.End, text.Count), k)).ToDictionary(n => n.End, n => n.k);
+            var notePlaces = new (int Reference, int Start, int End)[notes.Count];
+            var pictures = new List<DocumentPicture>();
+
             var output = new StringBuilder(text.Count);
             var runs = new List<TextRun>();
             var formats = new List<ParagraphFormat>();
@@ -550,8 +626,13 @@ public static class MacWordDocuments
             Pap? pap = null;
             var papRun = -2;
             var style = 0;
-            for (var i = 0; i < text.Count; i++)
+            foreach (var i in order)
             {
+                if (noteStarts.TryGetValue(i, out var starting))
+                {
+                    notePlaces[starting].Start = output.Length;
+                }
+
                 var fc = text[i].Fc;
                 var p = RunAt(paragraphs, fc);
                 if (pap is null || p != papRun)
@@ -586,16 +667,40 @@ public static class MacWordDocuments
                 }
 
                 var b = text[i].Byte;
-                char? shown = b switch
+                // A footnote's mark: at its reference in the main text, and at the start of its text.
+                var note = b != 0x05 ? -1
+                    : i < mainLength && references.TryGetValue(i, out var referenced) ? referenced
+                    : noteStarts.TryGetValue(i, out var own) ? own : -1;
+                if (note >= 0 && i < mainLength)
                 {
-                    0x0D or 0x0C => '\r',
-                    0x0B => '\u2028',                                    // a line break within the paragraph
-                    0x09 => '\t',
-                    0x07 => pap.RowEnd ? '\r' : '\t',
-                    0x1E => '‑',
-                    0x1F => '­',
+                    notePlaces[note].Reference = output.Length;
+                }
+
+                // A picture's character has properties long enough to say where it is.
+                var picture = b == 0x01 && chpx.Length >= 12 ? Picture(chpx) : null;
+                if (b == 0x01 && chpx.Length >= 12 && picture is null)
+                {
+                    Report(DiagnosticSeverity.Warning, "word.bad-picture", $"\"{title}\": a picture's data cannot be found; it is left out.");
+                }
+                else if (picture is { } found)
+                {
+                    pictures.Add(new DocumentPicture(output.Length, (short)(pictures.Count + 1), found.Pict, found.Width, found.Height,
+                        pap.Justification switch { Justification.Center => PictureAlignment.Center, Justification.Right => PictureAlignment.Right, _ => PictureAlignment.Left },
+                        NoScale: true, PictureAction.None));
+                }
+
+                var shown = b switch
+                {
+                    0x0D or 0x0C => "\r",
+                    0x0B => "\u2028",                                    // a line break within the paragraph
+                    0x09 => "\t",
+                    0x07 => pap.RowEnd ? "\r" : "\t",
+                    0x1E => "‑",
+                    0x1F => "­",
+                    0x05 when note >= 0 => (note + 1).ToString(CultureInfo.InvariantCulture),
+                    0x01 when picture is not null => "\u00A0",             // the picture's anchor
                     < 0x20 => null,
-                    _ => chp.AllCaps ? char.ToUpperInvariant(MacRoman.ToChar(b)) : MacRoman.ToChar(b),
+                    _ => (chp.AllCaps ? char.ToUpperInvariant(MacRoman.ToChar(b)) : MacRoman.ToChar(b)).ToString(),
                 };
                 if (b is 0x0D or 0x0C or 0x07)
                 {
@@ -610,30 +715,42 @@ public static class MacWordDocuments
                 // Hidden text is left out, as Word shows and prints it by default [ClassicMac]; its paragraph marks stay.
                 if (chp.Hidden && b is not (0x0D or 0x0C or 0x07))
                 {
-                    continue;
+                    if (picture is not null)
+                    {
+                        pictures.RemoveAt(pictures.Count - 1);
+                    }
                 }
-
-                if (shown is null)
+                else if (shown is null && b == 0x01 && chpx.Length >= 12)
+                {
+                    // A picture that cannot be read (reported).
+                }
+                else if (shown is null)
                 {
                     Report(DiagnosticSeverity.Info, "word.not-shown",
-                        $"\"{title}\": pictures, footnote references and other special characters are left out.");
-                    continue;
-                }
-
-                var size = chp.HalfPoints / 2;
-                var name = fonts.TryGetValue(chp.Font, out var known) ? known : StyleRuns.FontName(chp.Font);
-                var (red, green, blue) = Colours[chp.Colour & 7];
-                var run = new TextRun(output.Length, 1, chp.Font, name, size > 0 ? size : 12, chp.Face, red, green, blue) { SmallCaps = chp.SmallCaps };
-                if (runs.Count > 0 && runs[^1] with { Start = run.Start, Length = 1 } == run && runs[^1].Start + runs[^1].Length == run.Start)
-                {
-                    runs[^1] = runs[^1] with { Length = runs[^1].Length + 1 };
+                        $"\"{title}\": special characters other than pictures and footnote marks are left out.");
                 }
                 else
                 {
-                    runs.Add(run);
+                    var size = chp.HalfPoints / 2;
+                    var name = fonts.TryGetValue(chp.Font, out var known) ? known : StyleRuns.FontName(chp.Font);
+                    var (red, green, blue) = Colours[chp.Colour & 7];
+                    var run = new TextRun(output.Length, shown.Length, chp.Font, name, size > 0 ? size : 12, chp.Face, red, green, blue) { SmallCaps = chp.SmallCaps };
+                    if (runs.Count > 0 && runs[^1] with { Start = run.Start, Length = run.Length } == run && runs[^1].Start + runs[^1].Length == run.Start)
+                    {
+                        runs[^1] = runs[^1] with { Length = runs[^1].Length + run.Length };
+                    }
+                    else
+                    {
+                        runs.Add(run);
+                    }
+
+                    output.Append(shown);
                 }
 
-                output.Append(shown.Value);
+                if (noteEnds.TryGetValue(i + 1, out var ending) && i >= mainLength)
+                {
+                    notePlaces[ending].End = output.Length;
+                }
             }
 
             if (tableStart is { } last)
@@ -641,10 +758,11 @@ public static class MacWordDocuments
                 tables.Add(Table(last, output.Length, tableEdges));
             }
 
-            var chapter = new DocumentChapter(1, title, new StyledText(output.ToString(), runs, true), Justification.Left, null, [], 0)
+            var chapter = new DocumentChapter(1, title, new StyledText(output.ToString(), runs, true), Justification.Left, null, pictures, 0)
             {
                 Paragraphs = formats,
                 Tables = tables,
+                Notes = [.. notePlaces.Select((n, k) => new DocumentNote(k + 1, (k + 1).ToString(CultureInfo.InvariantCulture), n.Reference, n.Start, n.End))],
             };
             return new StyledDocument(DocumentKind.Word, title, [chapter], []);
         }

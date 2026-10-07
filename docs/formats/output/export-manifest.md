@@ -614,7 +614,7 @@ has them written into `document/` beside the type folders, and `document` (§1.1
 converted only when every type is exported (no type filter). A converter that throws a data error is reported
 (`export.converter-failed`) and the next converter is tried.
 
-The built-in converters: `document.html` version 1 converts DOCMaker, SimpleText and Word documents to HTML
+The built-in converters: `document.html` version 2 converts DOCMaker, SimpleText and Word documents to HTML
 ([html.md](html.md)), the AIFF converter AIFF and AIFF-C sounds to WAV, and `document.pdf` writes PDF documents out
 as they are ([pdf.md](../documents/pdf.md)). Its diagnostics (`document.*`) join the manifest's `diagnostics`.
 

@@ -14,7 +14,7 @@ internal sealed class HtmlDocumentConverter(DecodeOptions options) : IDocumentCo
 
     public string Name => HtmlDocuments.ConverterName;
 
-    public int Version => 1;
+    public int Version => 2;                    // 2: Word documents' pictures and notes
 
     public IReadOnlyList<DocumentFile> Convert(DocumentInput input)
     {

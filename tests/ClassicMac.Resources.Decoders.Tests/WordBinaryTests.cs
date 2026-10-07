@@ -244,4 +244,119 @@ public class WordBinaryTests
         Assert.Equal(DocumentKind.Word, document.Kind);
         Assert.Contains("text-align:center", index);
     }
+
+    // --- Notes and pictures ---
+
+    private static byte[] Le32(params int[] values) => [.. values.SelectMany(BitConverter.GetBytes)];
+
+    // A footnote ([MS-DOC] PlcffndRef, PlcffndTxt) or endnote (PlcfendRef, PlcfendTxt): its auto-numbered reference
+    // ($02 with sprmCFSpec) shows its number, and its text, after the main text, is the chapter's note.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_note_s_reference_shows_its_number_and_its_text_follows_the_main_text(bool endnote)
+    {
+        var builder = Builder().Text("See\u0002 x.\r\u0002 Note.\r")
+            .Chp(3, 4, Sprm(0x0855, 1)).Chp(8, 9, Sprm(0x0855, 1));
+        if (endnote)
+        {
+            builder.EndnoteLength = 8;
+        }
+        else
+        {
+            builder.FootnoteLength = 8;
+        }
+
+        builder.Tables[endnote ? 46 : 2] = [.. Le32(3, 9), 1, 0];                    // the reference at CP 3, auto-numbered
+        builder.Tables[endnote ? 47 : 3] = Le32(0, 8, 9);
+        var diagnostics = new List<Diagnostic>();
+
+        var chapter = Assert.Single(Read(builder.Build(), diagnostics).Chapters);
+
+        var note = Assert.Single(chapter.Notes);
+        Assert.Equal("See1 x.\r1 Note.\r", chapter.Text.Text);
+        Assert.Equal((1, "1", 3, 8, 16), (note.Number, note.Mark, note.Reference, note.Start, note.End));
+        Assert.Empty(diagnostics);
+    }
+
+    // A PICF ([MS-DOC] PICFAndOfficeArtData): lcb, cbHeader $44, mm $64 (an Office Art shape), the goal size in twips at
+    // +28 and +30 and the scale in thousandths at +32 and +34; then the shape's records, a blip among them.
+    private static byte[] Picf(int width, int height, byte[] records)
+    {
+        var header = new byte[0x44];
+        BitConverter.GetBytes(0x44 + records.Length).CopyTo(header, 0);
+        BitConverter.GetBytes((short)0x44).CopyTo(header, 4);
+        BitConverter.GetBytes((short)0x64).CopyTo(header, 6);
+        BitConverter.GetBytes((short)(width * 20)).CopyTo(header, 28);
+        BitConverter.GetBytes((short)(height * 20)).CopyTo(header, 30);
+        BitConverter.GetBytes((short)1000).CopyTo(header, 32);
+        BitConverter.GetBytes((short)500).CopyTo(header, 34);                         // half height
+        return [.. header, .. records];
+    }
+
+    // An Office Art record ([MS-ODRAW] OfficeArtRecordHeader): version and instance, type, length.
+    private static byte[] Record(int version, int instance, int type, byte[] body) =>
+        [.. BitConverter.GetBytes((ushort)(version | instance << 4)), .. BitConverter.GetBytes((ushort)type), .. BitConverter.GetBytes(body.Length), .. body];
+
+    // An FBSE around a blip: btWin32, btMacOS, a UID, tag, size, cRef, foDelay, unused, cbName 0, unused (36 bytes).
+    private static byte[] Fbse(int type, byte[] blip) => Record(2, type, 0xF007, [(byte)type, (byte)type, .. new byte[16], 0, 0,
+        .. BitConverter.GetBytes(blip.Length), 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, .. blip]);
+
+    // A picture character ($01, sprmCFSpec) whose sprmCPicLocation is 0: its PICF at the start of the Data stream.
+    private static WordBinaryBuilder PictureDocument(byte[] data)
+    {
+        var builder = Builder().Text("\u0001\r").Chp(0, 1, [.. Sprm(0x0855, 1), .. Sprm(0x6A03, 0, 0, 0, 0)]);
+        builder.Data = data;
+        return builder;
+    }
+
+    [Fact]
+    public void A_PICT_blip_is_inflated_into_the_chapter_s_picture()
+    {
+        byte[] pict = [0, 30, 0, 0, 0, 0, 0, 20, 0, 40, 0x11, 0x01, 0xFF];             // a version 1 PICT, 40 × 20
+        using var deflated = new MemoryStream();
+        using (var zlib = new System.IO.Compression.ZLibStream(deflated, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
+        {
+            zlib.Write(pict);
+        }
+
+        // OfficeArtBlipPICT: a UID, then the metafile header: cbSize, rcBounds, ptSize, cbSave, compression 0 (deflate), filter.
+        byte[] header = [.. BitConverter.GetBytes(pict.Length), .. new byte[24], .. BitConverter.GetBytes((int)deflated.Length), 0, 0xFE];
+        var blip = Record(0, 0x542, 0xF01C, [.. new byte[16], .. header, .. deflated.ToArray()]);
+        var diagnostics = new List<Diagnostic>();
+
+        var chapter = Assert.Single(Read(PictureDocument(Picf(40, 20, Record(0xF, 0, 0xF004, Fbse(4, blip)))).Build(), diagnostics).Chapters);
+
+        var picture = Assert.Single(chapter.Pictures);
+        Assert.Equal((" \r", 0, PictureFormat.Pict, 40, 10), (chapter.Text.Text, picture.Anchor, picture.Format, picture.Width, picture.Height));
+        Assert.Equal(pict, picture.Picture!.Value.ToArray());
+        Assert.Empty(diagnostics);
+    }
+
+    [Theory]
+    [InlineData(0xF01E, 0x6E0, PictureFormat.Png)]
+    [InlineData(0xF01D, 0x46A, PictureFormat.Jpeg)]
+    public void A_PNG_or_JPEG_blip_is_the_picture_as_stored(int type, int instance, PictureFormat format)
+    {
+        byte[] image = [1, 2, 3, 4, 5];
+        var blip = Record(0, instance, type, [.. new byte[16], 0xFF, .. image]);         // a UID, the tag, the file
+
+        var chapter = Assert.Single(Read(PictureDocument(Picf(8, 8, Fbse(type - 0xF018, blip))).Build()).Chapters);
+
+        var picture = Assert.Single(chapter.Pictures);
+        Assert.Equal(format, picture.Format);
+        Assert.Equal(image, picture.Picture!.Value.ToArray());
+    }
+
+    [Fact]
+    public void A_picture_whose_data_is_missing_is_reported_and_left_out()
+    {
+        var diagnostics = new List<Diagnostic>();
+
+        var chapter = Assert.Single(Read(PictureDocument([1, 2, 3]).Build(), diagnostics).Chapters);
+
+        Assert.Empty(chapter.Pictures);
+        Assert.Equal("\r", chapter.Text.Text);
+        Assert.Equal(["word.bad-picture"], diagnostics.Select(d => d.Code));
+    }
 }
