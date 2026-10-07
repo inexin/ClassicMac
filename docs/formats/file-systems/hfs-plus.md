@@ -331,8 +331,10 @@ For the extents overflow, catalog and attributes trees [Doc] unless marked:
    `CheckDirectory`]. CNIDs are unique. Folder records do not set the file-locked or thread-exists flags [Code: Apple
    fsck_hfs `CheckDirectory`].
 5. The root's key has parent ID 1. Every other record's `parentID` names an existing folder and every folder's
-   ancestry reaches the root. Every file and folder has a thread record (a file sets the thread-exists flag), each
-   thread points back to its record's parent and name, and no thread names a missing record [Doc].
+   ancestry reaches the root. Every file and folder has a thread record, each thread points back to its record's
+   parent and name, and no thread names a missing record [Doc]. A file sets the thread-exists flag [Doc], but one with
+   its thread and the flag clear is only reported (`hfs.plus-thread-flag`): Apple's Mac OS X 10.4.6 install DVD leaves
+   it clear on its 388 symbolic links and a `.localized` file, and boots and installs [Verified: the DVD in QEMU].
 6. `nextCatalogID` exceeds every CNID unless the IDs-reused bit is set, and is at least 16 either way [Doc].
 7. A folder's `valence` is the number of file and folder records whose parent is that folder [Doc]. On HFSX,
    `folderCount` is the number of folders inside plus directory hard-link aliases, not all children [Code: Apple
@@ -584,6 +586,7 @@ has not been followed in its code; Mac OS 9.0 does not mount HFSX at all, and th
 | `hfs.plus-hardlink-signature-invalid` | Warning | A file of type `hlnk` whose creator is not `hfs+` (creator `hfs+` alone is Apple's mark for its own files, the journal files `jrnl`/`hfs+` among them [Fitted: a journaled Mac OS X volume]), or a directory-link candidate lacks `alis`, `MACS` or `IsAlias` | Keeps it as an ordinary file | Not traced |
 | `hfs.plus-hardlink-target-missing` | Warning | A link reference has no indirect node, or a directory link's `dir_<CNID>` lacks the link-chain flag | Keeps the link with its catalog forks | Not traced |
 | `hfs.plus-valence` | Warning | A folder's `valence` is not its file and folder records (§2.4 item 7) | Reads on; First Aid repairs it | TN1150 [Doc] |
+| `hfs.plus-thread-flag` | Warning | File records' thread-exists flag is clear (their threads are there); once per volume, with the count | Reads on | Mounts it; First Aid sets the flag (§5) |
 | `hfs.plus-invalid-bsd-mode` | Warning | An initialised BSD mode does not match the record (folder not a directory, file of an unknown type) | Reads on | `fsck_hfs` `CheckBSDInfo` [Code] |
 | `hfs.plus-journal-info-invalid` | Warning | The JournalInfoBlock pointer, flags, range or allocation, the root journal files or their extents, or the journal header are inconsistent | Reads the catalog without replaying the journal | TN1150 Journal Info Block [Doc] |
 | `hfs.plus-journal-not-replayed` | Info | The volume is journaled | Reads the recorded structures | Not traced |

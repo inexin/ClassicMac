@@ -176,6 +176,7 @@ internal static class HfsPlusReader
         var catalogNodes = new Dictionary<uint, CatalogNode>();
         var catalogThreads = new Dictionary<uint, CatalogThread>();
         var catalogAttributeFlags = new Dictionary<uint, bool>();
+        var withoutThreadFlag = new List<string>();
         var catalogSecurityFlags = new Dictionary<uint, bool>();
         ulong requiredEncodingBitmap = 0;
         foreach (var (key, data) in records)
@@ -250,9 +251,12 @@ internal static class HfsPlusReader
 
                     catalogAttributeFlags.Add(fileId, (dataReader.ReadUInt16At(2) & HasAttributesMask) != 0);
                     catalogSecurityFlags.Add(fileId, (dataReader.ReadUInt16At(2) & HasSecurityMask) != 0);
+                    // The thread-exists flag clear: reported, and read on (the file's thread is found by its CNID, and a
+                    // missing thread is still refused). Apple's Mac OS X 10.4.6 install DVD leaves it clear on its
+                    // symbolic links and boots (hfs-plus.md §2.4).
                     if ((dataReader.ReadUInt16At(2) & 0x0002) == 0)
                     {
-                        throw new InvalidDataException("An HFS Plus file is missing its required thread flag.");
+                        withoutThreadFlag.Add(Name(keyReader));
                     }
 
                     ValidateCatalogObjectName(keyReader);
@@ -301,6 +305,13 @@ internal static class HfsPlusReader
                     throw new InvalidDataException($"Unknown HFS Plus catalog record type {dataReader.ReadUInt16At(0)}.");
             }
         }
+        if (withoutThreadFlag.Count > 0)
+        {
+            context.Report(DiagnosticSeverity.Warning, "hfs.plus-thread-flag", withoutThreadFlag.Count == 1
+                ? $"The HFS Plus file '{withoutThreadFlag[0]}' does not have its thread-exists flag set."
+                : $"{withoutThreadFlag.Count} HFS Plus files ('{withoutThreadFlag[0]}' first) do not have their thread-exists flag set.");
+        }
+
         foreach (uint fileId in attributeFileIds)
         {
             if (!catalogIds.Contains(fileId) && fileId is not (>= 3 and <= 8))

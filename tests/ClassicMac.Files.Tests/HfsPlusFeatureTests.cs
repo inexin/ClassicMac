@@ -4053,13 +4053,17 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    // A file whose thread-exists flag is clear but which has its thread reads, with a warning: Apple's Mac OS X 10.4.6
+    // install DVD leaves the flag clear on its 388 symbolic links and a .localized file, and boots and installs.
     [Fact]
-    public void HfsPlusFileThreadFlagMustBeSet()
+    public void HfsPlusFileWithItsThreadButNoThreadFlagIsReadWithAWarning()
     {
         byte[] image = HfsPlusFixture.Build(missingFileThreadFlag: true);
+        var diagnostics = new List<Diagnostic>();
 
-        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
-            ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics)));
+        var warning = Assert.Single(diagnostics, d => d.Code == "hfs.plus-thread-flag");
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
     }
 
     [Fact]
