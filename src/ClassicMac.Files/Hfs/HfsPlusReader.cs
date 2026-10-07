@@ -472,9 +472,10 @@ internal static class HfsPlusReader
                     folderCounts[parentId] = checked(count + 1);
                 }
             }
+            // Only a folder with the has-folder-count flag keeps the count: Mac OS X 10.4 writes neither (hfs-plus.md §2.4).
             foreach (var (folderId, folder) in folders)
             {
-                if (folder.FolderCount != folderCounts[folderId])
+                if ((folder.Flags & 0x0010) != 0 && folder.FolderCount != folderCounts[folderId])
                 {
                     context.Report(DiagnosticSeverity.Info, "hfs.plus-folder-count",
                         $"HFSX folder {folderId} records {folder.FolderCount} enclosed folders, but {folderCounts[folderId]} are present.");

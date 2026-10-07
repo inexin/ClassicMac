@@ -273,12 +273,13 @@ internal sealed class PlusCatalogScan
             }
         }
 
-        // HFSX: each folder's has-folder-count flag set, and its folder count its folders and directory hard links
-        // [Code: Apple fsck_hfs CheckFolderCount, reference only; hfs-plus.md §2.4].
+        // HFSX: a folder with the has-folder-count flag keeps its folders and directory hard links in its folder count
+        // [Code: Apple fsck_hfs CheckFolderCount, reference only]; one without it (as Mac OS X 10.4 writes them) keeps none,
+        // and its fsck_hfs finds it OK [Verified: Mac OS X 10.4.6; hfs-plus.md §2.4].
         if (run.Hfsx)
         {
             var expected = FolderCounts(run.Catalog!.Records.ConvertAll(r => (r.Key, r.Data)));
-            if (folderCounts.Any(f => !f.Value.Flagged || f.Value.Count != expected.GetValueOrDefault(f.Key)))
+            if (folderCounts.Any(f => f.Value.Flagged && f.Value.Count != expected.GetValueOrDefault(f.Key)))
             {
                 run.Problem("A folder's folder count is not its folders", "firstaid.folder-count", FirstAidRepairs.Valences);
             }

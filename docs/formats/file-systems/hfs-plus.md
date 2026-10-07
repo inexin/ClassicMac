@@ -337,8 +337,12 @@ For the extents overflow, catalog and attributes trees [Doc] unless marked:
    it clear on its 388 symbolic links and a `.localized` file, and boots and installs [Verified: the DVD in QEMU].
 6. `nextCatalogID` exceeds every CNID unless the IDs-reused bit is set, and is at least 16 either way [Doc].
 7. A folder's `valence` is the number of file and folder records whose parent is that folder [Doc]. On HFSX,
-   `folderCount` is the number of folders inside plus directory hard-link aliases, not all children [Code: Apple
-   fsck_hfs `CheckFolderCount`]; Apple's verifier sets a missing has-folder-count flag before comparing.
+   a folder with the has-folder-count flag (`$0010`) keeps the number of folders inside plus directory hard-link
+   aliases, not all children, in `folderCount` [Code: Apple fsck_hfs `CheckFolderCount`]. Mac OS X 10.4 writes every
+   HFSX folder without the flag and with a count of 0, does not keep the count up, and its `fsck_hfs` finds such a
+   volume OK [Verified: Mac OS X 10.4.6 `newfs_hfs -s` and `-s -J` volumes]; so a folder without the flag is not
+   counted. (Later `fsck_hfs` sets a missing flag before comparing [Code]; ClassicMac does not, so 10.4 can keep
+   using the volume.)
 8. `fileCount` is the number of file records and `folderCount` the number of folder records less the root, private
    hard-link inode files and directory inodes included [Doc].
 9. `encodingsBitmap` has the bit of every record's `textEncoding`: encodings below 64 use the same-numbered bit,
@@ -464,8 +468,9 @@ Everything else is reported and the volume read (§6):
 
 - The alternate header's absence or mismatch; the volume-inconsistent and journaled bits.
 - The journal (§2.7): ClassicMac never replays it and reads the on-disk structures as they are.
-- Counts: `fileCount` and `folderCount` against the catalog before hard links are resolved; HFSX `folderCount` whether
-  or not its flag is set; `freeBlocks`; the spared-blocks bit; `encodingsBitmap`.
+- Counts: `fileCount` and `folderCount` against the catalog before hard links are resolved; an HFSX folder's
+  `folderCount` when its has-folder-count flag is set (§2.4 item 7); `freeBlocks`; the spared-blocks bit;
+  `encodingsBitmap`.
 - An attributes tree with `btreeType` `$FF`, seen on the reference image (§7), is read.
 - Attribute records for unknown CNIDs; has-attributes and has-security flags; the ACL attribute's magic, entry count,
   payload length and ACE kinds (principals, flags and rights are not checked); BSD modes.
@@ -485,8 +490,9 @@ numbers and words where they mean the same. The rules are TN1150's; where Disk F
 traced, the choices are ClassicMac's [ClassicMac]. HFSX (`'HX'`, version 5, never wrapped) is checked the same way:
 its catalog in the order its header's `keyCompareType` names (`$CF` case folding, `$BC` binary, so names differing
 only in case are distinct; any other is `firstaid.key-compare-type`, not repaired), kept when repair writes it again;
-and each folder's has-folder-count flag set and its `folderCount` its folders and directory hard-link aliases (§2.4
-item 7; `firstaid.folder-count`, repaired). A volume the reader refuses (§5.2) is still checked and repaired: `check`, the edit session and
+and each folder with the has-folder-count flag keeping its folders and directory hard-link aliases in `folderCount`
+(§2.4 item 7; `firstaid.folder-count`, repaired; a folder without the flag is left without it) [Verified: repairs of
+Mac OS X 10.4.6 HFSX volumes, plain and journaled, mount in 10.4 and pass its `fsck_hfs`]. A volume the reader refuses (§5.2) is still checked and repaired: `check`, the edit session and
 `repair` know it by its signature at byte 1024.
 
 1. **"Checking disk volume."**: the volume is the image (`'H+'` at 1024) or a wrapper's `drEmbedExtent`. A journaled
@@ -572,7 +578,7 @@ has not been followed in its code; Mac OS 9.0 does not mount HFSX at all, and th
 | `hfs.plus-counts` | Info | The catalog's file or folder records differ from `fileCount`/`folderCount` | Reports only | Not traced |
 | `hfs.plus-encoding-bitmap` | Info | A record's text encoding has no bit in `encodingsBitmap` | Reports only | Not traced |
 | `hfs.plus-file-link-count-invalid` | Warning | A regular file that is not a recognised link has a link count over 1 | Keeps the file and its forks | `fsck_hfs` checks the count [Code] |
-| `hfs.plus-folder-count` | Info | An HFSX folder's `folderCount` differs from its folders and directory-link aliases | Reports only | `fsck_hfs` repairs the stored count [Code] |
+| `hfs.plus-folder-count` | Info | An HFSX folder with the has-folder-count flag has a `folderCount` other than its folders and directory-link aliases | Reports only | `fsck_hfs` repairs the stored count [Code] |
 | `hfs.plus-free-blocks` | Info | The bitmap's free blocks differ from `freeBlocks` | Reports only | Not traced |
 | `hfs.plus-hardlink-alias-has-data` | Warning | A hard-link alias has allocated data-fork blocks | Reads the link through its indirect node | `fsck_hfs` checks alias data forks [Code] |
 | `hfs.plus-hardlink-ancestor-flag-missing` | Warning | A folder above a directory-link alias lacks the has-child-link flag | Keeps the aliases and their contents | `dirhardlink.c` checks ancestor flags [Code] |

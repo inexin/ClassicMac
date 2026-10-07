@@ -266,8 +266,10 @@ public sealed class HfsPlusFeatureTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-folder-count");
     }
 
+    // Mac OS X 10.4 writes HFSX folders without the has-folder-count flag and with a count of 0; its fsck_hfs finds them
+    // OK, so the count means nothing until the flag is set [Verified: Mac OS X 10.4.6 newfs_hfs -s and fsck_hfs].
     [Fact]
-    public void HfsXReportsAFolderCountMismatchEvenWhenItsFlagIsClear()
+    public void HfsXIgnoresTheFolderCountWhenItsFlagIsClear()
     {
         byte[] image = HfsPlusFixture.Build(hfsX: true, catalogFolderCount: 1);
         var diagnostics = new List<Diagnostic>();
@@ -275,8 +277,7 @@ public sealed class HfsPlusFeatureTests
         Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
             new ContainerContext(diagnostics: diagnostics)));
 
-        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-folder-count" &&
-            diagnostic.Severity == DiagnosticSeverity.Info);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-folder-count");
     }
 
     [Fact]

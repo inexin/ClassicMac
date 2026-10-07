@@ -189,7 +189,8 @@ internal sealed class PlusCatalogRepair
         }
     }
 
-    // HFSX: each folder's has-folder-count flag set and its folder count its folders and directory hard links.
+    // HFSX: each folder with the has-folder-count flag gets its folders and directory hard links as its folder count; one
+    // without it stays so, as Mac OS X 10.4 would not keep the count up (hfs-plus.md §2.4).
     private void FolderCounts()
     {
         if (!run.Hfsx)
@@ -201,9 +202,8 @@ internal sealed class PlusCatalogRepair
         foreach (var (_, data) in records.Where(r => Type(r.Data) == Folder && r.Data.Length >= 88))
         {
             uint id = Id(data), count = counts.GetValueOrDefault(id), old = new BigEndianReader(data).ReadUInt32At(84);
-            if ((data[3] & 0x10) == 0 || old != count)
+            if ((data[3] & 0x10) != 0 && old != count)
             {
-                data[3] |= 0x10;
                 new BigEndianWriter(data).WriteUInt32At(84, count);
                 Add(id, $"the folder count set from {old} to {count}");
             }

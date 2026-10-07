@@ -61,6 +61,29 @@ public class FirstAidHfsxTests
         ReadsClean(result.Volume!);
     }
 
+    // Mac OS X 10.4's HFSX: no folder has the has-folder-count flag, every count 0 [Verified: Mac OS X 10.4.6 newfs_hfs -s,
+    // its fsck_hfs finding such volumes OK]. They verify clean, and a repair of something else leaves the flags clear, as
+    // 10.4 does not keep the counts up.
+    [Fact]
+    public void Folders_without_the_folder_count_flag_are_not_counted_and_stay_so()
+    {
+        var image = Volume(caseSensitive: true);
+        foreach (var (_, data) in Records(image).Where(r => U16(image, r.Data) == 1).ToList())
+        {
+            image[data + 3] &= unchecked((byte)~0x10);
+            Put32(image, data + 84, 0);
+        }
+
+        Assert.Equal(FirstAidVerdict.AppearsOk, Verify(image).Verdict);
+
+        Put32(image, Record(image, HfsPlusBuilder.Root, "Docs") + 4, 9);         // valence
+        var result = HfsFirstAid.Repair(ForkData.FromBytes(image));
+
+        Assert.Equal(FirstAidVerdict.AppearsOk, result.After.Verdict);
+        Assert.All(Records(result.Volume!).Where(r => U16(result.Volume!, r.Data) == 1),
+            r => Assert.Equal((0, 0u), (result.Volume![r.Data + 3] & 0x10, U32(result.Volume!, r.Data + 84))));
+    }
+
     // A case-sensitive catalog repaired keeps its binary order: both names stay, each with its own data.
     [Fact]
     public void A_case_sensitive_catalog_is_repaired_in_its_own_order()

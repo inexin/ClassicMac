@@ -127,10 +127,12 @@ Standing decisions, with their dates; superseded ones are dropped.
 
 In rough priority; each item names what blocks it, if anything.
 
-1. **HFSX live**: HFS passes Disk First Aid 8.5.5 live (27 repaired faults, clean disks), HFS Plus repairs on Mac OS
+1. **HFS Plus live**: HFS passes Disk First Aid 8.5.5 live (27 repaired faults, clean disks), HFS Plus repairs on Mac OS
    9-made volumes pass it too, and so do edits with overflow extents, writes to several partitions, and new and edited
-   NDIF images (mounted in Disk Copy 6.3.3). HFSX has been tried only on built volumes: it needs Mac OS X 10.3 or later
-   (fsck_hfs), which the harness does not have.
+   NDIF images (mounted in Disk Copy 6.3.3). HFSX passes Mac OS X 10.4.6's own check: volumes its `newfs_hfs -s`
+   made (plain and journaled) read byte for byte, and repairs of their counts and valences mount in 10.4 and pass its
+   `fsck_hfs`. Still to do: HFS Plus symbolic links are shown by `stat` as aliases, and `get --follow` does not follow
+   them.
 2. **Fuzzing**: `tools/Fuzz` runs libFuzzer through SharpFuzz nightly (`.github/workflows/fuzz.yml`, five minutes a
    target) on fifteen targets: containers, resource forks, single resources through every decoder, 68k and PowerPC
    code, PEF, PICT on both QuickDraws, TIFF, WAV and First Aid; and the writers, where the input chooses what is
